@@ -76,7 +76,7 @@ def worksheet(number, role, rng, rows=80, cols=12):
     return f'<worksheet xmlns="{SHEET}"><dimension ref="A1:{column(cols)}{rows}"/><sheetData>{"".join(lines)}</sheetData>{drawing}</worksheet>'
 
 
-def workbook(path, role, seed, sheets=3, rows=80, cols=12):
+def workbook(path, role, seed, sheets=3, rows=295, cols=12):
     rng = random.Random(f"{seed}:{role}:{path.name}")
     macro = path.suffix == ".xlsm"
     main_type = "application/vnd.ms-excel.sheet.macroEnabled.main+xml" if macro else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
@@ -110,7 +110,7 @@ def shape(name, text, ident=2, split=False):
     return f'<p:sp><p:nvSpPr><p:cNvPr id="{ident}" name="{xml(name)}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p>{paragraph}</a:p></p:txBody></p:sp>'
 
 
-def presentation(path, seed, slides=8, shapes_per_slide=6):
+def presentation(path, seed, slides=165, shapes_per_slide=8):
     rng = random.Random(f"{seed}:{path.name}")
     slide_ids = ''.join(f'<p:sldId id="{255+i}" r:id="rId{i}"/>' for i in range(1, slides + 1))
     group = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>'
@@ -145,7 +145,7 @@ def paragraph(text, split=False):
     return '<w:p>' + ''.join(f'<w:r><w:t>{xml(piece)}</w:t></w:r>' for piece in pieces) + '</w:p>'
 
 
-def word_document(path, seed, paragraphs=50):
+def word_document(path, seed, paragraphs=3400):
     rng = random.Random(f"{seed}:{path.name}")
     body = [paragraph("Beacon field guide"), paragraph("BEACON followup", True)]
     body.extend(paragraph(f"Section {i:03d}: regional operations record {rng.randrange(100000, 999999)}. This paragraph carries stable sample content for search and extraction.") for i in range(3, paragraphs + 1))
@@ -199,10 +199,12 @@ def generate(output, profile, seed):
     (root / "spreadsheets" / "~$temporary.xlsx").write_bytes(b"excluded office temporary file")
     (root / "notes" / "legacy.xls").write_bytes(b"unsupported format beacon")
     if profile == "load":
+        for i in range(1, 33):
+            workbook(output / "load" / f"book-{i:03d}.xlsx", "load", seed, sheets=5, rows=150, cols=16)
+            presentation(output / "load" / f"slides-{i:03d}.pptx", seed)
+        for i in range(1, 32):
+            word_document(output / "load" / f"report-{i:03d}.docx", seed)
         for i in range(1, 21):
-            workbook(output / "load" / f"book-{i:03d}.xlsx", "load", seed, sheets=5, rows=250, cols=16)
-            presentation(output / "load" / f"slides-{i:03d}.pptx", seed, slides=20, shapes_per_slide=8)
-            word_document(output / "load" / f"report-{i:03d}.docx", seed, paragraphs=150)
             text_document(output / "load" / f"notes-{i:03d}.txt", seed, lines=1000)
     shutil.copyfile(HERE / "backend-cases.json", output / "backend-cases.json")
     manifest = {"schemaVersion": 1, "profile": profile, "seed": seed, "files": sorted(str(p.relative_to(output)).replace("\\", "/") for p in output.rglob("*") if p.is_file() and p.name != "backend-cases.json")}

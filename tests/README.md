@@ -26,7 +26,7 @@ python .\tests\generate-fixtures.py
 python .\tests\generate-fixtures.py --output C:\Temp\doc-search-corpus --profile load
 ```
 
-`acceptance` プロファイルは `search/` に 16 ファイルを作ります。対象10拡張子、入れ子のフォルダー、非表示シート・スライド、Excel の共有文字列・セル・保存済み数式結果・図形、PowerPoint の図形・表、Word の本文・入れ子表、UTF-8 と BOM、破損・不正 UTF-8・対象外形式・Office 一時ファイルを含みます。`.jsp`、`.xhtml`、`.html`、`.js`、`.java` はそれぞれ1ファイルです。Excel は 3 シート各 80 行 × 12 列、PowerPoint は 8 スライド各 6 図形、Word は 50 本文段落と表、テキストは各 150 行を生成します。`load` は `search/` の内容に加えて、独立した `load/` に各 20 個の Excel・PowerPoint・Word・テキストファイルを生成し、合計96ファイルになります。性能の合格時間はここでは定めません。
+`acceptance` プロファイルは `search/` に 16 ファイルを作ります。対象10拡張子、入れ子のフォルダー、非表示シート・スライド、Excel の共有文字列・セル・保存済み数式結果・図形、PowerPoint の図形・表、Word の本文・入れ子表、UTF-8 と BOM、破損・不正 UTF-8・対象外形式・Office 一時ファイルを含みます。`.jsp`、`.xhtml`、`.html`、`.js`、`.java` はそれぞれ1ファイルです。Excel は 3 シート各 295 行 × 12 列、PowerPoint は 165 スライド各 8 図形、Word は 3400 本文段落と表、テキストは各 150 行を生成します。`load` は `search/` の内容に加えて、独立した `load/` に Excel 32 個、PowerPoint 32 個、Word 31 個、テキスト 20 個を生成し、合計131ファイルになります。正常な Office 文書は両ディレクトリを合わせて100ファイルで、各ファイルはおおむね 0.5 MB（45万～55万バイト）です。破損した `.xlsx`、Office 一時ファイル、対象外の `.xls` はこの100ファイルに含めません。性能の合格時間はここでは定めません。
 
 固定シードは `20260927` です。乱数は各ファイル名から独立に初期化し、ZIP 内の時刻・格納順も固定します。同じプロファイル、ジェネレータ、検証ケース原本からは同じバイト列を出力します。シードや内容を変更する場合は、期待結果と一緒に更新します。
 
