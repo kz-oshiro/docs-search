@@ -14,7 +14,13 @@ struct SearchState(Mutex<Option<ActiveSearch>>);
 #[tauri::command]
 async fn pick_folder() -> Option<String> {
     tauri::async_runtime::spawn_blocking(|| {
-        rfd::FileDialog::new()
+        let mut dialog = rfd::FileDialog::new();
+        if let Ok(executable) = std::env::current_exe() {
+            if let Some(directory) = executable.parent() {
+                dialog = dialog.set_directory(directory);
+            }
+        }
+        dialog
             .pick_folder()
             .map(|p| p.to_string_lossy().into_owned())
     })
