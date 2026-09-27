@@ -168,6 +168,7 @@ def text_document(path, seed, lines=150, bom=False):
         content[24] = "beacon beta"
         content[69] = "literal a+b expression"
         content[70] = "decomposed cafe\u0301 and Straße"
+        content[99] = "UTF-8 の日本語サンプル"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(("\ufeff" if bom else "").encode("utf-8") + ("\n".join(content) + "\n").encode("utf-8"))
 
@@ -189,9 +190,11 @@ def generate(output, profile, seed):
     word_document(root / "documents" / "operations-guide.docx", seed)
     text_document(root / "notes" / "research-log.txt", seed)
     text_document(root / "notes" / "bom-note.txt", seed, bom=True)
+    (root / "notes" / "shift-jis.txt").write_bytes("Shift_JIS の文書\n日本語①を検索\n".encode("cp932"))
     code_document(root / "code" / "sample.jsp", '<%@ page contentType="text/html" %>\n<p>Beacon JSP sample</p>\n')
     code_document(root / "code" / "sample.xhtml", '<?xml version="1.0"?>\n<html><body>Beacon XHTML sample</body></html>\n')
     code_document(root / "code" / "sample.html", '<!doctype html>\n<p>Beacon HTML sample</p>\n')
+    (root / "code" / "shift-jis.html").write_bytes('<meta charset="Shift_JIS">\n<p>日本語①を検索</p>\n'.encode("cp932"))
     code_document(root / "code" / "sample.js", 'const label = "Beacon JS sample";\n')
     code_document(root / "code" / "sample.java", 'class Sample { String label = "Beacon Java sample"; }\n')
     (root / "spreadsheets" / "broken.xlsx").write_bytes(b"not an OOXML archive")

@@ -36,11 +36,16 @@ class GeneratorTests(unittest.TestCase):
             manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
             cases = json.loads((first / "backend-cases.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["seed"], cases["seed"])
-            self.assertEqual(len(manifest["files"]), 16)
+            self.assertEqual(len(manifest["files"]), 18)
             self.assertEqual(set(manifest["files"]), {name for name in left if name.startswith("search/")})
             self.assertEqual([p.suffix for p in (first / "search").rglob("*") if p.is_file()].count(".xlsx"), 4)
             for suffix in (".jsp", ".xhtml", ".html", ".js", ".java"):
-                self.assertEqual(sum(name.startswith("search/code/") and name.endswith(suffix) for name in manifest["files"]), 1)
+                expected = 2 if suffix == ".html" else 1
+                self.assertEqual(sum(name.startswith("search/code/") and name.endswith(suffix) for name in manifest["files"]), expected)
+            for name in ("notes/shift-jis.txt", "code/shift-jis.html"):
+                data = (first / "search" / name).read_bytes()
+                self.assertIn("日本語①".encode("cp932"), data)
+                self.assertNotIn("日本語①".encode("utf-8"), data)
 
             for case in cases["cases"]:
                 expected = case["expected"]
@@ -72,8 +77,8 @@ class GeneratorTests(unittest.TestCase):
             subprocess.run([sys.executable, str(GENERATOR), "--output", str(output), "--profile", "load"], check=True, capture_output=True)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["profile"], "load")
-            self.assertEqual(len(manifest["files"]), 131)
-            self.assertEqual(sum(name.startswith("search/") for name in manifest["files"]), 16)
+            self.assertEqual(len(manifest["files"]), 133)
+            self.assertEqual(sum(name.startswith("search/") for name in manifest["files"]), 18)
             self.assertEqual(sum(name.startswith("load/") for name in manifest["files"]), 115)
             for suffix, count in ((".xlsx", 32), (".pptx", 32), (".docx", 31), (".txt", 20)):
                 self.assertEqual(sum(name.startswith("load/") and name.endswith(suffix) for name in manifest["files"]), count)

@@ -11,7 +11,7 @@
       "expected": {
         "accepted": true,
         "finished": "completed",
-        "counts": { "discoveredFiles": 14, "processedFiles": 14, "resultCount": 18, "issueCount": 2 },
+        "counts": { "discoveredFiles": 16, "processedFiles": 16, "resultCount": 18, "issueCount": 2 },
         "results": [
           { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Hidden", "cellAddress": "A1" }, "textContains": "hidden-beacon" },
           { "file": "nested/quarterly-ledger.xlsm", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "A1" }, "textContains": "BEACON macro value" },
@@ -63,7 +63,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search", "query": "filename-token", "recursive": true },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 9, "processedFiles": 9, "resultCount": 1, "issueCount": 2 },
+        "counts": { "discoveredFiles": 10, "processedFiles": 10, "resultCount": 1, "issueCount": 2 },
         "results": [{ "file": "spreadsheets/filename-token.xlsx", "sourceKind": "fileName", "location": {}, "textContains": "filename-token.xlsx" }],
         "issues": [
           { "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" },
@@ -77,7 +77,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "a+b", "recursive": true },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "counts": { "discoveredFiles": 4, "processedFiles": 4, "resultCount": 1, "issueCount": 1 },
         "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 70 }, "textContains": "literal a+b expression" }],
         "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
       }
@@ -88,7 +88,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "CAFÉ", "recursive": true },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "counts": { "discoveredFiles": 4, "processedFiles": 4, "resultCount": 1, "issueCount": 1 },
         "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 71 }, "textContains": "decomposed café" }],
         "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
       }
@@ -99,7 +99,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "STRASSE", "recursive": true },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "counts": { "discoveredFiles": 4, "processedFiles": 4, "resultCount": 1, "issueCount": 1 },
         "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 71 }, "textContains": "Straße" }],
         "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
       }
@@ -110,7 +110,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "no-such-marker-8723", "recursive": true },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 0, "issueCount": 1 },
+        "counts": { "discoveredFiles": 4, "processedFiles": 4, "resultCount": 0, "issueCount": 1 },
         "results": [],
         "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
       }
@@ -133,7 +133,7 @@
       "request": { "rootDirectory": "${fixtureRoot}/search/code", "query": "beacon", "recursive": true, "extensions": ["jsp", "xhtml", "html", "js", "java"] },
       "expected": {
         "accepted": true, "finished": "completed",
-        "counts": { "discoveredFiles": 5, "processedFiles": 5, "resultCount": 5, "issueCount": 0 },
+        "counts": { "discoveredFiles": 6, "processedFiles": 6, "resultCount": 5, "issueCount": 0 },
         "results": [
           { "file": "code/sample.jsp", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon JSP sample" },
           { "file": "code/sample.xhtml", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon XHTML sample" },
@@ -142,6 +142,21 @@
           { "file": "code/sample.java", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Java sample" }
         ],
         "issues": []
+      }
+    },
+    {
+      "id": "mixed-utf8-and-shift-jis-text",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "日本語", "recursive": true, "extensions": ["txt", "html"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 6, "processedFiles": 6, "resultCount": 3, "issueCount": 1 },
+        "results": [
+          { "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 100 }, "textContains": "UTF-8 の日本語サンプル" },
+          { "file": "notes/shift-jis.txt", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "日本語①を検索" },
+          { "file": "code/shift-jis.html", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "日本語①を検索" }
+        ],
+        "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
       }
     },
     {

@@ -1,3 +1,4 @@
+use encoding_rs::SHIFT_JIS;
 use roxmltree::{Document, Node};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -211,11 +212,24 @@ fn read_archive<R: Read + Seek>(reader: R) -> Result<HashMap<String, String>, Ex
 }
 
 pub fn text_units(bytes: &[u8]) -> Result<Vec<Unit>, ExtractError> {
-    let text = std::str::from_utf8(bytes).map_err(|_| ExtractError {
-        code: "unsupportedEncoding",
-        message: "UTF-8 として読めません。".into(),
-    })?;
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let text = if bytes.starts_with(&[0xef, 0xbb, 0xbf]) {
+        // A UTF-8 BOM identifies the encoding even when the remaining bytes are damaged.
+        std::str::from_utf8(&bytes[3..])
+            .map(std::borrow::Cow::Borrowed)
+            .map_err(|_| ExtractError {
+                code: "unsupportedEncoding",
+                message: "UTF-8 BOM のあるファイルを UTF-8 として読めません。".into(),
+            })?
+    } else if let Ok(utf8) = std::str::from_utf8(bytes) {
+        std::borrow::Cow::Borrowed(utf8)
+    } else {
+        SHIFT_JIS
+            .decode_without_bom_handling_and_without_replacement(bytes)
+            .ok_or_else(|| ExtractError {
+                code: "unsupportedEncoding",
+                message: "UTF-8 または Shift_JIS として読めません。".into(),
+            })?
+    };
     Ok(text
         .lines()
         .enumerate()
@@ -562,6 +576,24 @@ fn word_block(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_units_decode_utf8_bom_and_shift_jis_without_replacement() {
+        let utf8 = text_units("\u{feff}日本語\n".as_bytes()).unwrap();
+        assert_eq!(utf8[0].text, "日本語");
+        let shift_jis =
+            text_units(&[0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea, 0x87, 0x40, b'\r', b'\n']).unwrap();
+        assert_eq!(shift_jis[0].text, "日本語①");
+        assert_eq!(shift_jis[0].location, json!({"lineNumber": 1}));
+        assert_eq!(
+            text_units(b"\xef\xbb\xbf\xff").unwrap_err().code,
+            "unsupportedEncoding"
+        );
+        assert_eq!(
+            text_units(b"\xff\xfe").unwrap_err().code,
+            "unsupportedEncoding"
+        );
+    }
 
     #[test]
     fn deeply_nested_word_tables_hit_resource_limit() {
