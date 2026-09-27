@@ -2,7 +2,7 @@
 
 文書をフォルダー単位で横断検索するツールです。Windows 向けの [v2.0](./v2.0/README.md) は Rust の検索コアと Rust→WebAssembly の画面で構成します。旧実装は [v1.0](./v1.0/README.md) に保存しています。
 
-v2.0 の Windows 実行ファイルは [GitHub Actions のビルド結果](https://github.com/kz-oshiro/work-tools/actions/workflows/doc-search-v2-build.yml)から取得できます。取得手順は [v2.0 の README](./v2.0/README.md#github-から実行ファイルを取得)を参照してください。
+v2.0 の Windows 実行ファイルはローカルでテスト・ビルドし、[GitHub Releases](https://github.com/kz-oshiro/work-tools/releases)から取得できます。手順は [v2.0 の README](./v2.0/README.md#ローカル-ci-と公開)を参照してください。
 
 ## 再構築版の要求仕様
 

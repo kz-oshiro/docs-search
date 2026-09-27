@@ -34,9 +34,23 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build-v2.0.ps1
 
 ビルド後は `v2.0\doc-search-desktop.exe` をダブルクリックして起動します。再ビルドの前には実行中のアプリを閉じてください。アプリ単体の起動ではターミナルを表示しません。`Build-v2.0.ps1 -Run` は開発用で、実行元の PowerShell ウィンドウが残ります。ビルドには crates.io へのアクセスが必要です。
 
-## GitHub から実行ファイルを取得
+## ローカル CI と公開
 
-[`Build doc-search v2.0` の Actions 実行一覧](https://github.com/kz-oshiro/work-tools/actions/workflows/doc-search-v2-build.yml)で、`main` の成功した実行を開き、ページ下部の **Artifacts** から `doc-search-v2.0-windows-x64` をダウンロードします。ZIP を展開すると `doc-search-desktop.exe` が入っています。v2.0 の変更を `main` に push すると自動生成され、Actions の **Run workflow** から手動でも生成できます。保存期間は実行後 90 日です。実行ファイルは Git の履歴には含めません。
+`doc-search` ディレクトリから次を実行すると、共通テストデータの検証、バックエンドの全ケース、検索コアのテスト、WASM のチェック、Windows 実行ファイルのビルドを順に行います。いずれかが失敗するとそこで停止します。初回は上記のビルドツールを準備してください。
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\v2.0\Run-Local-CI.ps1
+```
+
+成功後に残る `v2.0\doc-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。`doc-search` ディレクトリからの v2.0.0 公開例です。GitHub CLI の認証が必要です。
+
+```powershell
+git tag v2.0.0
+git push origin v2.0.0
+gh release create v2.0.0 .\v2.0\doc-search-desktop.exe --verify-tag --title "doc-search v2.0.0" --notes "Windows x64 実行ファイル"
+```
+
+公開済みの実行ファイルは [Releases](https://github.com/kz-oshiro/work-tools/releases)から取得できます。新しい版を公開するときは、その版のタグとリリースを作成します。
 
 ## 操作
 
