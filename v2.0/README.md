@@ -34,6 +34,10 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build-v2.0.ps1
 
 ビルド後は `v2.0\doc-search-desktop.exe` をダブルクリックして起動します。再ビルドの前には実行中のアプリを閉じてください。アプリ単体の起動ではターミナルを表示しません。`Build-v2.0.ps1 -Run` は開発用で、実行元の PowerShell ウィンドウが残ります。ビルドには crates.io へのアクセスが必要です。
 
+## GitHub から実行ファイルを取得
+
+[`Build doc-search v2.0` の Actions 実行一覧](https://github.com/kz-oshiro/work-tools/actions/workflows/doc-search-v2-build.yml)で、`main` の成功した実行を開き、ページ下部の **Artifacts** から `doc-search-v2.0-windows-x64` をダウンロードします。ZIP を展開すると `doc-search-desktop.exe` が入っています。v2.0 の変更を `main` に push すると自動生成され、Actions の **Run workflow** から手動でも生成できます。保存期間は実行後 90 日です。実行ファイルは Git の履歴には含めません。
+
 ## 操作
 
 検索フォルダーを入力または「選択…」で選び、検索語を入れ、対象拡張子を選んで「検索」を押します。初期状態では従来の5拡張子が選択され、新しい5拡張子は必要に応じて追加できます。選択をすべて外すと検索は開始しません。結果は到着順で表示され、一致箇所を黄色で示します。結果を選択すると絶対パスと文書内の場所を確認でき、「元ファイルを開く」「場所をコピー」を使えます。多数の結果があるときは 200 件ずつ表示し、残りは「さらに表示」で確認できます。結果件数は表示範囲にかかわらず全件です。検索中は「中断」で停止を要求できます。

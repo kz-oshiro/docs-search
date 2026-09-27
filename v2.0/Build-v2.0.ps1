@@ -21,7 +21,12 @@ function Remove-BuildDirectory([string]$path) {
         if ((Get-Item -LiteralPath $fullPath).LinkType) {
             throw "リンク先を削除しないため処理を中止します: $fullPath"
         }
-        Remove-Item -LiteralPath $fullPath -Recurse -Force
+        try {
+            Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+        } catch {
+            # Windows PowerShell can report a missing child after deleting the directory.
+            if (Test-Path -LiteralPath $fullPath) { throw }
+        }
     }
 }
 
