@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The local search window can invoke commands and receive search events.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:event:allow-listen"]
+}

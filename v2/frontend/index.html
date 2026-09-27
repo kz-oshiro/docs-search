@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>doc-search v2</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./boot.js"></script>
+</head>
+<body>
+  <main>
+    <header><h1>doc-search <span>v2</span></h1><p>フォルダー内の文書を横断検索</p></header>
+    <form id="search-form">
+      <div class="field"><label for="root">検索フォルダー</label><div class="inline"><input id="root" type="text" autocomplete="off" aria-describedby="root-error"><button id="pick" type="button">選択…</button></div><small id="root-error" class="error" role="alert"></small></div>
+      <div class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
+      <div class="actions"><button id="search" type="submit">検索</button><button id="cancel" type="button" disabled>中断</button></div>
+    </form>
+    <section class="summary" aria-live="polite"><strong id="status">待機中</strong><span id="counts">結果 0 · 処理 0 · エラー 0</span></section>
+    <div class="columns">
+      <section><h2>結果</h2><div id="results" class="results" role="list"></div><button id="more" type="button" hidden>さらに表示</button></section>
+      <aside><h2>選択した場所</h2><pre id="selection">結果を選択してください。</pre><div class="actions"><button id="open" type="button" disabled>元ファイルを開く</button><button id="copy" type="button" disabled>場所をコピー</button></div><p id="general-error" aria-live="polite"></p><h2>読み取りエラー</h2><ul id="issues"></ul></aside>
+    </div>
+  </main>
+</body>
+</html>

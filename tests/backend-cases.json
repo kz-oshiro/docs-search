@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "corpusProfile": "acceptance",
+  "seed": 20260927,
+  "pathToken": "${fixtureRoot}",
+  "cases": [
+    {
+      "id": "all-formats-and-errors",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true },
+      "expected": {
+        "accepted": true,
+        "finished": "completed",
+        "counts": { "discoveredFiles": 9, "processedFiles": 9, "resultCount": 13, "issueCount": 2 },
+        "results": [
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Hidden", "cellAddress": "A1" }, "textContains": "hidden-beacon" },
+          { "file": "nested/quarterly-ledger.xlsm", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "A1" }, "textContains": "BEACON macro value" },
+          { "file": "nested/team-briefing.pptx", "sourceKind": "shape", "location": { "slideNumber": 1, "shapeName": "Text 1" }, "textContains": "Beacon presentation title" },
+          { "file": "nested/team-briefing.pptx", "sourceKind": "shape", "location": { "slideNumber": 2, "shapeName": "Text 1" }, "textContains": "BEACON split phrase" },
+          { "file": "nested/team-briefing.pptx", "sourceKind": "slideTableCell", "location": { "slideNumber": 3, "tableName": "Evidence table", "row": 1, "column": 1 }, "textContains": "Beacon table entry" },
+          { "file": "nested/team-briefing.pptx", "sourceKind": "shape", "location": { "slideNumber": 4, "shapeName": "Text 1" }, "textContains": "Beacon hidden slide" },
+          { "file": "documents/operations-guide.docx", "sourceKind": "paragraph", "location": { "paragraphNumber": 1 }, "textContains": "Beacon field guide" },
+          { "file": "documents/operations-guide.docx", "sourceKind": "paragraph", "location": { "paragraphNumber": 2 }, "textContains": "BEACON followup" },
+          { "file": "documents/operations-guide.docx", "sourceKind": "wordTableParagraph", "location": { "tablePath": [{ "table": 1, "row": 1, "column": 1 }], "paragraphNumber": 1 }, "textContains": "Beacon table entry" },
+          { "file": "documents/operations-guide.docx", "sourceKind": "wordTableParagraph", "location": { "tablePath": [{ "table": 1, "row": 1, "column": 1 }, { "table": 1, "row": 1, "column": 1 }], "paragraphNumber": 1 }, "textContains": "Beacon nested table" },
+          { "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon alpha" },
+          { "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 25 }, "textContains": "beacon beta" },
+          { "file": "notes/bom-note.txt", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "BOM beacon" }
+        ],
+        "issues": [
+          { "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" },
+          { "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }
+        ]
+      }
+    },
+    {
+      "id": "legacy-excel-needle",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/spreadsheets", "query": "needle", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 7, "issueCount": 1 },
+        "results": [
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "fileName", "location": {}, "textContains": "needle-book.xlsx" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "A1" }, "textContains": "Alpha needle" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "B1" }, "textContains": "Inline needle" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "D1" }, "textContains": "needle" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "A2" }, "textContains": "Rich needle" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "shape", "location": { "sheetName": "Main", "shapeName": "Callout", "anchor": "C4" }, "textContains": "Shape needle" },
+          { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "shape", "location": { "sheetName": "Main", "shapeName": "LegacyBox", "anchor": "B5" }, "textContains": "VML needle" }
+        ],
+        "issues": [{ "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" }]
+      }
+    },
+    {
+      "id": "filename-only",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "filename-token", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 9, "processedFiles": 9, "resultCount": 1, "issueCount": 2 },
+        "results": [{ "file": "spreadsheets/filename-token.xlsx", "sourceKind": "fileName", "location": {}, "textContains": "filename-token.xlsx" }],
+        "issues": [
+          { "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" },
+          { "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }
+        ]
+      }
+    },
+    {
+      "id": "literal-plus",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "a+b", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 70 }, "textContains": "literal a+b expression" }],
+        "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
+      }
+    },
+    {
+      "id": "unicode-normalization-and-folding",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "CAFÉ", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 71 }, "textContains": "decomposed café" }],
+        "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
+      }
+    },
+    {
+      "id": "unicode-case-folding",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "STRASSE", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "results": [{ "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 71 }, "textContains": "Straße" }],
+        "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
+      }
+    },
+    {
+      "id": "no-content-match",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/notes", "query": "no-such-marker-8723", "recursive": true },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 0, "issueCount": 1 },
+        "results": [],
+        "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
+      }
+    },
+    {
+      "id": "empty-query-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "  ", "recursive": true },
+      "expected": { "accepted": false, "inputErrorField": "query", "events": [] }
+    },
+    {
+      "id": "missing-root-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/missing", "query": "beacon", "recursive": true },
+      "expected": { "accepted": false, "inputErrorField": "rootDirectory", "events": [] }
+    },
+    {
+      "id": "cancel-load-search",
+      "profile": "load",
+      "steps": [
+        { "operation": "startSearch", "request": { "rootDirectory": "${fixtureRoot}/load", "query": "record", "recursive": true } },
+        { "operation": "cancelSearch", "searchId": "${startedSearchId}", "when": { "afterEvent": "Started", "beforeEvent": "Finished" } }
+      ],
+      "expected": {
+        "accepted": true,
+        "finished": "cancelled",
+        "invariants": ["oneStarted", "oneFinished", "increasingSequence", "resultCountMatchesEvents", "issueCountMatchesEvents", "processedFilesNotGreaterThanDiscoveredFiles"]
+      }
+    }
+  ]
+}
