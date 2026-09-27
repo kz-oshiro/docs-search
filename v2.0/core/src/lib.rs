@@ -2,15 +2,28 @@ mod extract;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use unicode_casefold::UnicodeCaseFold;
 use unicode_normalization::UnicodeNormalization;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub use extract::Unit;
 
 const MAX_TEXT_BYTES: u64 = 32 * 1024 * 1024;
+pub const SUPPORTED_EXTENSIONS: [&str; 10] = [
+    "xlsx", "xlsm", "pptx", "docx", "txt", "jsp", "xhtml", "html", "js", "java",
+];
+pub const DEFAULT_EXTENSIONS: [&str; 5] = ["xlsx", "xlsm", "pptx", "docx", "txt"];
+
+pub fn default_extensions() -> Vec<String> {
+    DEFAULT_EXTENSIONS
+        .iter()
+        .map(|ext| (*ext).to_owned())
+        .collect()
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +31,8 @@ pub struct SearchRequest {
     pub root_directory: String,
     pub query: String,
     pub recursive: bool,
+    #[serde(default = "default_extensions")]
+    pub extensions: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -46,6 +61,7 @@ pub struct SearchHit {
     pub location: Value,
     pub preview_text: String,
     pub preview_truncated: bool,
+    pub match_ranges: Vec<[usize; 2]>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -101,6 +117,22 @@ pub fn validate(request: &SearchRequest) -> Result<PathBuf, InputError> {
             message: "この版はサブフォルダーを含む検索のみ対応します。",
         });
     }
+    if request.extensions.is_empty() {
+        return Err(InputError {
+            field: "extensions",
+            message: "検索する拡張子を1つ以上選んでください。",
+        });
+    }
+    if request
+        .extensions
+        .iter()
+        .any(|ext| !SUPPORTED_EXTENSIONS.contains(&ext.as_str()))
+    {
+        return Err(InputError {
+            field: "extensions",
+            message: "対応していない拡張子が含まれています。",
+        });
+    }
     let path = Path::new(&request.root_directory);
     if !path.is_dir() {
         return Err(InputError {
@@ -116,6 +148,37 @@ pub fn validate(request: &SearchRequest) -> Result<PathBuf, InputError> {
 
 pub fn normalize_fold(text: &str) -> String {
     text.nfc().case_fold().collect()
+}
+
+fn match_ranges(text: &str, needle: &str) -> Vec<[usize; 2]> {
+    if needle.is_empty() {
+        return Vec::new();
+    }
+    let mut folded = String::new();
+    let mut source_ranges = Vec::new();
+    let mut source_index = 0;
+    for grapheme in text.graphemes(true) {
+        let end = source_index + grapheme.chars().count();
+        let part = normalize_fold(grapheme);
+        source_ranges.extend(std::iter::repeat_n([source_index, end], part.len()));
+        folded.push_str(&part);
+        source_index = end;
+    }
+    debug_assert_eq!(folded, normalize_fold(text));
+
+    let mut ranges: Vec<[usize; 2]> = Vec::new();
+    for (offset, _) in folded.match_indices(needle) {
+        let start = source_ranges[offset][0];
+        let end = source_ranges[offset + needle.len() - 1][1];
+        if let Some(last) = ranges.last_mut() {
+            if start <= last[1] {
+                last[1] = end;
+                continue;
+            }
+        }
+        ranges.push([start, end]);
+    }
+    ranges
 }
 
 fn preview(value: &str, needle: &str) -> (String, bool) {
@@ -171,13 +234,13 @@ fn display_path(path: &Path) -> String {
     value.into_owned()
 }
 
-fn supported(path: &Path) -> Option<String> {
+fn supported(path: &Path, selected: &HashSet<String>) -> Option<String> {
     let name = path.file_name()?.to_string_lossy();
-    if name.starts_with("~$") {
+    let ext = path.extension()?.to_string_lossy().to_ascii_lowercase();
+    if name.starts_with("~$") && ["xlsx", "xlsm", "pptx", "docx"].contains(&ext.as_str()) {
         return None;
     }
-    let ext = path.extension()?.to_string_lossy().to_ascii_lowercase();
-    if ["xlsx", "xlsm", "pptx", "docx", "txt"].contains(&ext.as_str()) {
+    if selected.contains(&ext) {
         Some(ext)
     } else {
         None
@@ -213,6 +276,7 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
     fn hit(&mut self, path: &Path, file_type: &str, unit: Unit, needle: &str) {
         self.counts.result_count += 1;
         let (preview_text, preview_truncated) = preview(&unit.text, needle);
+        let match_ranges = match_ranges(&preview_text, needle);
         self.send(EventKind::Result {
             hit: SearchHit {
                 result_id: self.counts.result_count,
@@ -222,6 +286,7 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 location: unit.location,
                 preview_text,
                 preview_truncated,
+                match_ranges,
             },
         });
     }
@@ -237,6 +302,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
 ) -> Result<(), InputError> {
     let root = validate(&request)?;
     let needle = normalize_fold(request.query.trim());
+    let selected: HashSet<String> = request.extensions.iter().cloned().collect();
     let mut sink = Emitter {
         id: search_id,
         sequence: 0,
@@ -264,7 +330,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                                 Ok(kind) if kind.is_symlink() => (),
                                 Ok(kind) if kind.is_dir() => pending.push(path),
                                 Ok(kind) if kind.is_file() => {
-                                    if let Some(ext) = supported(&path) {
+                                    if let Some(ext) = supported(&path, &selected) {
                                         sink.counts.discovered_files += 1;
                                         files.push((path, ext));
                                         if sink.counts.discovered_files % 32 == 0 {
@@ -322,7 +388,8 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                 &needle,
             );
         }
-        let result = if file_type == "txt" {
+        let result = if ["txt", "jsp", "xhtml", "html", "js", "java"].contains(&file_type.as_str())
+        {
             fs::metadata(&path)
                 .map_err(extract::ExtractError::from)
                 .and_then(|m| {
@@ -370,4 +437,26 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         counts: sink.counts.clone(),
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{match_ranges, normalize_fold};
+
+    #[test]
+    fn match_ranges_follow_search_normalization_and_unicode_positions() {
+        assert_eq!(
+            match_ranges("予告 BEACON beacon", &normalize_fold("beacon")),
+            vec![[3, 9], [10, 16]]
+        );
+        assert_eq!(
+            match_ranges("😀 cafe\u{301}", &normalize_fold("CAFÉ")),
+            vec![[2, 7]]
+        );
+        assert_eq!(
+            match_ranges("Straße", &normalize_fold("STRASSE")),
+            vec![[0, 6]]
+        );
+        assert_eq!(match_ranges("ß", &normalize_fold("s")), vec![[0, 1]]);
+    }
 }

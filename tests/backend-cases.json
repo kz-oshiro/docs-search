@@ -7,11 +7,11 @@
     {
       "id": "all-formats-and-errors",
       "operation": "startSearch",
-      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true },
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": ["xlsx", "xlsm", "pptx", "docx", "txt", "jsp", "xhtml", "html", "js", "java"] },
       "expected": {
         "accepted": true,
         "finished": "completed",
-        "counts": { "discoveredFiles": 9, "processedFiles": 9, "resultCount": 13, "issueCount": 2 },
+        "counts": { "discoveredFiles": 14, "processedFiles": 14, "resultCount": 18, "issueCount": 2 },
         "results": [
           { "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Hidden", "cellAddress": "A1" }, "textContains": "hidden-beacon" },
           { "file": "nested/quarterly-ledger.xlsm", "sourceKind": "cell", "location": { "sheetName": "Main", "cellAddress": "A1" }, "textContains": "BEACON macro value" },
@@ -25,7 +25,12 @@
           { "file": "documents/operations-guide.docx", "sourceKind": "wordTableParagraph", "location": { "tablePath": [{ "table": 1, "row": 1, "column": 1 }, { "table": 1, "row": 1, "column": 1 }], "paragraphNumber": 1 }, "textContains": "Beacon nested table" },
           { "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon alpha" },
           { "file": "notes/research-log.txt", "sourceKind": "textLine", "location": { "lineNumber": 25 }, "textContains": "beacon beta" },
-          { "file": "notes/bom-note.txt", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "BOM beacon" }
+          { "file": "notes/bom-note.txt", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "BOM beacon" },
+          { "file": "code/sample.jsp", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon JSP sample" },
+          { "file": "code/sample.xhtml", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon XHTML sample" },
+          { "file": "code/sample.html", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon HTML sample" },
+          { "file": "code/sample.js", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JS sample" },
+          { "file": "code/sample.java", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Java sample" }
         ],
         "issues": [
           { "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" },
@@ -121,6 +126,57 @@
       "operation": "startSearch",
       "request": { "rootDirectory": "${fixtureRoot}/missing", "query": "beacon", "recursive": true },
       "expected": { "accepted": false, "inputErrorField": "rootDirectory", "events": [] }
+    },
+    {
+      "id": "selected-code-formats",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/code", "query": "beacon", "recursive": true, "extensions": ["jsp", "xhtml", "html", "js", "java"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 5, "processedFiles": 5, "resultCount": 5, "issueCount": 0 },
+        "results": [
+          { "file": "code/sample.jsp", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon JSP sample" },
+          { "file": "code/sample.xhtml", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon XHTML sample" },
+          { "file": "code/sample.html", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon HTML sample" },
+          { "file": "code/sample.js", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JS sample" },
+          { "file": "code/sample.java", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Java sample" }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "selected-js-only",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": ["js"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 1, "issueCount": 0 },
+        "results": [{ "file": "code/sample.js", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JS sample" }],
+        "issues": []
+      }
+    },
+    {
+      "id": "selected-xlsx-only",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": ["xlsx"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 3, "processedFiles": 3, "resultCount": 1, "issueCount": 1 },
+        "results": [{ "file": "spreadsheets/needle-book.xlsx", "sourceKind": "cell", "location": { "sheetName": "Hidden", "cellAddress": "A1" }, "textContains": "hidden-beacon" }],
+        "issues": [{ "file": "spreadsheets/broken.xlsx", "stage": "read", "code": "unreadable" }]
+      }
+    },
+    {
+      "id": "empty-extensions-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": [] },
+      "expected": { "accepted": false, "inputErrorField": "extensions", "events": [] }
+    },
+    {
+      "id": "unsupported-extension-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": ["pdf"] },
+      "expected": { "accepted": false, "inputErrorField": "extensions", "events": [] }
     },
     {
       "id": "cancel-load-search",

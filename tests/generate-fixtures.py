@@ -172,6 +172,11 @@ def text_document(path, seed, lines=150, bom=False):
     path.write_bytes(("\ufeff" if bom else "").encode("utf-8") + ("\n".join(content) + "\n").encode("utf-8"))
 
 
+def code_document(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def generate(output, profile, seed):
     output = output.resolve()
     if output.exists() and any(output.iterdir()):
@@ -184,6 +189,11 @@ def generate(output, profile, seed):
     word_document(root / "documents" / "operations-guide.docx", seed)
     text_document(root / "notes" / "research-log.txt", seed)
     text_document(root / "notes" / "bom-note.txt", seed, bom=True)
+    code_document(root / "code" / "sample.jsp", '<%@ page contentType="text/html" %>\n<p>Beacon JSP sample</p>\n')
+    code_document(root / "code" / "sample.xhtml", '<?xml version="1.0"?>\n<html><body>Beacon XHTML sample</body></html>\n')
+    code_document(root / "code" / "sample.html", '<!doctype html>\n<p>Beacon HTML sample</p>\n')
+    code_document(root / "code" / "sample.js", 'const label = "Beacon JS sample";\n')
+    code_document(root / "code" / "sample.java", 'class Sample { String label = "Beacon Java sample"; }\n')
     (root / "spreadsheets" / "broken.xlsx").write_bytes(b"not an OOXML archive")
     (root / "notes" / "invalid-utf8.txt").write_bytes(b"invalid utf8: \xff\xfe\n")
     (root / "spreadsheets" / "~$temporary.xlsx").write_bytes(b"excluded office temporary file")

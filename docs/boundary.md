@@ -22,7 +22,7 @@ GUI は文書形式の内部構造を解析しない。バックエンドは画�
 | `cancelSearch` | 検索 ID | 中断要求を受理する。同じ ID への再要求は安全。終了済み ID への要求は状態を変えない。 |
 | 通知の購読 | 検索 ID | 受理済み検索のイベントを順次受け取る。開始前に受信準備を整えられること。 |
 
-`SearchRequest` は少なくとも `rootDirectory`（検索対象フォルダーのパス）、`query`（検索語）、`recursive`（初期版では真）を持つ。対応形式は初期版では [全体仕様](./requirements.md) の 5 形式で固定し、GUI から形式ごとの実装名や解析設定を渡さない。
+`SearchRequest` は `rootDirectory`（検索対象フォルダーのパス）、`query`（検索語）、`recursive`（現行版では真）を持ち、`extensions`（検索対象の拡張子の配列）を指定できる。`extensions` の要素は先頭のドットを付けない小文字の拡張子で、[全体仕様](./requirements.md) の10種類から選ぶ。空配列や未対応の値は入力エラーとし、未指定なら従来の5種類（`xlsx`、`xlsm`、`pptx`、`docx`、`txt`）を選ぶ。GUI から形式ごとの実装名や解析設定を渡さない。
 
 ## 通知の共通規則
 
@@ -44,10 +44,11 @@ GUI は文書形式の内部構造を解析しない。バックエンドは画�
 | --- | --- |
 | `resultId` | その検索内で一意の識別子。表示順やファイル名を識別子に代用しない。 |
 | `filePath` | 元ファイルの絶対パス。ファイルを開くときの対象。 |
-| `fileType` | `xlsx`、`xlsm`、`pptx`、`docx`、`txt` のいずれか。 |
+| `fileType` | `xlsx`、`xlsm`、`pptx`、`docx`、`txt`、`jsp`、`xhtml`、`html`、`js`、`java` のいずれか。 |
 | `sourceKind` | `fileName`、`cell`、`shape`、`slideTableCell`、`paragraph`、`wordTableParagraph`、`textLine` のいずれか。 |
 | `location` | 次表の構造化した場所。ファイル名一致では空。 |
 | `previewText` | 一致語と周辺が分かる抜粋。ファイル名一致ではファイル名。表示用の長さ制限を設けてよいが、一致部分を消さない。 |
+| `matchRanges` | `previewText` 内で一致した範囲の `[開始, 終了)`。Unicode の文字単位で数え、GUI が一致箇所を強調表示する。 |
 | `previewTruncated` | 抜粋が元の検索単位の全文ではない場合は真。 |
 
 | `sourceKind` | `location` に必要な値 |
@@ -57,7 +58,7 @@ GUI は文書形式の内部構造を解析しない。バックエンドは画�
 | `slideTableCell` | 1 始まりのスライド番号、表を識別できる名前または番号、1 始まりの行・列 |
 | `paragraph` | 本文内で 1 始まりの段落番号 |
 | `wordTableParagraph` | 本文内で 1 始まりの表番号から始まる表・行・列の経路。入れ子の表はその経路を繰り返す。最後にセル内の段落番号 |
-| `textLine` | 1 始まりの行番号 |
+| `textLine` | `.txt` とコード・マークアップファイルの 1 始まりの行番号 |
 
 `location` は欠けた位置を推測値で埋めない。取得できない補助情報は省略してよいが、文書内で検索単位を区別するための値は必須とする。GUI は `sourceKind` と `location` から地域化した場所表示とコピー用文字列を作る。コピーは絶対パスを必ず含め、場所がある場合は後ろに添える。
 

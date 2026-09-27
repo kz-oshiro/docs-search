@@ -10,6 +10,19 @@ let selected = null;
 let allHits = [];
 let shown = 0;
 let scheduled = false;
+function renderPreview(target, hit) {
+  const characters = Array.from(hit.previewText);
+  let cursor = 0;
+  for (const [start, end] of hit.matchRanges ?? []) {
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < cursor || end <= start || end > characters.length) continue;
+    target.append(document.createTextNode(characters.slice(cursor, start).join('')));
+    const mark = document.createElement('mark');
+    mark.textContent = characters.slice(start, end).join('');
+    target.append(mark);
+    cursor = end;
+  }
+  target.append(document.createTextNode(characters.slice(cursor).join('')));
+}
 function renderMore() {
   scheduled = false;
   const until = Math.min(shown + 200, allHits.length);
@@ -19,7 +32,7 @@ function renderMore() {
     const { hit, location } = allHits[shown];
     const row = document.createElement('button'); row.type = 'button'; row.className = 'result';
     const line = document.createElement('span'); line.className = 'result-line'; line.textContent = `${hit.fileType.toUpperCase()} · ${location}`;
-    const preview = document.createElement('span'); preview.className = 'preview'; preview.textContent = hit.previewText;
+    const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
     const path = document.createElement('span'); path.className = 'path'; path.textContent = hit.filePath;
     row.append(line, preview, path); row.title = `${hit.filePath}\n${location}`;
     row.addEventListener('click', () => { document.querySelectorAll('.result.selected').forEach(el => el.classList.remove('selected')); row.classList.add('selected'); selected = hit; disabled('open', false); disabled('copy', false); set_text('selection', `${hit.filePath}\n${location}`); });
@@ -36,6 +49,7 @@ export function bind(id, event, callback) {
 export function listen(callback) { return window.__TAURI__.event.listen('search-events', e => { for (const item of e.payload) callback(item); }); }
 export function invoke(command, args) { return window.__TAURI__.core.invoke(command, args); }
 export function input(id) { return document.getElementById(id).value; }
+export function selected_extensions() { return Array.from(document.querySelectorAll('input[name="extension"]:checked'), input => input.value); }
 export function set_input(id, value) { document.getElementById(id).value = value; }
 export function set_text(id, value) { document.getElementById(id).textContent = value; }
 export function disabled(id, value) { document.getElementById(id).disabled = value; }
@@ -58,6 +72,7 @@ extern "C" {
     fn listen(callback: &Function) -> Promise;
     fn invoke(command: &str, args: JsValue) -> Promise;
     fn input(id: &str) -> String;
+    fn selected_extensions() -> JsValue;
     fn set_input(id: &str, value: &str);
     fn set_text(id: &str, value: &str);
     fn disabled(id: &str, value: bool);
@@ -152,8 +167,11 @@ fn location(kind: &str, data: &Value) -> String {
 fn on_search() {
     let root = input("root");
     let query = input("query");
+    let extensions: Vec<String> =
+        serde_wasm_bindgen::from_value(selected_extensions()).unwrap_or_default();
     set_text("root-error", "");
     set_text("query-error", "");
+    set_text("extensions-error", "");
     set_text("general-error", "");
     if query.trim().is_empty() {
         set_text("query-error", "検索語を入力してください。");
@@ -161,6 +179,13 @@ fn on_search() {
     }
     if root.trim().is_empty() {
         set_text("root-error", "フォルダーを指定してください。");
+        return;
+    }
+    if extensions.is_empty() {
+        set_text(
+            "extensions-error",
+            "検索する拡張子を1つ以上選んでください。",
+        );
         return;
     }
     let id = STATE.with(|cell| {
@@ -182,7 +207,7 @@ fn on_search() {
     set_text("counts", "結果 0 · 処理 0 · エラー 0");
     disabled("search", true);
     disabled("cancel", false);
-    let args = json!({"request": {"rootDirectory": root, "query": query, "recursive": true}, "searchId": id});
+    let args = json!({"request": {"rootDirectory": root, "query": query, "recursive": true, "extensions": extensions}, "searchId": id});
     spawn_local(async move {
         if let Err(error) = JsFuture::from(invoke("start_search", js(&args))).await {
             let data = value(error.clone());
@@ -193,6 +218,7 @@ fn on_search() {
             let target = match field {
                 "rootDirectory" => "root-error",
                 "query" => "query-error",
+                "extensions" => "extensions-error",
                 _ => "general-error",
             };
             set_text(target, &message(error));
