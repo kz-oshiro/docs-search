@@ -54,6 +54,8 @@ python .\tests\generate-fixtures.py --output .\outputs\test-data\load-manual-new
 
 ## バックエンド検証データ
 
+複数フォルダーのケースは `additionalDirectories`、対象外のケースは `excludedDirectories` を `SearchRequest` に加えます。Tauri のテストアダプターは CLI の `--add-directory` と `--exclude-directory` に変換し、重なる検索フォルダーの重複排除、対象外フォルダーの優先、存在しない対象外フォルダーの入力拒否を確認します。生成する文書数と内容は変えません。
+
 `backend-cases.json` が管理対象の原本で、生成時に同一内容を出力先へコピーします。JSON は言語や実装の型を指定しません。テストアダプターは `${fixtureRoot}` を生成先の絶対パスに置換し、OS のパス区切りに変換して `SearchRequest` と操作を実行します。`expected.results[].file` と `expected.issues[].file` は `search/` からの相対パスです。結果の `sourceKind`、構造化 `location` の掲載フィールド、`textContains` を照合し、余分な結果・Issue がないことを件数と併せて確認します。`resultId`、`searchId`、通知の到着順、プレビューの全文、利用者向けエラー文言には依存しません。
 
 `expected.counts` は `Finished` の最終集計です。入力拒否ケースはイベントを発行しません。`cancel-load-search` は `load` プロファイル専用で、`Started` 受信後、`Finished` 前に中断操作を配送できるテスト環境で実行します。中断の結果件数は固定せず、イベント件数と最終集計の整合を確認します。Tauri 実装は [テストアダプター](../tauri/tests/run-backend-cases.py) でこの JSON を実行します。PowerShell 実装は仕様と API が異なるため、同じ文書を使って既存動作だけを検証します。

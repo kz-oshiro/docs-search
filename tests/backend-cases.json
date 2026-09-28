@@ -229,6 +229,54 @@
       }
     },
     {
+      "id": "multiple-search-directories",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/code", "additionalDirectories": ["${fixtureRoot}/search/extended"], "query": "beacon", "recursive": true, "extensions": ["js", "json"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 2, "processedFiles": 2, "resultCount": 2, "issueCount": 0 },
+        "results": [
+          { "file": "code/sample.js", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JS sample" },
+          { "file": "extended/sample.json", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JSON sample" }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "overlapping-search-directories",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "additionalDirectories": ["${fixtureRoot}/search/code"], "query": "beacon", "recursive": true, "extensions": ["js"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 1, "issueCount": 0 },
+        "results": [{ "file": "code/sample.js", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JS sample" }],
+        "issues": []
+      }
+    },
+    {
+      "id": "excluded-search-directory",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "additionalDirectories": ["${fixtureRoot}/search/code"], "excludedDirectories": ["${fixtureRoot}/search/code"], "query": "beacon", "recursive": true, "extensions": ["js", "json"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 1, "issueCount": 0 },
+        "results": [{ "file": "extended/sample.json", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JSON sample" }],
+        "issues": []
+      }
+    },
+    {
+      "id": "missing-additional-directory-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "additionalDirectories": ["${fixtureRoot}/missing"], "query": "beacon", "recursive": true },
+      "expected": { "accepted": false, "inputErrorField": "additionalDirectories", "events": [] }
+    },
+    {
+      "id": "missing-excluded-directory-rejected",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search", "excludedDirectories": ["${fixtureRoot}/missing"], "query": "beacon", "recursive": true },
+      "expected": { "accepted": false, "inputErrorField": "excludedDirectories", "events": [] }
+    },
+    {
       "id": "empty-extensions-rejected",
       "operation": "startSearch",
       "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": [] },

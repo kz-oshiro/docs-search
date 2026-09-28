@@ -129,6 +129,10 @@ pub fn default_extensions() -> Vec<String> {
 #[serde(rename_all = "camelCase")]
 pub struct SearchRequest {
     pub root_directory: String,
+    #[serde(default)]
+    pub additional_directories: Vec<String>,
+    #[serde(default)]
+    pub excluded_directories: Vec<String>,
     pub query: String,
     pub recursive: bool,
     #[serde(default = "default_extensions")]
@@ -204,7 +208,54 @@ pub enum EventKind {
     },
 }
 
-pub fn validate(request: &SearchRequest) -> Result<PathBuf, InputError> {
+struct SearchPaths {
+    roots: Vec<PathBuf>,
+    excluded: Vec<PathBuf>,
+}
+
+fn canonical_directory(raw: &str, field: &'static str) -> Result<PathBuf, InputError> {
+    let path = Path::new(raw);
+    if raw.trim().is_empty() || !path.is_dir() {
+        return Err(InputError {
+            field,
+            message: "存在するフォルダーを指定してください。",
+        });
+    }
+    fs::canonicalize(path).map_err(|_| InputError {
+        field,
+        message: "フォルダーを読み取れません。",
+    })
+}
+
+fn path_key(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        PathBuf::from(path.to_string_lossy().to_lowercase())
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
+}
+
+fn remove_nested_paths(mut paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    paths.sort_by(|a, b| {
+        a.components()
+            .count()
+            .cmp(&b.components().count())
+            .then_with(|| a.cmp(b))
+    });
+    let mut kept: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for path in paths {
+        let key = path_key(&path);
+        if !kept.iter().any(|(_, parent)| key.starts_with(parent)) {
+            kept.push((path, key));
+        }
+    }
+    kept.into_iter().map(|(path, _)| path).collect()
+}
+
+fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
     if request.query.trim().is_empty() {
         return Err(InputError {
             field: "query",
@@ -233,17 +284,22 @@ pub fn validate(request: &SearchRequest) -> Result<PathBuf, InputError> {
             message: "対応していない拡張子が含まれています。",
         });
     }
-    let path = Path::new(&request.root_directory);
-    if !path.is_dir() {
-        return Err(InputError {
-            field: "rootDirectory",
-            message: "存在するフォルダーを指定してください。",
-        });
+    let mut roots = vec![canonical_directory(&request.root_directory, "rootDirectory")?];
+    for directory in &request.additional_directories {
+        roots.push(canonical_directory(directory, "additionalDirectories")?);
     }
-    fs::canonicalize(path).map_err(|_| InputError {
-        field: "rootDirectory",
-        message: "フォルダーを読み取れません。",
+    let mut excluded = Vec::with_capacity(request.excluded_directories.len());
+    for directory in &request.excluded_directories {
+        excluded.push(canonical_directory(directory, "excludedDirectories")?);
+    }
+    Ok(SearchPaths {
+        roots: remove_nested_paths(roots),
+        excluded: remove_nested_paths(excluded),
     })
+}
+
+pub fn validate(request: &SearchRequest) -> Result<(), InputError> {
+    validate_paths(request).map(|_| ())
 }
 
 pub fn normalize_fold(text: &str) -> String {
@@ -400,7 +456,8 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     cancel: &AtomicBool,
     emit: F,
 ) -> Result<(), InputError> {
-    let root = validate(&request)?;
+    let paths = validate_paths(&request)?;
+    let excluded_keys: Vec<PathBuf> = paths.excluded.iter().map(|path| path_key(path)).collect();
     let needle = normalize_fold(request.query.trim());
     let selected: HashSet<String> = request.extensions.iter().cloned().collect();
     let mut sink = Emitter {
@@ -412,10 +469,17 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     sink.send(EventKind::Started { request });
     sink.progress("discovery");
     let mut files = Vec::<(PathBuf, String)>::new();
-    let mut pending = vec![root];
+    let mut pending = paths.roots;
     while let Some(dir) = pending.pop() {
         if cancel.load(Ordering::Relaxed) {
             break;
+        }
+        let directory_key = path_key(&dir);
+        if excluded_keys
+            .iter()
+            .any(|excluded| directory_key.starts_with(excluded))
+        {
+            continue;
         }
         match fs::read_dir(&dir) {
             Ok(entries) => {

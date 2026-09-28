@@ -60,6 +60,10 @@ def main():
             request = case.get("request") or case["steps"][0]["request"]
             folder = request["rootDirectory"].replace("${fixtureRoot}", str(root))
             args = [str(EXE), folder, request["query"]]
+            for directory in request.get("additionalDirectories", []):
+                args.extend(["--add-directory", directory.replace("${fixtureRoot}", str(root))])
+            for directory in request.get("excludedDirectories", []):
+                args.extend(["--exclude-directory", directory.replace("${fixtureRoot}", str(root))])
             if "extensions" in request:
                 args.extend(["--extensions", ",".join(request["extensions"])])
             if case["id"] == "cancel-load-search":
@@ -75,6 +79,8 @@ def main():
             check(run.returncode == 0, f"{prefix}: {run.stderr}")
             check(events[0]["type"] == "started" and events[-1]["type"] == "finished", f"{prefix}: boundaries")
             check(events[0]["request"]["extensions"] == request.get("extensions", ["xlsx", "xlsm", "pptx", "docx", "txt"]), f"{prefix}: selected extensions")
+            check(events[0]["request"]["additionalDirectories"] == [directory.replace("${fixtureRoot}", str(root)) for directory in request.get("additionalDirectories", [])], f"{prefix}: additional directories")
+            check(events[0]["request"]["excludedDirectories"] == [directory.replace("${fixtureRoot}", str(root)) for directory in request.get("excludedDirectories", [])], f"{prefix}: excluded directories")
             check(sum(e["type"] == "started" for e in events) == 1 and sum(e["type"] == "finished" for e in events) == 1, f"{prefix}: terminal count")
             check([e["sequence"] for e in events] == list(range(1, len(events) + 1)), f"{prefix}: sequence")
             check(all(e["searchId"] == "cli" for e in events), f"{prefix}: search ID")

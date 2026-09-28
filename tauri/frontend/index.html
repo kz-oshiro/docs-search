@@ -12,9 +12,10 @@
     <header><div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div><p class="header-description">フォルダー内の文書を、まとめて検索。</p></header>
     <form id="search-form">
       <div class="search-fields">
-        <div class="field"><label for="root">検索フォルダー</label><div class="inline"><input id="root" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button id="pick" type="button">参照…</button></div><small id="root-error" class="error" role="alert"></small></div>
+        <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
         <div class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
       </div>
+      <div class="field"><span class="field-label">対象外フォルダー</span><div id="excluded-folders" class="folder-list"></div><button id="add-excluded" class="folder-add" type="button" aria-label="対象外フォルダーを追加">追加</button><small id="excluded-error" class="error" role="alert"></small></div>
       <fieldset class="field" aria-describedby="extensions-error">
         <legend>対象ファイル</legend>
         <details class="extension-picker">
@@ -141,7 +142,16 @@
       <summary>読み取りエラー <span id="issue-count">0</span> 件</summary>
       <ul id="issues"></ul>
     </details>
-    <section class="results-panel"><div class="results-heading"><h2>検索結果</h2><span>ファイル名から元ファイルを開けます</span></div><div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button></section>
+    <section class="results-panel">
+      <div class="results-heading"><h2>検索結果</h2><span>ファイル名から元ファイルを開けます</span></div>
+      <div class="result-filters" role="group" aria-label="検索結果の絞り込み">
+        <div class="filter-field"><label for="result-filter-text">ファイル名・パス</label><input id="result-filter-text" type="search" autocomplete="off" placeholder="結果内のファイルを絞り込む"></div>
+        <div class="filter-field"><label for="result-filter-extension">拡張子</label><select id="result-filter-extension"><option value="">すべての拡張子</option></select></div>
+        <button id="result-filter-clear" type="button" disabled>絞り込みを解除</button>
+      </div>
+      <p id="result-filter-summary" class="result-filter-summary">絞り込み後 0 / 0 ファイル · 0 / 0 件</p>
+      <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
+    </section>
   </main>
 </body>
 </html>

@@ -4,14 +4,27 @@ use std::sync::atomic::AtomicBool;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: docs-search-cli <directory> <query> [--extensions xlsx,txt,...] [--cancel-on-start]");
+        eprintln!("Usage: docs-search-cli <directory> <query> [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--cancel-on-start]");
         std::process::exit(2);
     }
     let mut extensions = default_extensions();
+    let mut additional_directories = Vec::new();
+    let mut excluded_directories = Vec::new();
     let mut cancel_on_start = false;
     let mut options = args[3..].iter();
     while let Some(option) = options.next() {
         match option.as_str() {
+            "--add-directory" | "--exclude-directory" => {
+                let Some(path) = options.next() else {
+                    eprintln!("{option} requires a directory path");
+                    std::process::exit(2);
+                };
+                if option.as_str() == "--add-directory" {
+                    additional_directories.push(path.clone());
+                } else {
+                    excluded_directories.push(path.clone());
+                }
+            }
             "--extensions" => {
                 let Some(list) = options.next() else {
                     eprintln!("--extensions requires a comma-separated list");
@@ -32,6 +45,8 @@ fn main() {
     }
     let request = SearchRequest {
         root_directory: args[1].clone(),
+        additional_directories,
+        excluded_directories,
         query: args[2].clone(),
         recursive: true,
         extensions,
