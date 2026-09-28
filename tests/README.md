@@ -11,7 +11,7 @@
 
 ## 生成と実行
 
-Windows PowerShell 5.1 と Python 3 を使用します。`doc-search` を作業ディレクトリとして実行します。
+Windows PowerShell 5.1 と Python 3 を使用します。`docs-search` を作業ディレクトリとして実行します。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-v1-tests.ps1
@@ -23,7 +23,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-v1-tes
 
 ```powershell
 python .\tests\generate-fixtures.py
-python .\tests\generate-fixtures.py --output C:\Temp\doc-search-corpus --profile load
+python .\tests\generate-fixtures.py --output C:\Temp\docs-search-corpus --profile load
 ```
 
 `acceptance` プロファイルは `search/` に 18 ファイルを作ります。対象10拡張子、入れ子のフォルダー、非表示シート・スライド、Excel の共有文字列・セル・保存済み数式結果・図形、PowerPoint の図形・表、Word の本文・入れ子表、UTF-8 と BOM、Shift_JIS の `.txt` と `.html`、破損・不正な文字コード・対象外形式・Office 一時ファイルを含みます。`.jsp`、`.xhtml`、`.js`、`.java` はそれぞれ1ファイル、`.html` は2ファイルです。Excel は 3 シート各 295 行 × 12 列、PowerPoint は 165 スライド各 8 図形、Word は 3400 本文段落と表、テキストは各 150 行を生成します。`load` は `search/` の内容に加えて、独立した `load/` に Excel 32 個、PowerPoint 32 個、Word 31 個、テキスト 20 個を生成し、合計133ファイルになります。正常な Office 文書は両ディレクトリを合わせて100ファイルで、各ファイルはおおむね 0.5 MB（45万～55万バイト）です。破損した `.xlsx`、Office 一時ファイル、対象外の `.xls` はこの100ファイルに含めません。性能の合格時間はここでは定めません。

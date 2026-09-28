@@ -1,4 +1,4 @@
-# doc-search v2.0
+# docs-search v2.0
 
 Windows 向けの文書横断検索アプリです。Rust の検索コアがローカル文書を読み取り、Tauri がデスクトップ画面との境界を担当し、画面の状態と操作は Rust からビルドした WebAssembly で動きます。Office や PowerShell を検索処理に使用しません。
 
@@ -32,25 +32,26 @@ cargo install wasm-bindgen-cli --version 0.2.129 --locked
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\Build-v2.0.ps1
 ```
 
-ビルド後は `v2.0\doc-search-desktop.exe` をダブルクリックして起動します。再ビルドの前には実行中のアプリを閉じてください。アプリ単体の起動ではターミナルを表示しません。`Build-v2.0.ps1 -Run` は開発用で、実行元の PowerShell ウィンドウが残ります。ビルドには crates.io へのアクセスが必要です。
+ビルド後は `v2.0\docs-search-desktop.exe` をダブルクリックして起動します。再ビルドの前には実行中のアプリを閉じてください。アプリ単体の起動ではターミナルを表示しません。`Build-v2.0.ps1 -Run` は開発用で、実行元の PowerShell ウィンドウが残ります。ビルドには crates.io へのアクセスが必要です。
 
 ## ローカル CI と公開
 
-`doc-search` ディレクトリから次を実行すると、共通テストデータの検証、バックエンドの全ケース、検索コアのテスト、WASM のチェック、Windows 実行ファイルのビルドを順に行います。いずれかが失敗するとそこで停止します。初回は上記のビルドツールを準備してください。
+`docs-search` ディレクトリから次を実行すると、共通テストデータの検証、バックエンドの全ケース、検索コアのテスト、WASM のチェック、Windows 実行ファイルのビルドを順に行います。いずれかが失敗するとそこで停止します。初回は上記のビルドツールを準備してください。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\v2.0\Run-Local-CI.ps1
 ```
 
-成功後に残る `v2.0\doc-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。`doc-search` ディレクトリからの v2.0.0 公開例です。GitHub CLI の認証が必要です。
+成功後に残る `v2.0\docs-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。`docs-search` ディレクトリからの v2.0.2 公開例です。GitHub CLI の認証が必要です。
 
 ```powershell
-git tag v2.0.0
-git push origin v2.0.0
-gh release create v2.0.0 .\v2.0\doc-search-desktop.exe --verify-tag --title "doc-search v2.0.0" --notes "Windows x64 実行ファイル"
+git tag v2.0.2
+git push origin v2.0.2
+gh release create v2.0.2 .\v2.0\docs-search-desktop.exe --verify-tag --title "docs-search v2.0.2" --notes "Windows x64 実行ファイル"
 ```
 
-公開済みの実行ファイルは [Releases](https://github.com/kz-oshiro/work-tools/releases)から取得できます。新しい版を公開するときは、その版のタグとリリースを作成します。
+公開済みの実行ファイルは [Releases](https://github.com/kz-oshiro/docs-search/releases)から取得できます。新しい版を公開するときは、その版のタグとリリースを作成します。
+v2.0.0 と v2.0.1 は移動前の名称 `doc-search-desktop.exe` で公開された版です。v2.0.2 から `docs-search-desktop.exe` です。
 
 ## 操作
 
@@ -60,7 +61,7 @@ gh release create v2.0.0 .\v2.0\doc-search-desktop.exe --verify-tag --title "doc
 
 ## テスト
 
-`doc-search` を作業ディレクトリとして、共通生成データと全 16 ケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
+`docs-search` を作業ディレクトリとして、共通生成データと全 16 ケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
 
 ```powershell
 python .\v2.0\tests\run-backend-cases.py
@@ -71,8 +72,8 @@ cargo check --manifest-path .\v2.0\frontend\Cargo.toml --target wasm32-unknown-u
 CLI でイベントを JSON Lines として確認できます。
 
 ```powershell
-.\v2.0\core\target\debug\doc-search-cli.exe C:\Documents beacon
-.\v2.0\core\target\debug\doc-search-cli.exe C:\Documents beacon --extensions js,java
+.\v2.0\core\target\debug\docs-search-cli.exe C:\Documents beacon
+.\v2.0\core\target\debug\docs-search-cli.exe C:\Documents beacon --extensions js,java
 ```
 
 GUI はデスクトップ上で実際に起動して、フォルダー選択、検索・中断、結果の選択、元ファイル起動、クリップボードへのコピーを確認します。バックエンドの共通ケースは GUI の操作性そのものを検証しません。

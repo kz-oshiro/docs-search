@@ -6,7 +6,7 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
-$root = Join-Path ([System.IO.Path]::GetTempPath()) ('doc-search-test-' + [guid]::NewGuid().ToString('N'))
+$root = Join-Path ([System.IO.Path]::GetTempPath()) ('docs-search-test-' + [guid]::NewGuid().ToString('N'))
 [void][System.IO.Directory]::CreateDirectory($root)
 try {
     $generator = Join-Path $PSScriptRoot 'generate-fixtures.py'
@@ -54,7 +54,7 @@ try {
         Assert-True (@($jobItems | Where-Object Type -eq 'Result').Count -eq 7) 'Background results missing'
     }
     finally { Remove-Job -Job $job -Force }
-    Write-Output 'All doc-search v1.0 engine tests passed.'
+    Write-Output 'All docs-search v1.0 engine tests passed.'
 }
 finally {
     $temp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar

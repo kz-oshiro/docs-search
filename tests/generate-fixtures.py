@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the stack-independent doc-search corpus with only the Python stdlib."""
+"""Generate the stack-independent docs-search corpus with only the Python stdlib."""
 
 import argparse
 import json

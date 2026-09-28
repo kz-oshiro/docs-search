@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 trap {
     Add-Type -AssemblyName System.Windows.Forms
-    [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'doc-search を起動できません')
+    [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, 'docs-search を起動できません')
     break
 }
 Add-Type -AssemblyName System.Windows.Forms
@@ -15,7 +15,7 @@ $script:resultCount = 0
 $script:errorCount = 0
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'doc-search | Excel 検索'
+$form.Text = 'docs-search | Excel 検索'
 $form.StartPosition = 'CenterScreen'
 $form.Size = New-Object System.Drawing.Size(1150, 730)
 $form.MinimumSize = New-Object System.Drawing.Size(850, 540)
@@ -184,11 +184,11 @@ $searchButton.Add_Click({
     $root = $folderBox.Text.Trim()
     $query = $queryBox.Text.Trim()
     if (-not (Test-Path -LiteralPath $root -PathType Container)) {
-        [void][System.Windows.Forms.MessageBox]::Show($form, '存在するフォルダーを指定してください。', 'doc-search')
+        [void][System.Windows.Forms.MessageBox]::Show($form, '存在するフォルダーを指定してください。', 'docs-search')
         return
     }
     if (-not $query) {
-        [void][System.Windows.Forms.MessageBox]::Show($form, '検索語を入力してください。', 'doc-search')
+        [void][System.Windows.Forms.MessageBox]::Show($form, '検索語を入力してください。', 'docs-search')
         return
     }
     $grid.Rows.Clear()
@@ -236,7 +236,7 @@ $grid.Add_CellContentClick({
     if ($eventArgs.RowIndex -lt 0 -or $eventArgs.ColumnIndex -ne $grid.Columns['Path'].Index) { return }
     $path = [string]$grid.Rows[$eventArgs.RowIndex].Cells['Path'].Value
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        [void][System.Windows.Forms.MessageBox]::Show($form, "ファイルが見つかりません: $path", 'doc-search')
+        [void][System.Windows.Forms.MessageBox]::Show($form, "ファイルが見つかりません: $path", 'docs-search')
         return
     }
     try { Start-Process -FilePath $path -ErrorAction Stop | Out-Null }

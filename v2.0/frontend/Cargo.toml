@@ -1,6 +1,6 @@
 [package]
-name = "doc-search-ui"
-version = "2.0.1"
+name = "docs-search-ui"
+version = "2.0.2"
 edition = "2021"
 
 [lib]

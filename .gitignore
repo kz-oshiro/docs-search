@@ -1,0 +1,9 @@
+/outputs/
+/tests/generated/
+**/__pycache__/
+*.pyc
+**/node_modules/
+**/target/
+/v2.0/.frontend-build/
+/v2.0/docs-search-desktop.exe
+/v2.0/src-tauri/gen/

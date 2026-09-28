@@ -876,8 +876,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-search-core"
-version = "2.0.1"
+name = "docs-search-core"
+version = "2.0.2"
 dependencies = [
  "encoding_rs",
  "roxmltree",
@@ -890,10 +890,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-search-desktop"
-version = "2.0.1"
+name = "docs-search-desktop"
+version = "2.0.2"
 dependencies = [
- "doc-search-core",
+ "docs-search-core",
  "open",
  "rfd",
  "serde",

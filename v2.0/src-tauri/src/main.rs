@@ -1,6 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-use doc_search_core::{run_search, validate, EventKind, InputError, SearchRequest};
+use docs_search_core::{run_search, validate, EventKind, InputError, SearchRequest};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
@@ -125,5 +125,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("doc-search desktop failed to start");
+        .expect("docs-search desktop failed to start");
 }

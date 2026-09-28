@@ -1,6 +1,6 @@
 [package]
-name = "doc-search-core"
-version = "2.0.1"
+name = "docs-search-core"
+version = "2.0.2"
 edition = "2021"
 
 [dependencies]
@@ -14,5 +14,5 @@ unicode-segmentation = "1"
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 
 [[bin]]
-name = "doc-search-cli"
+name = "docs-search-cli"
 path = "src/main.rs"

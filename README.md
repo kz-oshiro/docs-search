@@ -1,8 +1,8 @@
-# doc-search
+# docs-search
 
 文書をフォルダー単位で横断検索するツールです。Windows 向けの [v2.0](./v2.0/README.md) は Rust の検索コアと Rust→WebAssembly の画面で構成します。旧実装は [v1.0](./v1.0/README.md) に保存しています。
 
-v2.0 の Windows 実行ファイルはローカルでテスト・ビルドし、[GitHub Releases](https://github.com/kz-oshiro/work-tools/releases)から取得できます。手順は [v2.0 の README](./v2.0/README.md#ローカル-ci-と公開)を参照してください。
+v2.0 の Windows 実行ファイルはローカルでテスト・ビルドし、[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)から取得できます。手順は [v2.0 の README](./v2.0/README.md#ローカル-ci-と公開)を参照してください。
 
 ## 再構築版の要求仕様
 
@@ -15,11 +15,11 @@ v2.0 の Windows 実行ファイルはローカルでテスト・ビルドし、
 
 ## v1.0 の実行
 
-`v1.0/Start-doc-search.vbs` をダブルクリックするか、[v1.0 の README](./v1.0/README.md) に従って起動してください。v1.0 の対応形式は `.xlsx` / `.xlsm` です。
+`v1.0/Start-docs-search.vbs` をダブルクリックするか、[v1.0 の README](./v1.0/README.md) に従って起動してください。v1.0 の対応形式は `.xlsx` / `.xlsm` です。
 
 ## 共通テストデータ
 
-[tests](./tests/README.md) に、技術スタックに依存しない検索用文書ジェネレータとバックエンド検証ケースを置きます。v1.0 と v2.0 は同じ入力文書を使います。`run-v1-tests.ps1` は生成データを使って v1.0 の Excel 検索を検証します。Windows PowerShell 5.1 と Python 3 で `doc-search` ディレクトリから実行します。
+[tests](./tests/README.md) に、技術スタックに依存しない検索用文書ジェネレータとバックエンド検証ケースを置きます。v1.0 と v2.0 は同じ入力文書を使います。`run-v1-tests.ps1` は生成データを使って v1.0 の Excel 検索を検証します。Windows PowerShell 5.1 と Python 3 で `docs-search` ディレクトリから実行します。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-v1-tests.ps1

@@ -9,9 +9,9 @@ import unicodedata
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DOC_SEARCH = HERE.parent.parent
+DOCS_SEARCH = HERE.parent.parent
 CORE = HERE.parent / "core"
-EXE = CORE / "target" / "debug" / ("doc-search-cli.exe" if sys.platform == "win32" else "doc-search-cli")
+EXE = CORE / "target" / "debug" / ("docs-search-cli.exe" if sys.platform == "win32" else "docs-search-cli")
 
 
 def check(condition, message):
@@ -21,10 +21,10 @@ def check(condition, message):
 
 def main():
     subprocess.run(["cargo", "build", "--manifest-path", str(CORE / "Cargo.toml")], check=True)
-    spec = json.loads((DOC_SEARCH / "tests" / "backend-cases.json").read_text(encoding="utf-8"))
-    with tempfile.TemporaryDirectory(prefix="doc-search-v2.0-") as temp:
+    spec = json.loads((DOCS_SEARCH / "tests" / "backend-cases.json").read_text(encoding="utf-8"))
+    with tempfile.TemporaryDirectory(prefix="docs-search-v2.0-") as temp:
         root = Path(temp) / "fixture"
-        subprocess.run([sys.executable, str(DOC_SEARCH / "tests" / "generate-fixtures.py"), "--output", str(root), "--profile", "load"], check=True)
+        subprocess.run([sys.executable, str(DOCS_SEARCH / "tests" / "generate-fixtures.py"), "--output", str(root), "--profile", "load"], check=True)
         for case in spec["cases"]:
             request = case.get("request") or case["steps"][0]["request"]
             folder = request["rootDirectory"].replace("${fixtureRoot}", str(root))

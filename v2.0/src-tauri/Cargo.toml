@@ -1,13 +1,13 @@
 [package]
-name = "doc-search-desktop"
-version = "2.0.1"
+name = "docs-search-desktop"
+version = "2.0.2"
 edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-doc-search-core = { path = "../core" }
+docs-search-core = { path = "../core" }
 open = "5"
 rfd = "0.16"
 serde = { version = "1", features = ["derive"] }

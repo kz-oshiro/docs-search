@@ -1,10 +1,10 @@
-use doc_search_core::{default_extensions, run_search, SearchRequest};
+use docs_search_core::{default_extensions, run_search, SearchRequest};
 use std::sync::atomic::AtomicBool;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: doc-search-cli <directory> <query> [--extensions xlsx,txt,...] [--cancel-on-start]");
+        eprintln!("Usage: docs-search-cli <directory> <query> [--extensions xlsx,txt,...] [--cancel-on-start]");
         std::process::exit(2);
     }
     let mut extensions = default_extensions();

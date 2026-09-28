@@ -24,7 +24,7 @@ def digest(path):
 
 class GeneratorTests(unittest.TestCase):
     def test_deterministic_corpus_and_case_references(self):
-        with tempfile.TemporaryDirectory(prefix="doc-search-generator-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="docs-search-generator-") as temporary:
             first = Path(temporary) / "first"
             second = Path(temporary) / "second"
             generate(first)
@@ -72,7 +72,7 @@ class GeneratorTests(unittest.TestCase):
             self.assertGreater((first / "search/notes/research-log.txt").stat().st_size, 10_000)
 
     def test_load_profile_keeps_acceptance_corpus_separate(self):
-        with tempfile.TemporaryDirectory(prefix="doc-search-load-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="docs-search-load-") as temporary:
             output = Path(temporary) / "corpus"
             subprocess.run([sys.executable, str(GENERATOR), "--output", str(output), "--profile", "load"], check=True, capture_output=True)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))

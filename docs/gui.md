@@ -1,4 +1,4 @@
-# doc-search 再構築版: GUI 仕様
+# docs-search 再構築版: GUI 仕様
 
 この文書は利用者に見える操作と表示を定義する。レイアウトの寸法、色、GUI フレームワークは指定しない。[全体仕様](./requirements.md)と[境界契約](./boundary.md)を併せて参照する。
 

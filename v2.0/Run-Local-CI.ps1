@@ -17,7 +17,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'WASM のチェックに失敗しました。' }
 
     & (Join-Path $here 'Build-v2.0.ps1')
-    if (-not (Test-Path -LiteralPath (Join-Path $here 'doc-search-desktop.exe'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $here 'docs-search-desktop.exe'))) {
         throw 'ビルド成果物が見つかりません。'
     }
 } finally {

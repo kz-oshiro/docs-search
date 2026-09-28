@@ -1,4 +1,4 @@
-# doc-search v1.0
+# docs-search v1.0
 
 現行の Excel 検索実装を保存したディレクトリです。再構築版の要求仕様は [上位の README](../README.md) を参照してください。以下の起動・テスト用コマンドは、この `v1.0` ディレクトリを作業ディレクトリとして実行します。
 
@@ -6,12 +6,12 @@
 
 ## 起動
 
-エクスプローラーで **`Start-doc-search.vbs` をダブルクリック**します。追加のインストールやパス設定は不要です。起動用スクリプトはすぐ終了し、検索画面だけが残ります。検索画面を閉じると PowerShell のプロセスも終了します。
+エクスプローラーで **`Start-docs-search.vbs` をダブルクリック**します。追加のインストールやパス設定は不要です。起動用スクリプトはすぐ終了し、検索画面だけが残ります。検索画面を閉じると PowerShell のプロセスも終了します。
 
 コマンドから起動する場合は、Windows PowerShell 5.1 でこのフォルダーから次を実行します。
 
 ```powershell
-powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File .\doc-search.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File .\docs-search.ps1
 ```
 
 起動ファイルの `RemoteSigned` は、この起動プロセスにだけ適用されます。組織のポリシーでスクリプト実行が禁止されている場合は、その設定が優先されます。
