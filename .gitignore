@@ -4,6 +4,6 @@
 *.pyc
 **/node_modules/
 **/target/
-/v2.0/.frontend-build/
-/v2.0/docs-search-desktop.exe
-/v2.0/src-tauri/gen/
+/tauri/.frontend-build/
+/tauri/docs-search-desktop.exe
+/tauri/src-tauri/gen/

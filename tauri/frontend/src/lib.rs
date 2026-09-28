@@ -23,6 +23,20 @@ function renderPreview(target, hit) {
   }
   target.append(document.createTextNode(characters.slice(cursor).join('')));
 }
+function selectRow(row, hit, location) {
+  document.querySelectorAll('.result.selected').forEach(el => el.classList.remove('selected'));
+  row.classList.add('selected');
+  selected = hit;
+  disabled('open', false);
+  disabled('copy', false);
+  set_text('selection', `${hit.filePath}\n${location}`);
+}
+export function open_file(path) {
+  set_text('general-error', '');
+  return window.__TAURI__.core.invoke('open_result', { path }).catch(error => {
+    set_text('general-error', error?.message ?? String(error));
+  });
+}
 function renderMore() {
   scheduled = false;
   const until = Math.min(shown + 200, allHits.length);
@@ -30,12 +44,28 @@ function renderMore() {
   const fragment = document.createDocumentFragment();
   for (; shown < until; shown++) {
     const { hit, location } = allHits[shown];
-    const row = document.createElement('button'); row.type = 'button'; row.className = 'result';
-    const line = document.createElement('span'); line.className = 'result-line'; line.textContent = `${hit.fileType.toUpperCase()} · ${location}`;
-    const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
+    const row = document.createElement('div'); row.className = 'result'; row.setAttribute('role', 'listitem'); row.tabIndex = 0;
+    const heading = document.createElement('div'); heading.className = 'result-heading';
+    const type = document.createElement('span'); type.className = 'file-type'; type.dataset.type = hit.fileType.toLowerCase(); type.textContent = `.${hit.fileType.toLowerCase()}`;
+    const name = document.createElement('a'); name.className = 'file-name'; name.href = '#'; name.textContent = hit.filePath.split(/[\\/]/).pop() || hit.filePath;
+    heading.append(type, name);
     const path = document.createElement('span'); path.className = 'path'; path.textContent = hit.filePath;
-    row.append(line, preview, path); row.title = `${hit.filePath}\n${location}`;
-    row.addEventListener('click', () => { document.querySelectorAll('.result.selected').forEach(el => el.classList.remove('selected')); row.classList.add('selected'); selected = hit; disabled('open', false); disabled('copy', false); set_text('selection', `${hit.filePath}\n${location}`); });
+    const place = document.createElement('span'); place.className = 'location'; place.textContent = location;
+    const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
+    row.append(heading, path, place, preview);
+    row.addEventListener('click', () => selectRow(row, hit, location));
+    row.addEventListener('keydown', event => {
+      if (event.target === row && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        selectRow(row, hit, location);
+      }
+    });
+    name.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      selectRow(row, hit, location);
+      void open_file(hit.filePath);
+    });
     fragment.append(row);
   }
   target.append(fragment);
@@ -82,6 +112,7 @@ extern "C" {
     fn add_issue(issue: JsValue);
     fn selected_hit() -> JsValue;
     fn copy_text(value: &str) -> Promise;
+    fn open_file(path: &str) -> Promise;
 }
 
 #[derive(Default)]
@@ -340,18 +371,8 @@ fn on_pick() {
 
 fn on_open() {
     let hit = value(selected_hit());
-    if let Some(path) = hit
-        .get("filePath")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-    {
-        spawn_local(async move {
-            if let Err(error) =
-                JsFuture::from(invoke("open_result", js(&json!({"path": path})))).await
-            {
-                set_text("general-error", &message(error));
-            }
-        });
+    if let Some(path) = hit.get("filePath").and_then(Value::as_str) {
+        let _ = open_file(path);
     }
 }
 

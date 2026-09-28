@@ -7,16 +7,16 @@ try {
     python .\tests\test_generator.py
     if ($LASTEXITCODE -ne 0) { throw '共通テストデータの検証に失敗しました。' }
 
-    python .\v2.0\tests\run-backend-cases.py
+    python .\tauri\tests\run-backend-cases.py
     if ($LASTEXITCODE -ne 0) { throw 'バックエンドの共通ケースに失敗しました。' }
 
-    cargo test --manifest-path .\v2.0\core\Cargo.toml
+    cargo test --manifest-path .\tauri\core\Cargo.toml
     if ($LASTEXITCODE -ne 0) { throw '検索コアのテストに失敗しました。' }
 
-    cargo check --manifest-path .\v2.0\frontend\Cargo.toml --target wasm32-unknown-unknown
+    cargo check --manifest-path .\tauri\frontend\Cargo.toml --target wasm32-unknown-unknown
     if ($LASTEXITCODE -ne 0) { throw 'WASM のチェックに失敗しました。' }
 
-    & (Join-Path $here 'Build-v2.0.ps1')
+    & (Join-Path $here 'Build.ps1')
     if (-not (Test-Path -LiteralPath (Join-Path $here 'docs-search-desktop.exe'))) {
         throw 'ビルド成果物が見つかりません。'
     }

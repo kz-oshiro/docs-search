@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the shared stack-independent backend cases against the v2.0 CLI."""
+"""Run the shared stack-independent backend cases against the Tauri app's CLI."""
 
 import json
 import subprocess
@@ -22,7 +22,7 @@ def check(condition, message):
 def main():
     subprocess.run(["cargo", "build", "--manifest-path", str(CORE / "Cargo.toml")], check=True)
     spec = json.loads((DOCS_SEARCH / "tests" / "backend-cases.json").read_text(encoding="utf-8"))
-    with tempfile.TemporaryDirectory(prefix="docs-search-v2.0-") as temp:
+    with tempfile.TemporaryDirectory(prefix="docs-search-tauri-") as temp:
         root = Path(temp) / "fixture"
         subprocess.run([sys.executable, str(DOCS_SEARCH / "tests" / "generate-fixtures.py"), "--output", str(root), "--profile", "load"], check=True)
         for case in spec["cases"]:

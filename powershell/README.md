@@ -1,6 +1,6 @@
-# docs-search v1.0
+# docs-search PowerShell 実装
 
-現行の Excel 検索実装を保存したディレクトリです。再構築版の要求仕様は [上位の README](../README.md) を参照してください。以下の起動・テスト用コマンドは、この `v1.0` ディレクトリを作業ディレクトリとして実行します。
+旧 v1.0 の Excel 検索実装を保存したディレクトリです。再構築版の要求仕様は [上位の README](../README.md) を参照してください。以下の起動・テスト用コマンドは、この `powershell` ディレクトリを作業ディレクトリとして実行します。
 
 追加ライブラリを入れずに、Excel ブックを横断検索する Windows 用ツールです。
 
@@ -29,7 +29,7 @@ powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File .\docs-search
 Windows PowerShell 5.1 でこのディレクトリからテストを実行します。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File ..\tests\run-v1-tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File ..\tests\run-powershell-tests.ps1
 ```
 
 ## 負荷確認用データ

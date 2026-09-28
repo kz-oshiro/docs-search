@@ -1,23 +1,23 @@
 # 共通テストデータ
 
-このディレクトリは v1.0 と v2.0 が共用するテスト入力を管理します。検索エンジン、GUI、通信方式が変わっても、文書データと期待結果の意味を同じに保ちます。
+このディレクトリは PowerShell 実装と Tauri 実装が共用するテスト入力を管理します。検索エンジン、GUI、通信方式が変わっても、文書データと期待結果の意味を同じに保ちます。
 
 | ファイル | 役割 |
 | --- | --- |
 | `generate-fixtures.py` | Python 3 標準ライブラリだけで検索用文書を生成 |
 | `backend-cases.json` | バックエンドの操作、検索入力、期待結果を記述した共通契約 |
 | `test_generator.py` | 同一シードのバイト一致、Office ZIP/XML、ケースの参照先を確認 |
-| `run-v1-tests.ps1` | 共通データを一時生成して保存版 v1.0 の Excel 検索を確認し、終了時に削除 |
+| `run-powershell-tests.ps1` | 共通データを一時生成して PowerShell 実装の Excel 検索を確認し、終了時に削除 |
 
 ## 生成と実行
 
 Windows PowerShell 5.1 と Python 3 を使用します。`docs-search` を作業ディレクトリとして実行します。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-v1-tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1
 ```
 
-`run-v1-tests.ps1` は OS の一時ディレクトリ内に `search/`、`manifest.json`、`backend-cases.json` を作り、成功・失敗のどちらでも `finally` で削除します。バックエンド再構築版のテストランナーも、各テストの前に同じジェネレータを実行し、終了時に一時ディレクトリを削除してください。生成物は Git で管理しません。
+`run-powershell-tests.ps1` は OS の一時ディレクトリ内に `search/`、`manifest.json`、`backend-cases.json` を作り、成功・失敗のどちらでも `finally` で削除します。バックエンド再構築版のテストランナーも、各テストの前に同じジェネレータを実行し、終了時に一時ディレクトリを削除してください。生成物は Git で管理しません。
 
 データを目視確認するときは次を実行します。既定の `tests/generated/` は Git の除外対象です。ジェネレータは出力先が空のときだけ動作し、既存データを上書きしません。既存の出力を残して新しい内容を生成する場合は、別の空ディレクトリを `--output` に指定します。
 
@@ -34,6 +34,6 @@ python .\tests\generate-fixtures.py --output C:\Temp\docs-search-corpus --profil
 
 `backend-cases.json` が管理対象の原本で、生成時に同一内容を出力先へコピーします。JSON は言語や実装の型を指定しません。テストアダプターは `${fixtureRoot}` を生成先の絶対パスに置換し、OS のパス区切りに変換して `SearchRequest` と操作を実行します。`expected.results[].file` と `expected.issues[].file` は `search/` からの相対パスです。結果の `sourceKind`、構造化 `location` の掲載フィールド、`textContains` を照合し、余分な結果・Issue がないことを件数と併せて確認します。`resultId`、`searchId`、通知の到着順、プレビューの全文、利用者向けエラー文言には依存しません。
 
-`expected.counts` は `Finished` の最終集計です。入力拒否ケースはイベントを発行しません。`cancel-load-search` は `load` プロファイル専用で、`Started` 受信後、`Finished` 前に中断操作を配送できるテスト環境で実行します。中断の結果件数は固定せず、イベント件数と最終集計の整合を確認します。v2.0 は [テストアダプター](../v2.0/tests/run-backend-cases.py) でこの JSON を実行します。v1.0 は仕様と API が異なるため、同じ文書を使って既存動作だけを検証します。
+`expected.counts` は `Finished` の最終集計です。入力拒否ケースはイベントを発行しません。`cancel-load-search` は `load` プロファイル専用で、`Started` 受信後、`Finished` 前に中断操作を配送できるテスト環境で実行します。中断の結果件数は固定せず、イベント件数と最終集計の整合を確認します。Tauri 実装は [テストアダプター](../tauri/tests/run-backend-cases.py) でこの JSON を実行します。PowerShell 実装は仕様と API が異なるため、同じ文書を使って既存動作だけを検証します。
 
 `manifest.json` は生成した相対パス一覧とシードを記録します。`search/` と `load/` の文書はテスト専用で、実際の利用者文書や正規の Office ファイルの代用品として配布しません。

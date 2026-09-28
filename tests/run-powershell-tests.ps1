@@ -25,7 +25,7 @@ try {
         Assert-True (Test-Path -LiteralPath (Join-Path $corpus $name)) "Missing generated file: $name"
     }
 
-    $engine = Join-Path (Split-Path $PSScriptRoot -Parent) 'v1.0/Search-Excel.ps1'
+    $engine = Join-Path (Split-Path $PSScriptRoot -Parent) 'powershell/Search-Excel.ps1'
     $items = @(& $engine -Root $corpus -Query 'needle')
     $hits = @($items | Where-Object Type -eq 'Result')
     $issues = @($items | Where-Object Type -eq 'Error')
@@ -54,7 +54,7 @@ try {
         Assert-True (@($jobItems | Where-Object Type -eq 'Result').Count -eq 7) 'Background results missing'
     }
     finally { Remove-Job -Job $job -Force }
-    Write-Output 'All docs-search v1.0 engine tests passed.'
+    Write-Output 'All docs-search PowerShell engine tests passed.'
 }
 finally {
     $temp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
