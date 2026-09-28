@@ -13,7 +13,8 @@ if (-not $python) {
 }
 
 $generator = Join-Path $PSScriptRoot 'generate-fixtures.py'
-$outputRoot = Join-Path $PSScriptRoot 'generated'
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$outputRoot = Join-Path (Join-Path $repoRoot 'outputs') 'test-data'
 [void][System.IO.Directory]::CreateDirectory($outputRoot)
 $runName = '{0}-{1}-{2}' -f $Profile, (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 8))
 $output = Join-Path $outputRoot $runName

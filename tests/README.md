@@ -20,7 +20,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powers
 
 `run-powershell-tests.ps1` は OS の一時ディレクトリ内に `search/`、`manifest.json`、`backend-cases.json` を作り、成功・失敗のどちらでも `finally` で削除します。バックエンド再構築版のテストランナーも、各テストの前に同じジェネレータを実行し、終了時に一時ディレクトリを削除してください。生成物は Git で管理しません。
 
-データを保存して確認するときは、リポジトリ直下の [`Generate-Test-Data.cmd`](../Generate-Test-Data.cmd) をダブルクリックします。既定の `acceptance` データを `tests/generated/acceptance-日時-識別子/` に作り、完了後にそのフォルダーを開きます。繰り返し実行しても毎回別のフォルダーを作るため、既存データを上書きしません。`tests/generated/` は Git の除外対象です。Python 3 の `python` コマンドが必要で、失敗時は画面にエラーを残します。
+データを保存して確認するときは、リポジトリ直下の [`Generate-Test-Data.cmd`](../Generate-Test-Data.cmd) をダブルクリックします。既定の `acceptance` データを `outputs/test-data/acceptance-日時-識別子/` に作り、完了後にそのフォルダーを開きます。繰り返し実行しても毎回別のフォルダーを作るため、既存データを上書きしません。`outputs/` は Git の除外対象です。Python 3 の `python` コマンドが必要で、失敗時は画面にエラーを残します。
 
 負荷確認用の `load` データを保存する場合は、コマンドプロンプトまたは PowerShell から次を実行します。
 
@@ -31,8 +31,8 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powers
 ジェネレータを直接実行するときは次のコマンドを使います。ジェネレータは出力先が空のときだけ動作し、既存データを上書きしません。既存の出力を残して新しい内容を生成する場合は、別の空ディレクトリを `--output` に指定します。
 
 ```powershell
-python .\tests\generate-fixtures.py --output C:\Temp\docs-search-acceptance-new
-python .\tests\generate-fixtures.py --output C:\Temp\docs-search-load-new --profile load
+python .\tests\generate-fixtures.py --output .\outputs\test-data\acceptance-manual-new
+python .\tests\generate-fixtures.py --output .\outputs\test-data\load-manual-new --profile load
 ```
 
 ## 生成仕様

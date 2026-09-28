@@ -21,7 +21,7 @@ Tauri 実装の Windows 実行ファイルはローカルでテスト・ビル�
 
 [tests](./tests/README.md) に、技術スタックに依存しない検索用文書ジェネレータとバックエンド検証ケースを置きます。両実装は同じ入力文書を使います。`run-powershell-tests.ps1` は生成データを使って PowerShell 実装の Excel 検索を検証します。Windows PowerShell 5.1 と Python 3 で `docs-search` ディレクトリから実行します。
 
-テストデータを手元に残して確認するときは [Generate-Test-Data.cmd](./Generate-Test-Data.cmd) をダブルクリックします。新しい出力フォルダーが開きます。負荷確認用データの出力方法は [共通テストデータの説明](./tests/README.md) を参照してください。
+テストデータを手元に残して確認するときは [Generate-Test-Data.cmd](./Generate-Test-Data.cmd) をダブルクリックします。`outputs/test-data/` に生成した新しいフォルダーが開きます。負荷確認用データの出力方法は [共通テストデータの説明](./tests/README.md) を参照してください。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1
