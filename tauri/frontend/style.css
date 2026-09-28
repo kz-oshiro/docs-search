@@ -38,12 +38,16 @@ button:disabled { opacity: .48; cursor: default; }
 .extension-picker[open] > summary::after { margin-top: 5px; transform: rotate(225deg); }
 .extension-picker-title { font-size: .85rem; font-weight: 700; }
 .extension-count { margin-left: auto; padding: 4px 10px; border-radius: 99px; background: #e3f2f0; color: #086b6e; font-size: .75rem; font-weight: 700; }
-.extension-help { margin: 0 14px 10px; color: #63787d; font-size: .78rem; }
-.extension-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); align-items: start; gap: 8px; max-height: min(42vh, 390px); margin: 0 12px 12px; overflow: auto; }
-.extension-group { min-width: 0; border: 1px solid #d5e0df; border-radius: 7px; background: #fff; }
-.extension-group > summary { padding: 9px 12px; cursor: pointer; font-size: .82rem; font-weight: 700; }
+.extension-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap:8px 12px; margin: 0 12px 10px; }
+.extension-help { margin: 0; color: #63787d; font-size: .78rem; }
+.extension-bulk-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.extension-bulk-actions button, .group-toggle { min-height: 30px; padding: 4px 9px; font-size: .74rem; }
+.extension-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: min(42vh, 390px); margin: 0 12px 12px; overflow: auto; }
+.extension-group { position: relative; min-width: 0; border: 1px solid #d5e0df; border-radius: 7px; background: #fff; }
+.extension-group > summary { padding: 9px 155px 9px 12px; cursor: pointer; font-size: .82rem; font-weight: 700; }
 .extension-group > summary:hover { background: #f4f9f8; }
-.extension-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(102px, 1fr)); gap: 7px; padding: 0 10px 10px; }
+.extension-group-actions { position: absolute; top: 4px; right: 10px; display: flex; justify-content: flex-end; }
+.extension-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 7px; padding: 0 10px 10px; }
 .extension-option { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 36px; margin: 0; padding: 6px 8px; border: 1px solid #d5e0df; border-radius: 6px; cursor: pointer; font-size: .76rem; font-weight: 500; }
 .extension-option:hover { border-color: #8ebcbb; }
 .extension-option:has(input:checked) { border-color: #a9d5d1; background: #eaf6f4; color: #075f63; }
@@ -94,7 +98,6 @@ h2 { margin: 0; color: #263f46; font-size: 1rem; }
   main { padding: 18px 14px 24px; }
   header { align-items: start; flex-direction: column; gap: 5px; }
   form { padding: 15px; }
-  .extension-groups { grid-template-columns: 1fr; }
   .summary, .results-heading { align-items: start; flex-direction: column; gap: 5px; }
   .results-panel { padding: 15px; }
 }

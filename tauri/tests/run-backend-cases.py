@@ -46,7 +46,7 @@ def check_extension_catalog():
     check(len(supported) == len(set(supported)), "duplicate backend extension")
     check(len(inputs.values) == len(set(inputs.values)), "duplicate GUI extension")
     check(set(supported) == set(inputs.values), "GUI and backend extensions differ")
-    check(inputs.defaults == ["xlsx", "xlsm", "pptx", "docx", "txt"], "GUI default extensions changed")
+    check(inputs.defaults == inputs.values, "GUI default extensions must all be selected")
 
 
 def main():

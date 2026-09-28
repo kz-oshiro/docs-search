@@ -16,11 +16,34 @@ function clearCopyStatus() {
   set_text('copy-status', '');
 }
 function updateExtensionSummary() {
-  const count = document.querySelectorAll('input[name="extension"]:checked').length;
+  const inputs = Array.from(document.querySelectorAll('input[name="extension"]'));
+  const count = inputs.filter(input => input.checked).length;
   set_text('selected-extension-count', `${count} 種類選択中`);
+  document.getElementById('select-all-extensions').disabled = count === inputs.length;
+  document.getElementById('clear-all-extensions').disabled = count === 0;
+  if (count > 0) set_text('extensions-error', '');
+  document.querySelectorAll('.extension-group').forEach(group => {
+    const groupInputs = Array.from(group.querySelectorAll('input[name="extension"]'));
+    const allSelected = groupInputs.every(input => input.checked);
+    const action = group.querySelector('.group-toggle');
+    action.textContent = allSelected ? '分類内をすべて解除' : '分類内をすべて選択';
+    action.setAttribute('aria-label', `${group.querySelector('summary').textContent}を${allSelected ? 'すべて解除' : 'すべて選択'}`);
+  });
+}
+function setExtensionChecks(scope, checked) {
+  scope.querySelectorAll('input[name="extension"]').forEach(input => { input.checked = checked; });
+  updateExtensionSummary();
 }
 export function init_extension_summary() {
   document.querySelectorAll('input[name="extension"]').forEach(input => input.addEventListener('change', updateExtensionSummary));
+  document.getElementById('select-all-extensions').addEventListener('click', () => setExtensionChecks(document, true));
+  document.getElementById('clear-all-extensions').addEventListener('click', () => setExtensionChecks(document, false));
+  document.querySelectorAll('.extension-group').forEach(group => {
+    group.querySelector('.group-toggle').addEventListener('click', () => {
+      const inputs = Array.from(group.querySelectorAll('input[name="extension"]'));
+      setExtensionChecks(group, !inputs.every(input => input.checked));
+    });
+  });
   updateExtensionSummary();
 }
 export function show_extension_picker() { document.querySelector('.extension-picker').open = true; }
