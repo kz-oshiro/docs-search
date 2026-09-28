@@ -2,10 +2,12 @@
 """Run the shared stack-independent backend cases against the Tauri app's CLI."""
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
 import unicodedata
+from html.parser import HTMLParser
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -19,7 +21,36 @@ def check(condition, message):
         raise AssertionError(message)
 
 
+class ExtensionInputs(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.values = []
+        self.defaults = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "input" and attributes.get("name") == "extension":
+            value = attributes["value"]
+            self.values.append(value)
+            if "checked" in attributes:
+                self.defaults.append(value)
+
+
+def check_extension_catalog():
+    source = (CORE / "src" / "lib.rs").read_text(encoding="utf-8")
+    catalog = re.search(r"pub const SUPPORTED_EXTENSIONS:.*?=\s*&\[(.*?)\];", source, re.S)
+    check(catalog is not None, "missing backend extension catalog")
+    supported = re.findall(r'"([a-z0-9]+)"', catalog.group(1))
+    inputs = ExtensionInputs()
+    inputs.feed((HERE.parent / "frontend" / "index.html").read_text(encoding="utf-8"))
+    check(len(supported) == len(set(supported)), "duplicate backend extension")
+    check(len(inputs.values) == len(set(inputs.values)), "duplicate GUI extension")
+    check(set(supported) == set(inputs.values), "GUI and backend extensions differ")
+    check(inputs.defaults == ["xlsx", "xlsm", "pptx", "docx", "txt"], "GUI default extensions changed")
+
+
 def main():
+    check_extension_catalog()
     subprocess.run(["cargo", "build", "--manifest-path", str(CORE / "Cargo.toml")], check=True)
     spec = json.loads((DOCS_SEARCH / "tests" / "backend-cases.json").read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory(prefix="docs-search-tauri-") as temp:

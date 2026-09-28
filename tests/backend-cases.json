@@ -5,7 +5,7 @@
   "pathToken": "${fixtureRoot}",
   "cases": [
     {
-      "id": "all-formats-and-errors",
+      "id": "original-formats-and-errors",
       "operation": "startSearch",
       "request": { "rootDirectory": "${fixtureRoot}/search", "query": "beacon", "recursive": true, "extensions": ["xlsx", "xlsm", "pptx", "docx", "txt", "jsp", "xhtml", "html", "js", "java"] },
       "expected": {
@@ -157,6 +157,29 @@
           { "file": "code/shift-jis.html", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "日本語①を検索" }
         ],
         "issues": [{ "file": "notes/invalid-utf8.txt", "stage": "read", "code": "unsupportedEncoding" }]
+      }
+    },
+    {
+      "id": "selected-extended-text-formats",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/extended", "query": "beacon", "recursive": true, "extensions": ["vue", "mjs", "jsx", "tsx", "json", "md", "csv", "py", "yaml", "svg", "ipynb"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 11, "processedFiles": 11, "resultCount": 11, "issueCount": 0 },
+        "results": [
+          { "file": "extended/sample.vue", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Vue sample" },
+          { "file": "extended/sample.mjs", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon MJS sample" },
+          { "file": "extended/sample.jsx", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JSX sample" },
+          { "file": "extended/sample.tsx", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon TSX sample" },
+          { "file": "extended/sample.json", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon JSON sample" },
+          { "file": "extended/sample.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Markdown sample" },
+          { "file": "extended/sample.csv", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "Beacon CSV sample" },
+          { "file": "extended/sample.py", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon Python sample" },
+          { "file": "extended/sample.yaml", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon YAML sample" },
+          { "file": "extended/sample.svg", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon SVG sample" },
+          { "file": "extended/sample.ipynb", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "Beacon notebook sample" }
+        ],
+        "issues": []
       }
     },
     {

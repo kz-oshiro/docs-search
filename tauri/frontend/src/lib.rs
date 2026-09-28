@@ -6,10 +6,24 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 #[wasm_bindgen(inline_js = r#"
-let selected = null;
 let allHits = [];
 let shown = 0;
 let scheduled = false;
+let copyStatusTimer = null;
+function clearCopyStatus() {
+  if (copyStatusTimer !== null) clearTimeout(copyStatusTimer);
+  copyStatusTimer = null;
+  set_text('copy-status', '');
+}
+function updateExtensionSummary() {
+  const count = document.querySelectorAll('input[name="extension"]:checked').length;
+  set_text('selected-extension-count', `${count} 種類選択中`);
+}
+export function init_extension_summary() {
+  document.querySelectorAll('input[name="extension"]').forEach(input => input.addEventListener('change', updateExtensionSummary));
+  updateExtensionSummary();
+}
+export function show_extension_picker() { document.querySelector('.extension-picker').open = true; }
 function renderPreview(target, hit) {
   const characters = Array.from(hit.previewText);
   let cursor = 0;
@@ -23,16 +37,9 @@ function renderPreview(target, hit) {
   }
   target.append(document.createTextNode(characters.slice(cursor).join('')));
 }
-function selectRow(row, hit, location) {
-  document.querySelectorAll('.result.selected').forEach(el => el.classList.remove('selected'));
-  row.classList.add('selected');
-  selected = hit;
-  disabled('open', false);
-  disabled('copy', false);
-  set_text('selection', `${hit.filePath}\n${location}`);
-}
-export function open_file(path) {
+function open_file(path) {
   set_text('general-error', '');
+  clearCopyStatus();
   return window.__TAURI__.core.invoke('open_result', { path }).catch(error => {
     set_text('general-error', error?.message ?? String(error));
   });
@@ -44,27 +51,32 @@ function renderMore() {
   const fragment = document.createDocumentFragment();
   for (; shown < until; shown++) {
     const { hit, location } = allHits[shown];
-    const row = document.createElement('div'); row.className = 'result'; row.setAttribute('role', 'listitem'); row.tabIndex = 0;
+    const row = document.createElement('div'); row.className = 'result'; row.setAttribute('role', 'listitem');
     const heading = document.createElement('div'); heading.className = 'result-heading';
     const type = document.createElement('span'); type.className = 'file-type'; type.dataset.type = hit.fileType.toLowerCase(); type.textContent = `.${hit.fileType.toLowerCase()}`;
     const name = document.createElement('a'); name.className = 'file-name'; name.href = '#'; name.textContent = hit.filePath.split(/[\\/]/).pop() || hit.filePath;
-    heading.append(type, name);
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'copy-location';
+    copy.title = '場所をコピー'; copy.setAttribute('aria-label', `${name.textContent}、${location}の場所をコピー`);
+    copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+    heading.append(type, name, copy);
     const path = document.createElement('span'); path.className = 'path'; path.textContent = hit.filePath;
     const place = document.createElement('span'); place.className = 'location'; place.textContent = location;
     const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
     row.append(heading, path, place, preview);
-    row.addEventListener('click', () => selectRow(row, hit, location));
-    row.addEventListener('keydown', event => {
-      if (event.target === row && (event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault();
-        selectRow(row, hit, location);
-      }
-    });
     name.addEventListener('click', event => {
       event.preventDefault();
-      event.stopPropagation();
-      selectRow(row, hit, location);
       void open_file(hit.filePath);
+    });
+    copy.addEventListener('click', async () => {
+      set_text('general-error', '');
+      clearCopyStatus();
+      try {
+        await navigator.clipboard.writeText(`${hit.filePath}\n${location}`);
+        set_text('copy-status', '場所をコピーしました。');
+        copyStatusTimer = setTimeout(clearCopyStatus, 3500);
+      } catch {
+        set_text('general-error', 'コピーできませんでした。結果に表示されたパスと場所を確認してください。');
+      }
     });
     fragment.append(row);
   }
@@ -82,8 +94,22 @@ export function input(id) { return document.getElementById(id).value; }
 export function selected_extensions() { return Array.from(document.querySelectorAll('input[name="extension"]:checked'), input => input.value); }
 export function set_input(id, value) { document.getElementById(id).value = value; }
 export function set_text(id, value) { document.getElementById(id).textContent = value; }
+export function set_status(value) {
+  set_text('status', value);
+  document.querySelector('.summary').dataset.state = value.includes('失敗') || value.includes('エラー') || value.includes('確認')
+    ? 'error' : value.includes('中断') ? 'paused' : value.startsWith('完了') ? 'complete' : 'active';
+}
 export function disabled(id, value) { document.getElementById(id).disabled = value; }
-export function clear_results() { document.getElementById('results').replaceChildren(); document.getElementById('issues').replaceChildren(); allHits = []; shown = 0; scheduled = false; document.getElementById('more').hidden = true; selected = null; disabled('open', true); disabled('copy', true); }
+export function clear_results() {
+  clearCopyStatus();
+  document.getElementById('results').replaceChildren();
+  document.getElementById('issues').replaceChildren();
+  const panel = document.getElementById('issues-panel'); panel.hidden = true; panel.open = false;
+  set_text('issue-count', '0');
+  allHits = []; shown = 0; scheduled = false;
+  document.getElementById('more').hidden = true;
+  set_text('empty-state', '一致する場所を探しています…');
+}
 export function add_hit(hit, location) {
   allHits.push({ hit, location });
   if (shown < 200 && !scheduled) { scheduled = true; requestAnimationFrame(renderMore); }
@@ -92,10 +118,10 @@ export function add_hit(hit, location) {
 export function enable_more() { document.getElementById('more').addEventListener('click', renderMore); }
 export function add_issue(issue) {
   const row = document.createElement('li'); row.textContent = `${issue.path || '(場所不明)'} · ${issue.reason}`; row.title = issue.path || '';
-  document.getElementById('issues').append(row);
+  const list = document.getElementById('issues'); list.append(row);
+  document.getElementById('issues-panel').hidden = false;
+  set_text('issue-count', String(list.childElementCount));
 }
-export function selected_hit() { return selected; }
-export function copy_text(text) { return navigator.clipboard.writeText(text); }
 "#)]
 extern "C" {
     fn bind(id: &str, event: &str, callback: &Function);
@@ -105,14 +131,14 @@ extern "C" {
     fn selected_extensions() -> JsValue;
     fn set_input(id: &str, value: &str);
     fn set_text(id: &str, value: &str);
+    fn set_status(value: &str);
     fn disabled(id: &str, value: bool);
     fn clear_results();
     fn add_hit(hit: JsValue, location: &str);
     fn enable_more();
+    fn init_extension_summary();
+    fn show_extension_picker();
     fn add_issue(issue: JsValue);
-    fn selected_hit() -> JsValue;
-    fn copy_text(value: &str) -> Promise;
-    fn open_file(path: &str) -> Promise;
 }
 
 #[derive(Default)]
@@ -204,6 +230,7 @@ fn on_search() {
     set_text("query-error", "");
     set_text("extensions-error", "");
     set_text("general-error", "");
+    set_text("copy-status", "");
     if query.trim().is_empty() {
         set_text("query-error", "検索語を入力してください。");
         return;
@@ -213,6 +240,7 @@ fn on_search() {
         return;
     }
     if extensions.is_empty() {
+        show_extension_picker();
         set_text(
             "extensions-error",
             "検索する拡張子を1つ以上選んでください。",
@@ -233,8 +261,7 @@ fn on_search() {
     });
     let Some(id) = id else { return };
     clear_results();
-    set_text("selection", "結果を選択してください。");
-    set_text("status", "列挙中…");
+    set_status("列挙中…");
     set_text("counts", "結果 0 · 処理 0 · エラー 0");
     disabled("search", true);
     disabled("cancel", false);
@@ -253,7 +280,8 @@ fn on_search() {
                 _ => "general-error",
             };
             set_text(target, &message(error));
-            set_text("status", "入力を確認してください。");
+            set_status("入力を確認してください。");
+            set_text("empty-state", "検索を開始できませんでした。入力とエラーを確認してください。");
             STATE.with(|cell| {
                 let mut state = cell.borrow_mut();
                 state.running = false;
@@ -275,7 +303,7 @@ fn on_cancel() {
         state.current_id.clone()
     });
     if let Some(id) = id {
-        set_text("status", "中断中…");
+        set_status("中断中…");
         disabled("cancel", true);
         spawn_local(async move {
             let _ = JsFuture::from(invoke("cancel_search", js(&json!({"searchId": id})))).await;
@@ -291,7 +319,7 @@ fn on_event(payload: JsValue) {
     }
     let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
     match kind {
-        "started" => set_text("status", "列挙中…"),
+        "started" => set_status("列挙中…"),
         "progress" | "finished" => {
             let counts = &event["counts"];
             let count = |key: &str| counts[key].as_u64().unwrap_or(0);
@@ -314,8 +342,7 @@ fn on_event(payload: JsValue) {
             };
             set_text("counts", &summary);
             if kind == "progress" && !STATE.with(|cell| cell.borrow().cancelling) {
-                set_text(
-                    "status",
+                set_status(
                     if event["phase"] == "discovery" {
                         "列挙中…"
                     } else {
@@ -338,8 +365,7 @@ fn on_event(payload: JsValue) {
         let reason = event["reason"].as_str().unwrap_or("failed");
         let issues = event["counts"]["issueCount"].as_u64().unwrap_or(0);
         let results = event["counts"]["resultCount"].as_u64().unwrap_or(0);
-        set_text(
-            "status",
+        set_status(
             match reason {
                 "completed" if issues > 0 => "完了（一部エラーあり）",
                 "completed" if results == 0 => "完了 · 該当なし",
@@ -348,6 +374,16 @@ fn on_event(payload: JsValue) {
                 _ => "全体失敗",
             },
         );
+        if results == 0 {
+            set_text(
+                "empty-state",
+                match reason {
+                    "completed" => "一致する結果はありませんでした。検索語や対象ファイルを確認してください。",
+                    "cancelled" => "検索は中断されました。条件を変えて再検索できます。",
+                    _ => "検索を完了できませんでした。上のエラーを確認してください。",
+                },
+            );
+        }
         STATE.with(|cell| {
             let mut state = cell.borrow_mut();
             state.running = false;
@@ -369,36 +405,10 @@ fn on_pick() {
     });
 }
 
-fn on_open() {
-    let hit = value(selected_hit());
-    if let Some(path) = hit.get("filePath").and_then(Value::as_str) {
-        let _ = open_file(path);
-    }
-}
-
-fn on_copy() {
-    let hit = value(selected_hit());
-    if let Some(path) = hit.get("filePath").and_then(Value::as_str) {
-        let text = format!(
-            "{}\n{}",
-            path,
-            location(hit["sourceKind"].as_str().unwrap_or(""), &hit["location"])
-        );
-        spawn_local(async move {
-            match JsFuture::from(copy_text(&text)).await {
-                Ok(_) => set_text("general-error", "場所をコピーしました。"),
-                Err(_) => set_text(
-                    "general-error",
-                    "コピーできませんでした。パスは選択欄から確認できます。",
-                ),
-            }
-        });
-    }
-}
-
 #[wasm_bindgen(start)]
 pub fn start() {
     enable_more();
+    init_extension_summary();
     let search = Closure::<dyn FnMut()>::new(on_search);
     bind("search-form", "submit", search.as_ref().unchecked_ref());
     search.forget();
@@ -408,12 +418,6 @@ pub fn start() {
     let pick = Closure::<dyn FnMut()>::new(on_pick);
     bind("pick", "click", pick.as_ref().unchecked_ref());
     pick.forget();
-    let open = Closure::<dyn FnMut()>::new(on_open);
-    bind("open", "click", open.as_ref().unchecked_ref());
-    open.forget();
-    let copy = Closure::<dyn FnMut()>::new(on_copy);
-    bind("copy", "click", copy.as_ref().unchecked_ref());
-    copy.forget();
     let event = Closure::<dyn FnMut(JsValue)>::new(on_event);
     let _ = listen(event.as_ref().unchecked_ref());
     event.forget();

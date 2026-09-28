@@ -9,33 +9,139 @@
 </head>
 <body>
   <main>
-    <header><h1>docs-search</h1><p>フォルダー内の文書を横断検索</p></header>
+    <header><div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div><p class="header-description">フォルダー内の文書を、まとめて検索。</p></header>
     <form id="search-form">
-      <div class="field"><label for="root">検索フォルダー</label><div class="inline"><input id="root" type="text" autocomplete="off" aria-describedby="root-error"><button id="pick" type="button">選択…</button></div><small id="root-error" class="error" role="alert"></small></div>
-      <div class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
+      <div class="search-fields">
+        <div class="field"><label for="root">検索フォルダー</label><div class="inline"><input id="root" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button id="pick" type="button">参照…</button></div><small id="root-error" class="error" role="alert"></small></div>
+        <div class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
+      </div>
       <fieldset class="field" aria-describedby="extensions-error">
-        <legend>検索する拡張子</legend>
-        <div class="extension-options">
-          <label class="extension-option"><input type="checkbox" name="extension" value="xlsx" checked>.xlsx</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="xlsm" checked>.xlsm</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="pptx" checked>.pptx</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="docx" checked>.docx</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="txt" checked>.txt</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="jsp">.jsp</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="xhtml">.xhtml</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="html">.html</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="js">.js</label>
-          <label class="extension-option"><input type="checkbox" name="extension" value="java">.java</label>
+        <legend>対象ファイル</legend>
+        <details class="extension-picker">
+          <summary><span class="extension-picker-title">検索する拡張子</span><span id="selected-extension-count" class="extension-count" aria-live="polite">5 種類選択中</span></summary>
+          <p class="extension-help">種類ごとに開いて選択できます。</p>
+        <div class="extension-groups">
+          <details class="extension-group" open><summary>Office 文書</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="xlsx" checked>.xlsx</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xlsm" checked>.xlsm</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="pptx" checked>.pptx</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="docx" checked>.docx</label>
+          </div></details>
+          <details class="extension-group" open><summary>テキスト・文書・表データ</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="txt" checked>.txt</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="md">.md</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="markdown">.markdown</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="mdx">.mdx</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="rst">.rst</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="adoc">.adoc</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="log">.log</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="csv">.csv</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="tsv">.tsv</label>
+          </div></details>
+          <details class="extension-group"><summary>Web・マークアップ</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="jsp">.jsp</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xhtml">.xhtml</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="html">.html</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="htm">.htm</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="vue">.vue</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="svelte">.svelte</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="astro">.astro</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="css">.css</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="scss">.scss</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="sass">.sass</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="less">.less</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="svg">.svg</label>
+          </div></details>
+          <details class="extension-group"><summary>JavaScript・TypeScript</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="js">.js</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="mjs">.mjs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cjs">.cjs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="jsx">.jsx</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ts">.ts</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="mts">.mts</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cts">.cts</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="tsx">.tsx</label>
+          </div></details>
+          <details class="extension-group"><summary>プログラム・スクリプト</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="java">.java</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="kt">.kt</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="kts">.kts</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="groovy">.groovy</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="gradle">.gradle</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="py">.py</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="rb">.rb</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="php">.php</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="go">.go</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="rs">.rs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="c">.c</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="h">.h</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cc">.cc</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cpp">.cpp</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="hpp">.hpp</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cs">.cs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="swift">.swift</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="scala">.scala</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="sh">.sh</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="bash">.bash</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="zsh">.zsh</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ps1">.ps1</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="bat">.bat</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cmd">.cmd</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="sql">.sql</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="dart">.dart</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="lua">.lua</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="r">.r</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="jl">.jl</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="pl">.pl</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ex">.ex</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="exs">.exs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="clj">.clj</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cljs">.cljs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="fs">.fs</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="fsx">.fsx</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="vb">.vb</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="vbs">.vbs</label>
+          </div></details>
+          <details class="extension-group"><summary>設定・構造化データ</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="json">.json</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="jsonc">.jsonc</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="jsonl">.jsonl</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ndjson">.ndjson</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="yaml">.yaml</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="yml">.yml</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="toml">.toml</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xml">.xml</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xsd">.xsd</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xsl">.xsl</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="xslt">.xslt</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ini">.ini</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="cfg">.cfg</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="conf">.conf</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="properties">.properties</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="tf">.tf</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="hcl">.hcl</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="tfvars">.tfvars</label>
+          </div></details>
+          <details class="extension-group"><summary>スキーマ・ノートブック</summary><div class="extension-options">
+            <label class="extension-option"><input type="checkbox" name="extension" value="graphql">.graphql</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="gql">.gql</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="proto">.proto</label>
+            <label class="extension-option"><input type="checkbox" name="extension" value="ipynb">.ipynb</label>
+          </div></details>
         </div>
+        </details>
         <small id="extensions-error" class="error" role="alert"></small>
       </fieldset>
       <div class="actions"><button id="search" type="submit">検索</button><button id="cancel" type="button" disabled>中断</button></div>
     </form>
     <section class="summary" aria-live="polite"><strong id="status">待機中</strong><span id="counts">結果 0 · 処理 0 · エラー 0</span></section>
-    <div class="columns">
-      <section><h2>結果</h2><div id="results" class="results" role="list"></div><button id="more" type="button" hidden>さらに表示</button></section>
-      <aside><h2>選択した場所</h2><pre id="selection">結果を選択してください。</pre><div class="actions"><button id="open" type="button" disabled>元ファイルを開く</button><button id="copy" type="button" disabled>場所をコピー</button></div><p id="general-error" aria-live="polite"></p><h2>読み取りエラー</h2><ul id="issues"></ul></aside>
-    </div>
+    <p id="general-error" class="notice notice-error" role="alert"></p>
+    <p id="copy-status" class="notice notice-success" role="status"></p>
+    <details id="issues-panel" class="issues-panel" hidden>
+      <summary>読み取りエラー <span id="issue-count">0</span> 件</summary>
+      <ul id="issues"></ul>
+    </details>
+    <section class="results-panel"><div class="results-heading"><h2>検索結果</h2><span>ファイル名から元ファイルを開けます</span></div><div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button></section>
   </main>
 </body>
 </html>

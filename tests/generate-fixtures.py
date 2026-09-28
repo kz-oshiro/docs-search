@@ -197,6 +197,21 @@ def generate(output, profile, seed):
     (root / "code" / "shift-jis.html").write_bytes('<meta charset="Shift_JIS">\n<p>日本語①を検索</p>\n'.encode("cp932"))
     code_document(root / "code" / "sample.js", 'const label = "Beacon JS sample";\n')
     code_document(root / "code" / "sample.java", 'class Sample { String label = "Beacon Java sample"; }\n')
+    extended = root / "extended"
+    for extension, content in {
+        "vue": '<template><p>Beacon Vue sample</p></template>\n',
+        "mjs": 'export const label = "Beacon MJS sample";\n',
+        "jsx": 'export const Sample = () => <p>Beacon JSX sample</p>;\n',
+        "tsx": 'export const Sample = () => <p>Beacon TSX sample</p>;\n',
+        "json": '{"label":"Beacon JSON sample"}\n',
+        "md": '# Beacon Markdown sample\n',
+        "csv": 'label,value\nBeacon CSV sample,1\n',
+        "py": 'label = "Beacon Python sample"\n',
+        "yaml": 'label: Beacon YAML sample\n',
+        "svg": '<svg xmlns="http://www.w3.org/2000/svg"><text>Beacon SVG sample</text></svg>\n',
+        "ipynb": '{"cells":[{"cell_type":"markdown","source":["Beacon notebook sample"]}],"metadata":{},"nbformat":4,"nbformat_minor":5}\n',
+    }.items():
+        code_document(extended / f"sample.{extension}", content)
     (root / "spreadsheets" / "broken.xlsx").write_bytes(b"not an OOXML archive")
     (root / "notes" / "invalid-utf8.txt").write_bytes(b"invalid utf8: \xff\xfe\n")
     (root / "spreadsheets" / "~$temporary.xlsx").write_bytes(b"excluded office temporary file")

@@ -13,8 +13,108 @@ use unicode_segmentation::UnicodeSegmentation;
 pub use extract::Unit;
 
 const MAX_TEXT_BYTES: u64 = 32 * 1024 * 1024;
-pub const SUPPORTED_EXTENSIONS: [&str; 10] = [
-    "xlsx", "xlsm", "pptx", "docx", "txt", "jsp", "xhtml", "html", "js", "java",
+const OFFICE_EXTENSIONS: [&str; 4] = ["xlsx", "xlsm", "pptx", "docx"];
+pub const SUPPORTED_EXTENSIONS: &[&str] = &[
+    // Office documents
+    "xlsx",
+    "xlsm",
+    "pptx",
+    "docx",
+    // Text, documentation, and tabular data
+    "txt",
+    "md",
+    "markdown",
+    "mdx",
+    "rst",
+    "adoc",
+    "log",
+    "csv",
+    "tsv",
+    // Web and markup
+    "jsp",
+    "xhtml",
+    "html",
+    "htm",
+    "vue",
+    "svelte",
+    "astro",
+    "css",
+    "scss",
+    "sass",
+    "less",
+    "svg",
+    // JavaScript and TypeScript
+    "js",
+    "mjs",
+    "cjs",
+    "jsx",
+    "ts",
+    "mts",
+    "cts",
+    "tsx",
+    // Programming languages and scripts
+    "java",
+    "kt",
+    "kts",
+    "groovy",
+    "gradle",
+    "py",
+    "rb",
+    "php",
+    "go",
+    "rs",
+    "c",
+    "h",
+    "cc",
+    "cpp",
+    "hpp",
+    "cs",
+    "swift",
+    "scala",
+    "sh",
+    "bash",
+    "zsh",
+    "ps1",
+    "bat",
+    "cmd",
+    "sql",
+    "dart",
+    "lua",
+    "r",
+    "jl",
+    "pl",
+    "ex",
+    "exs",
+    "clj",
+    "cljs",
+    "fs",
+    "fsx",
+    "vb",
+    "vbs",
+    // Structured data and configuration
+    "json",
+    "jsonc",
+    "jsonl",
+    "ndjson",
+    "yaml",
+    "yml",
+    "toml",
+    "xml",
+    "xsd",
+    "xsl",
+    "xslt",
+    "ini",
+    "cfg",
+    "conf",
+    "properties",
+    "tf",
+    "hcl",
+    "tfvars",
+    // Schemas and notebooks
+    "graphql",
+    "gql",
+    "proto",
+    "ipynb",
 ];
 pub const DEFAULT_EXTENSIONS: [&str; 5] = ["xlsx", "xlsm", "pptx", "docx", "txt"];
 
@@ -388,8 +488,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                 &needle,
             );
         }
-        let result = if ["txt", "jsp", "xhtml", "html", "js", "java"].contains(&file_type.as_str())
-        {
+        let result = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
             fs::metadata(&path)
                 .map_err(extract::ExtractError::from)
                 .and_then(|m| {
