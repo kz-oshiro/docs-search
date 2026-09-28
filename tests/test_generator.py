@@ -36,7 +36,7 @@ class GeneratorTests(unittest.TestCase):
             manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
             cases = json.loads((first / "backend-cases.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["seed"], cases["seed"])
-            self.assertEqual(len(manifest["files"]), 29)
+            self.assertEqual(len(manifest["files"]), 32)
             self.assertEqual(set(manifest["files"]), {name for name in left if name.startswith("search/")})
             self.assertEqual([p.suffix for p in (first / "search").rglob("*") if p.is_file()].count(".xlsx"), 4)
             for suffix in (".jsp", ".xhtml", ".html", ".js", ".java"):
@@ -57,7 +57,7 @@ class GeneratorTests(unittest.TestCase):
                 for item in expected.get("results", []) + expected.get("issues", []):
                     self.assertTrue((first / "search" / item["file"]).is_file(), (case["id"], item["file"]))
 
-            office = [p for p in (first / "search").rglob("*") if p.suffix in (".xlsx", ".xlsm", ".pptx", ".docx") and p.name != "broken.xlsx" and not p.name.startswith("~$")]
+            office = [p for p in (first / "search").rglob("*") if p.suffix in (".xlsx", ".xlsm", ".pptx", ".docx") and "errors" not in p.relative_to(first / "search").parts and p.name != "broken.xlsx" and not p.name.startswith("~$")]
             self.assertEqual(len(office), 5)
             for path in office:
                 with self.subTest(path=path.name), ZipFile(path) as archive:
@@ -79,12 +79,12 @@ class GeneratorTests(unittest.TestCase):
             subprocess.run([sys.executable, str(GENERATOR), "--output", str(output), "--profile", "load"], check=True, capture_output=True)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["profile"], "load")
-            self.assertEqual(len(manifest["files"]), 144)
-            self.assertEqual(sum(name.startswith("search/") for name in manifest["files"]), 29)
+            self.assertEqual(len(manifest["files"]), 147)
+            self.assertEqual(sum(name.startswith("search/") for name in manifest["files"]), 32)
             self.assertEqual(sum(name.startswith("load/") for name in manifest["files"]), 115)
             for suffix, count in ((".xlsx", 32), (".pptx", 32), (".docx", 31), (".txt", 20)):
                 self.assertEqual(sum(name.startswith("load/") and name.endswith(suffix) for name in manifest["files"]), count)
-            office = [output / name for name in manifest["files"] if Path(name).suffix in (".xlsx", ".xlsm", ".pptx", ".docx") and not name.endswith("broken.xlsx") and not Path(name).name.startswith("~$")]
+            office = [output / name for name in manifest["files"] if Path(name).suffix in (".xlsx", ".xlsm", ".pptx", ".docx") and "errors" not in Path(name).parts and not name.endswith("broken.xlsx") and not Path(name).name.startswith("~$")]
             self.assertEqual(len(office), 100)
             for path in office:
                 with self.subTest(path=path.name):

@@ -214,6 +214,11 @@ def generate(output, profile, seed):
         code_document(extended / f"sample.{extension}", content)
     (root / "spreadsheets" / "broken.xlsx").write_bytes(b"not an OOXML archive")
     (root / "notes" / "invalid-utf8.txt").write_bytes(b"invalid utf8: \xff\xfe\n")
+    errors = root / "errors"
+    errors.mkdir(parents=True, exist_ok=True)
+    (errors / "broken-presentation.pptx").write_bytes(b"not a PowerPoint archive")
+    (errors / "broken-document.docx").write_bytes(b"not a Word archive")
+    (errors / "invalid-bom.txt").write_bytes(b"\xef\xbb\xbf\xff\n")
     (root / "spreadsheets" / "~$temporary.xlsx").write_bytes(b"excluded office temporary file")
     (root / "notes" / "legacy.xls").write_bytes(b"unsupported format beacon")
     if profile == "load":

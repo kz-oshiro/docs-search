@@ -62,7 +62,7 @@ Office 以外の対応拡張子は UTF-8、UTF-8 BOM、Shift_JIS（Windows-31J �
 
 ## テスト
 
-`docs-search` を作業ディレクトリとして、共通生成データと全 17 ケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
+`docs-search` を作業ディレクトリとして、共通生成データと全 18 ケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
 
 ```powershell
 python .\tauri\tests\run-backend-cases.py
