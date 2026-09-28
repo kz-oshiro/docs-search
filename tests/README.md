@@ -5,6 +5,7 @@
 | ファイル | 役割 |
 | --- | --- |
 | `generate-fixtures.py` | Python 3 標準ライブラリだけで検索用文書を生成 |
+| `Generate-Test-Data.ps1` | ダブルクリック用ランチャーから呼ばれ、保存先を作成して生成後に開く |
 | `backend-cases.json` | バックエンドの操作、検索入力、期待結果を記述した共通契約 |
 | `test_generator.py` | 同一シードのバイト一致、Office ZIP/XML、ケースの参照先を確認 |
 | `run-powershell-tests.ps1` | 共通データを一時生成して PowerShell 実装の Excel 検索を確認し、終了時に削除 |
@@ -19,11 +20,19 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powers
 
 `run-powershell-tests.ps1` は OS の一時ディレクトリ内に `search/`、`manifest.json`、`backend-cases.json` を作り、成功・失敗のどちらでも `finally` で削除します。バックエンド再構築版のテストランナーも、各テストの前に同じジェネレータを実行し、終了時に一時ディレクトリを削除してください。生成物は Git で管理しません。
 
-データを目視確認するときは次を実行します。既定の `tests/generated/` は Git の除外対象です。ジェネレータは出力先が空のときだけ動作し、既存データを上書きしません。既存の出力を残して新しい内容を生成する場合は、別の空ディレクトリを `--output` に指定します。
+データを保存して確認するときは、リポジトリ直下の [`Generate-Test-Data.cmd`](../Generate-Test-Data.cmd) をダブルクリックします。既定の `acceptance` データを `tests/generated/acceptance-日時-識別子/` に作り、完了後にそのフォルダーを開きます。繰り返し実行しても毎回別のフォルダーを作るため、既存データを上書きしません。`tests/generated/` は Git の除外対象です。Python 3 の `python` コマンドが必要で、失敗時は画面にエラーを残します。
+
+負荷確認用の `load` データを保存する場合は、コマンドプロンプトまたは PowerShell から次を実行します。
 
 ```powershell
-python .\tests\generate-fixtures.py
-python .\tests\generate-fixtures.py --output C:\Temp\docs-search-corpus --profile load
+.\Generate-Test-Data.cmd -Profile load
+```
+
+ジェネレータを直接実行するときは次のコマンドを使います。ジェネレータは出力先が空のときだけ動作し、既存データを上書きしません。既存の出力を残して新しい内容を生成する場合は、別の空ディレクトリを `--output` に指定します。
+
+```powershell
+python .\tests\generate-fixtures.py --output C:\Temp\docs-search-acceptance-new
+python .\tests\generate-fixtures.py --output C:\Temp\docs-search-load-new --profile load
 ```
 
 ## 生成仕様
