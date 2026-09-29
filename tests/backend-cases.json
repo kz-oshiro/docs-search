@@ -289,6 +289,59 @@
       "expected": { "accepted": false, "inputErrorField": "extensions", "events": [] }
     },
     {
+      "id": "fuzzy-identifier-variants",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customerId", "recursive": true, "extensions": ["md"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 6, "issueCount": 0 },
+        "results": [
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId", "matchType": "exact", "score": 100 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "CustomerId", "matchType": "caseFolded", "score": 98 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 3 }, "textContains": "CUSTOMER_ID", "matchType": "identifier", "score": 90 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 4 }, "textContains": "customer_id", "matchType": "identifier", "score": 90 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 5 }, "textContains": "customer-id", "matchType": "identifier", "score": 90 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 6 }, "textContains": "customer id", "matchType": "separatorVariant", "score": 92 }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "fuzzy-width-and-spacing",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "顧客ID", "recursive": true, "extensions": ["md"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 3, "issueCount": 0 },
+        "results": [
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 7 }, "textContains": "顧客ID", "matchType": "exact", "score": 100 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 8 }, "textContains": "顧客ＩＤ", "matchType": "normalized", "score": 95 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 9 }, "textContains": "顧客 ID", "matchType": "separatorVariant", "score": 92 }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "fuzzy-typo-candidate",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customer", "recursive": true, "extensions": ["md"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 8, "issueCount": 0 },
+        "results": [
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "CustomerId" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 3 }, "textContains": "CUSTOMER_ID" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 4 }, "textContains": "customer_id" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 5 }, "textContains": "customer-id" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 6 }, "textContains": "customer id" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 10 }, "textContains": "customer", "matchType": "exact", "score": 100 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 11 }, "textContains": "custmer", "matchType": "editDistance", "score": 50 }
+        ],
+        "issues": []
+      }
+    },
+    {
       "id": "cancel-load-search",
       "profile": "load",
       "steps": [

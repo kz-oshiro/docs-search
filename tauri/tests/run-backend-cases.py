@@ -97,7 +97,8 @@ def main():
                 for start, end in ranges:
                     check(previous_end <= start < end <= len(characters), f"{prefix}: invalid highlight range")
                     marked = unicodedata.normalize("NFC", "".join(characters[start:end])).casefold()
-                    check(needle in marked, f"{prefix}: highlight does not match query")
+                    if hit["matchType"] in ("exact", "caseFolded"):
+                        check(needle in marked, f"{prefix}: highlight does not match query")
                     previous_end = end
             counts = final["counts"]
             check(counts["resultCount"] == len(results) and counts["issueCount"] == len(issues), f"{prefix}: event counts")
@@ -117,6 +118,10 @@ def main():
             for wanted in expected["results"]:
                 key = (wanted["file"], wanted["sourceKind"], json.dumps(wanted["location"], sort_keys=True))
                 check(key in actual_hits and wanted["textContains"] in actual_hits[key]["previewText"], f"{prefix}: missing {wanted}")
+                if "matchType" in wanted:
+                    check(actual_hits[key]["matchType"] == wanted["matchType"], f"{prefix}: match type {wanted}")
+                if "score" in wanted:
+                    check(actual_hits[key]["score"] == wanted["score"], f"{prefix}: score {wanted}")
             actual_issues = {(relative(issue["path"]), issue["stage"], issue["code"]) for issue in issues}
             wanted_issues = {(issue["file"], issue["stage"], issue["code"]) for issue in expected["issues"]}
             check(actual_issues == wanted_issues, f"{prefix}: issues {actual_issues}")

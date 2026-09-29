@@ -191,6 +191,7 @@ def generate(output, profile, seed):
     text_document(root / "notes" / "research-log.txt", seed)
     text_document(root / "notes" / "bom-note.txt", seed, bom=True)
     (root / "notes" / "shift-jis.txt").write_bytes("Shift_JIS の文書\n日本語①を検索\n".encode("cp932"))
+    code_document(root / "fuzzy" / "variants.md", "customerId\nCustomerId\nCUSTOMER_ID\ncustomer_id\ncustomer-id\ncustomer id\n顧客ID\n顧客ＩＤ\n顧客 ID\ncustomer\ncustmer\nID\nNO\n1/2\n12\n")
     code_document(root / "code" / "sample.jsp", '<%@ page contentType="text/html" %>\n<p>Beacon JSP sample</p>\n')
     code_document(root / "code" / "sample.xhtml", '<?xml version="1.0"?>\n<html><body>Beacon XHTML sample</body></html>\n')
     code_document(root / "code" / "sample.html", '<!doctype html>\n<p>Beacon HTML sample</p>\n')

@@ -218,7 +218,9 @@ function createMatch(group, { hit, location }) {
   const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'copy-location';
   copy.title = '場所をコピー'; copy.setAttribute('aria-label', `${group.path.split(/[\\/]/).pop() || group.path}、${location}の場所をコピー`);
   copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
-  heading.append(place, copy);
+  const labels = { exact: '完全一致', caseFolded: '表記揺れ', normalized: '表記揺れ', separatorVariant: '表記揺れ', identifier: '識別子一致', kanaVariant: '表記揺れ', prefix: '前方一致', substring: '部分一致', editDistance: 'タイプミス候補' };
+  const reason = document.createElement('span'); reason.className = 'match-type'; reason.textContent = labels[hit.matchType] || '一致';
+  heading.append(place, reason, copy);
   const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
   item.append(heading, preview);
   copy.addEventListener('click', async () => {
@@ -321,6 +323,15 @@ export function add_hit(hit, location) {
   updateFilterSummary();
   updateMore();
 }
+export function rank_results() {
+  const highest = group => group.hits.reduce((score, item) => Math.max(score, item.hit.score || 0), 0);
+  const nameHit = group => group.hits.some(item => item.hit.sourceKind === 'fileName') ? 1 : 0;
+  fileGroups.sort((a, b) => highest(b) - highest(a) || nameHit(b) - nameHit(a) || a.path.localeCompare(b.path));
+  for (const group of fileGroups) {
+    group.hits.sort((a, b) => (b.hit.score || 0) - (a.hit.score || 0) || a.location.localeCompare(b.location));
+  }
+  applyResultFilter();
+}
 export function enable_more() { document.getElementById('more').addEventListener('click', () => { visibleLimit += pageSize; updateMore(); scheduleRender(); }); }
 export function add_issue(issue) {
   const row = document.createElement('li'); row.textContent = `${issue.path || '(場所不明)'} · ${issue.reason}`; row.title = issue.path || '';
@@ -346,6 +357,7 @@ extern "C" {
     fn disabled(id: &str, value: bool);
     fn clear_results();
     fn add_hit(hit: JsValue, location: &str);
+    fn rank_results();
     fn enable_more();
     fn init_result_filter();
     fn init_extension_summary();
@@ -535,6 +547,16 @@ fn on_cancel() {
     }
 }
 
+fn on_clear_index() {
+    set_text("general-error", "");
+    spawn_local(async move {
+        match JsFuture::from(invoke("clear_search_index", JsValue::NULL)).await {
+            Ok(_) => set_text("copy-status", "検索用索引を削除しました。次回の検索で再作成します。"),
+            Err(error) => set_text("general-error", &message(error)),
+        }
+    });
+}
+
 fn on_event(payload: JsValue) {
     let event = value(payload);
     let id = event.get("searchId").and_then(Value::as_str).unwrap_or("");
@@ -586,6 +608,7 @@ fn on_event(payload: JsValue) {
         _ => (),
     }
     if kind == "finished" {
+        rank_results();
         let reason = event["reason"].as_str().unwrap_or("failed");
         let issues = event["counts"]["issueCount"].as_u64().unwrap_or(0);
         let results = event["counts"]["resultCount"].as_u64().unwrap_or(0);
@@ -621,6 +644,9 @@ fn on_event(payload: JsValue) {
 #[wasm_bindgen(start)]
 pub fn start() {
     enable_more();
+    let clear = Closure::<dyn FnMut()>::new(on_clear_index);
+    bind("clear-index", "click", clear.as_ref().unchecked_ref());
+    clear.forget();
     init_result_filter();
     init_extension_summary();
     init_folder_lists();

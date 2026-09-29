@@ -51,6 +51,8 @@ GUI は文書形式の内部構造を解析しない。バックエンドは画�
 | `location` | 次表の構造化した場所。ファイル名一致では空。 |
 | `previewText` | 一致語と周辺が分かる抜粋。ファイル名一致ではファイル名。表示用の長さ制限を設けてよいが、一致部分を消さない。 |
 | `matchRanges` | `previewText` 内で一致した範囲の `[開始, 終了)`。Unicode の文字単位で数え、GUI が一致箇所を強調表示する。 |
+| `matchType` | 最も強い一致方式。`exact`、`caseFolded`、`normalized`、`separatorVariant`、`identifier`、`kanaVariant`、`prefix`、`substring`、`editDistance` のいずれか。 |
+| `score` | 一致方式に対応する 0～100 の順位値。同じ検索単位に複数方式が成立しても最も高いものだけを返す。 |
 | `previewTruncated` | 抜粋が元の検索単位の全文ではない場合は真。 |
 
 | `sourceKind` | `location` に必要な値 |
@@ -68,7 +70,7 @@ GUI は文書形式の内部構造を解析しない。バックエンドは画�
 
 `SearchIssue` は発生段階（`discovery` または `read`）、判明している場合のパス、分類コード、利用者向けの短い理由を持つ。分類コードは少なくとも `accessDenied`、`unreadable`、`encrypted`、`unsupportedEncoding`、`resourceLimit`、`changedDuringRead`、`internalError` を区別する。内部の例外やスタックトレースを GUI にそのまま渡さない。
 
-`Finished` の終了理由は `completed`、`cancelled`、`failed` のいずれか。`completed` に `Issue` があれば GUI は「完了（一部エラーあり）」と示す。最終集計には `discoveredFiles`、`processedFiles`、`resultCount`、`issueCount` を含める。`processedFiles` は読み取りを試みた対象ファイル数で、個別エラーになったファイルも数える。`resultCount` と `issueCount` は通知した `Result` と `Issue` の件数に厳密に一致する。`processedFiles` は `discoveredFiles` を超えない。中断時も同じ集計を返す。
+`Finished` の終了理由は `completed`、`cancelled`、`failed` のいずれか。`completed` に `Issue` があれば GUI は「完了（一部エラーあり）」と示す。最終集計には `discoveredFiles`、`processedFiles`、`resultCount`、`issueCount` を含める。`processedFiles` は索引の再利用を含め、検索処理を試みた対象ファイル数とする。個別エラーになったファイルも数える。`resultCount` と `issueCount` は通知した `Result` と `Issue` の件数に厳密に一致する。`processedFiles` は `discoveredFiles` を超えない。中断時も同じ集計を返す。
 
 入力拒否は `Finished(failed)` と混同しない。検索が受理された後にバックエンド自身が停止した場合は、途中までの通知を保持して `Finished(failed)` を返す。
 

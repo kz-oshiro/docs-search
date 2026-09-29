@@ -1,4 +1,6 @@
 mod extract;
+mod fuzzy;
+mod index;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -8,9 +10,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use unicode_casefold::UnicodeCaseFold;
 use unicode_normalization::UnicodeNormalization;
+#[cfg(test)]
 use unicode_segmentation::UnicodeSegmentation;
 
 pub use extract::Unit;
+
+pub fn clear_search_index() -> Result<(), String> {
+    index::clear()
+}
 
 const MAX_TEXT_BYTES: u64 = 32 * 1024 * 1024;
 const OFFICE_EXTENSIONS: [&str; 4] = ["xlsx", "xlsm", "pptx", "docx"];
@@ -166,6 +173,8 @@ pub struct SearchHit {
     pub preview_text: String,
     pub preview_truncated: bool,
     pub match_ranges: Vec<[usize; 2]>,
+    pub match_type: &'static str,
+    pub score: u8,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -284,7 +293,10 @@ fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
             message: "対応していない拡張子が含まれています。",
         });
     }
-    let mut roots = vec![canonical_directory(&request.root_directory, "rootDirectory")?];
+    let mut roots = vec![canonical_directory(
+        &request.root_directory,
+        "rootDirectory",
+    )?];
     for directory in &request.additional_directories {
         roots.push(canonical_directory(directory, "additionalDirectories")?);
     }
@@ -306,6 +318,7 @@ pub fn normalize_fold(text: &str) -> String {
     text.nfc().case_fold().collect()
 }
 
+#[cfg(test)]
 fn match_ranges(text: &str, needle: &str) -> Vec<[usize; 2]> {
     if needle.is_empty() {
         return Vec::new();
@@ -337,30 +350,26 @@ fn match_ranges(text: &str, needle: &str) -> Vec<[usize; 2]> {
     ranges
 }
 
-fn preview(value: &str, needle: &str) -> (String, bool) {
+fn preview(value: &str, range: [usize; 2]) -> (String, bool, [usize; 2]) {
     let chars: Vec<char> = value.chars().collect();
     if chars.len() <= 240 {
-        return (value.to_owned(), false);
+        return (value.to_owned(), false, range);
     }
-    let width = 180.max(needle.chars().count() + 80);
-    let mut start = 0;
-    while start < chars.len() {
-        let end = (start + width).min(chars.len());
-        let segment: String = chars[start..end].iter().collect();
-        if normalize_fold(&segment).contains(needle) {
-            return (
-                format!(
-                    "{}{}{}",
-                    if start > 0 { "… " } else { "" },
-                    segment,
-                    if end < chars.len() { " …" } else { "" }
-                ),
-                true,
-            );
-        }
-        start += (width / 2).max(1);
-    }
-    (value.to_owned(), false)
+    let start = range[0].saturating_sub(60).min(chars.len());
+    let end = (start + 180.max(range[1].saturating_sub(start) + 60)).min(chars.len());
+    let before = if start > 0 { "… " } else { "" };
+    let after = if end < chars.len() { " …" } else { "" };
+    (
+        format!(
+            "{before}{}{after}",
+            chars[start..end].iter().collect::<String>()
+        ),
+        true,
+        [
+            range[0] - start + before.chars().count(),
+            range[1] - start + before.chars().count(),
+        ],
+    )
 }
 
 fn issue_for(
@@ -429,10 +438,9 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
         self.counts.issue_count += 1;
         self.send(EventKind::Issue { issue });
     }
-    fn hit(&mut self, path: &Path, file_type: &str, unit: Unit, needle: &str) {
+    fn hit(&mut self, path: &Path, file_type: &str, unit: Unit, matched: fuzzy::Match) {
         self.counts.result_count += 1;
-        let (preview_text, preview_truncated) = preview(&unit.text, needle);
-        let match_ranges = match_ranges(&preview_text, needle);
+        let (preview_text, preview_truncated, range) = preview(&unit.text, matched.range);
         self.send(EventKind::Result {
             hit: SearchHit {
                 result_id: self.counts.result_count,
@@ -442,7 +450,9 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 location: unit.location,
                 preview_text,
                 preview_truncated,
-                match_ranges,
+                match_ranges: vec![range],
+                match_type: matched.kind,
+                score: matched.score,
             },
         });
     }
@@ -458,7 +468,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
 ) -> Result<(), InputError> {
     let paths = validate_paths(&request)?;
     let excluded_keys: Vec<PathBuf> = paths.excluded.iter().map(|path| path_key(path)).collect();
-    let needle = normalize_fold(request.query.trim());
+    let query = fuzzy::Query::new(&request.query);
     let selected: HashSet<String> = request.extensions.iter().cloned().collect();
     let mut sink = Emitter {
         id: search_id,
@@ -533,6 +543,10 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
     }
     sink.progress("search");
+    let mut search_index = index::Index::open().ok();
+    if let Some(cache) = search_index.as_mut() {
+        let _ = cache.prune_missing();
+    }
     files.sort_by(|a, b| a.0.cmp(&b.0));
     for (path, file_type) in files {
         if cancel.load(Ordering::Relaxed) {
@@ -540,7 +554,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
         sink.counts.processed_files += 1;
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if normalize_fold(&name).contains(&needle) {
+        if let Some(matched) = fuzzy::evaluate(&name, &query) {
             sink.hit(
                 &path,
                 &file_type,
@@ -549,8 +563,24 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                     location: json!({}),
                     text: name.into_owned(),
                 },
-                &needle,
+                matched,
             );
+        }
+        if let Some(cache) = search_index.as_ref() {
+            if cache.current(&path) {
+                if let Ok(units) = cache.candidates(&path, &query) {
+                    for unit in units {
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        if let Some(matched) = fuzzy::evaluate(&unit.text, &query) {
+                            sink.hit(&path, &file_type, unit, matched);
+                        }
+                    }
+                    sink.progress("search");
+                    continue;
+                }
+            }
         }
         let result = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
             fs::metadata(&path)
@@ -577,12 +607,21 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         };
         match result {
             Ok(units) => {
-                for unit in units {
+                for unit in &units {
                     if cancel.load(Ordering::Relaxed) {
                         break;
                     }
-                    if normalize_fold(&unit.text).contains(&needle) {
-                        sink.hit(&path, &file_type, unit, &needle);
+                    if fuzzy::could_match(&unit.text, &query) {
+                        if let Some(matched) = fuzzy::evaluate(&unit.text, &query) {
+                            sink.hit(&path, &file_type, unit.clone(), matched);
+                        }
+                    }
+                }
+                if !cancel.load(Ordering::Relaxed) {
+                    if let Some(cache) = search_index.as_mut() {
+                        if cache.replace(&path, &units).is_err() {
+                            search_index = None;
+                        }
                     }
                 }
             }

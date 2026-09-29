@@ -96,6 +96,14 @@ fn cancel_search(search_id: String, state: tauri::State<'_, SearchState>) {
 }
 
 #[tauri::command]
+fn clear_search_index(state: tauri::State<'_, SearchState>) -> Result<(), String> {
+    if state.0.lock().map_err(|_| "検索状態を取得できません。")?.is_some() {
+        return Err("検索中は索引を削除できません。".into());
+    }
+    docs_search_core::clear_search_index()
+}
+
+#[tauri::command]
 fn open_result(path: String) -> Result<(), String> {
     let candidate = std::path::Path::new(&path);
     if !candidate.is_file() {
@@ -111,6 +119,7 @@ fn main() {
             pick_folder,
             start_search,
             cancel_search,
+            clear_search_index,
             open_result
         ])
         .on_window_event(|window, event| {
