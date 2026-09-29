@@ -45,7 +45,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-
 成功後に残る `tauri\docs-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。版番号は Cargo/Tauri のメタデータと Git タグで管理します。GitHub CLI の認証が必要です。
 
 ```powershell
-$version = '2.0.4'  # 次に公開する版番号に置き換える
+$version = '2.0.5'  # 次に公開する版番号に置き換える
 git tag "v$version"
 git push origin "v$version"
 gh release create "v$version" .\tauri\docs-search-desktop.exe --verify-tag --title "docs-search v$version" --notes "Windows x64 実行ファイル"
