@@ -62,6 +62,6 @@ python .\tests\generate-fixtures.py --output .\outputs\test-data\load-manual-new
 
 `expected.counts` は `Finished` の最終集計です。入力拒否ケースはイベントを発行しません。`cancel-load-search` は `load` プロファイル専用で、`Started` 受信後、`Finished` 前に中断操作を配送できるテスト環境で実行します。中断の結果件数は固定せず、イベント件数と最終集計の整合を確認します。Tauri 実装は [テストアダプター](../tauri/tests/run-backend-cases.py) でこの JSON を実行します。PowerShell 実装は仕様と API が異なるため、同じ文書を使って既存動作だけを検証します。
 
-通常検索の1ケースとあいまい検索の3ケースでは `matchType` と `score` も期待値に含めます。検索オプションは `useIndex` と `fuzzySearch` で指定し、省略時はどちらも無効です。確認項目と手順は [あいまい検索の確認方針](../docs/fuzzy-search-test-plan.md) にまとめています。
+通常検索の1ケースとあいまい検索の3ケースでは `matchType`、`matchCategory`、`score` の代表値も期待値に含めます。検索オプションは `useIndex` と `fuzzySearch` で指定し、省略時はどちらも無効です。確認項目と手順は [あいまい検索の確認方針](../docs/fuzzy-search-test-plan.md) と [結果ラベル・エラー表示の確認方針](../docs/result-match-error-test-plan.md) にまとめています。
 
 `manifest.json` は生成した相対パス一覧とシードを記録します。`search/` と `load/` の文書はテスト専用で、実際の利用者文書や正規の Office ファイルの代用品として配布しません。

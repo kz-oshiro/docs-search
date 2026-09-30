@@ -21,6 +21,11 @@ let visibleLimit = pageSize;
 let pendingGroups = new Set();
 let renderFrame = null;
 let copyStatusTimer = null;
+let reportRequest = null;
+let reportFinished = null;
+let reportSearchId = '';
+let reportIssues = [];
+let reportBusy = false;
 function clearCopyStatus() {
   if (copyStatusTimer !== null) clearTimeout(copyStatusTimer);
   copyStatusTimer = null;
@@ -150,6 +155,80 @@ function matchesFilter(group) {
 function updateFilterSummary() {
   set_text('result-filter-summary', `絞り込み後 ${filteredGroups.length} / ${fileGroups.length} ファイル · ${filteredHitCount} / ${totalHitCount} 件`);
   document.getElementById('result-filter-clear').disabled = !filterQuery && !filterExtension;
+  updateReportSummary();
+}
+function updateReportSummary() {
+  const filtered = document.getElementById('export-scope').value === 'filtered';
+  const files = filtered ? filteredGroups.length : fileGroups.length;
+  const hits = filtered ? filteredHitCount : totalHitCount;
+  set_text('export-summary', `${files} ファイル · ${hits} 件を対象`);
+}
+function setReportEnabled(enabled) {
+  for (const id of ['copy-results', 'save-csv', 'save-tsv', 'save-report']) {
+    document.getElementById(id).disabled = !enabled;
+  }
+}
+function makeReport() {
+  const scope = document.getElementById('export-scope').value;
+  const groups = scope === 'filtered' ? filteredGroups : fileGroups;
+  return {
+    schemaVersion: 1, generatedAt: new Date().toISOString(), searchId: reportSearchId, request: reportRequest,
+    finishedReason: reportFinished.reason, counts: reportFinished.counts, scope,
+    filterText: scope === 'filtered' ? document.getElementById('result-filter-text').value.trim() : '',
+    filterExtension: scope === 'filtered' ? filterExtension : '',
+    selectedFileCount: groups.length,
+    rows: groups.flatMap(group => group.hits.map(({ hit, location }) => ({
+      resultId: hit.resultId,
+      fileName: group.path.split(/[\\/]/).pop() || group.path,
+      filePath: group.path, fileType: group.fileType,
+      sourceKind: hit.sourceKind, unitKey: hit.unitKey, partKey: hit.partKey,
+      groupKey: hit.groupKey, row: hit.row ?? null, column: hit.column ?? null,
+      contentClass: hit.contentClass, anchor: hit.anchor ?? null,
+      location, locationData: hit.location,
+      previewText: hit.previewText, previewTruncated: hit.previewTruncated,
+      matchRanges: hit.matchRanges, matchType: hit.matchType,
+      matchCategory: hit.matchCategory, score: hit.score
+    }))),
+    issues: reportIssues
+  };
+}
+export function report_started(searchId, request) {
+  reportSearchId = searchId;
+  reportRequest = request;
+}
+export function report_finished(reason, counts) {
+  reportFinished = { reason, counts };
+  setReportEnabled(Boolean(reportRequest) && !reportBusy);
+}
+export function init_report_actions() {
+  document.getElementById('export-scope').addEventListener('change', updateReportSummary);
+  for (const [id, format] of [['copy-results', 'copy'], ['save-csv', 'csv'], ['save-tsv', 'tsv'], ['save-report', 'json']]) {
+    document.getElementById(id).addEventListener('click', async () => {
+      if (!reportFinished || !reportRequest || reportBusy) return;
+      const report = makeReport();
+      const searchId = report.searchId;
+      reportBusy = true;
+      setReportEnabled(false);
+      clearCopyStatus();
+      set_text('general-error', '');
+      try {
+        if (format === 'copy') {
+          const content = await window.__TAURI__.core.invoke('format_report', { report });
+          await navigator.clipboard.writeText(content);
+          if (searchId === reportSearchId) set_text('copy-status', `${report.rows.length} 件をTSVでコピーしました。`);
+        } else {
+          const saved = await window.__TAURI__.core.invoke('save_report', { report, format });
+          if (saved && searchId === reportSearchId) set_text('copy-status', `${report.rows.length} 件の${format.toUpperCase()}を保存しました。`);
+        }
+      } catch (error) {
+        if (searchId === reportSearchId) set_text('general-error', error?.message ?? String(error));
+      } finally {
+        reportBusy = false;
+        setReportEnabled(reportFinished !== null);
+      }
+    });
+  }
+  updateReportSummary();
 }
 function addFilterType(fileType) {
   const type = fileType.toLowerCase();
@@ -218,9 +297,12 @@ function createMatch(group, { hit, location }) {
   const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'copy-location';
   copy.title = '場所をコピー'; copy.setAttribute('aria-label', `${group.path.split(/[\\/]/).pop() || group.path}、${location}の場所をコピー`);
   copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+  const category = document.createElement('span'); category.className = 'match-category';
+  category.dataset.category = ['standard', 'fuzzy'].includes(hit.matchCategory) ? hit.matchCategory : 'unknown';
+  category.textContent = { standard: '一致検索', fuzzy: 'あいまい検索' }[hit.matchCategory] || '判定不明';
   const labels = { exact: '完全一致', caseFolded: '表記揺れ', normalized: '表記揺れ', separatorVariant: '表記揺れ', identifier: '識別子一致', kanaVariant: '表記揺れ', prefix: '前方一致', substring: '部分一致', editDistance: 'タイプミス候補' };
   const reason = document.createElement('span'); reason.className = 'match-type'; reason.textContent = labels[hit.matchType] || '一致';
-  heading.append(place, reason, copy);
+  heading.append(place, category, reason, copy);
   const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
   item.append(heading, preview);
   copy.addEventListener('click', async () => {
@@ -281,7 +363,8 @@ export function selected_extensions() { return Array.from(document.querySelector
 export function set_text(id, value) { document.getElementById(id).textContent = value; }
 export function set_status(value) {
   set_text('status', value);
-  document.querySelector('.summary').dataset.state = value.includes('失敗') || value.includes('エラー') || value.includes('確認')
+  document.querySelector('.summary').dataset.state = value === '全体失敗' ? 'failed'
+    : value.includes('エラー') ? 'warning' : value.includes('失敗') || value.includes('確認')
     ? 'error' : value.includes('中断') ? 'paused' : value.startsWith('完了') ? 'complete' : 'active';
 }
 export function disabled(id, value) { document.getElementById(id).disabled = value; }
@@ -293,8 +376,11 @@ export function clear_results() {
   const panel = document.getElementById('issues-panel'); panel.hidden = true; panel.open = false;
   set_text('issue-count', '0');
   fileGroups = []; filteredGroups = []; groupsByPath = new Map(); issuePaths = new Set(); availableTypes = new Set();
+  reportRequest = null; reportFinished = null; reportSearchId = ''; reportIssues = [];
+  setReportEnabled(false);
   filterQuery = ''; filterExtension = ''; totalHitCount = 0; filteredHitCount = 0;
   document.getElementById('result-filter-text').value = '';
+  document.getElementById('export-scope').value = 'filtered';
   const typeSelect = document.getElementById('result-filter-extension');
   typeSelect.replaceChildren(typeSelect.firstElementChild); typeSelect.value = '';
   shownGroups = 0; visibleLimit = pageSize; pendingGroups = new Set(); renderFrame = null;
@@ -335,7 +421,12 @@ export function rank_results() {
 }
 export function enable_more() { document.getElementById('more').addEventListener('click', () => { visibleLimit += pageSize; updateMore(); scheduleRender(); }); }
 export function add_issue(issue) {
-  const row = document.createElement('li'); row.textContent = `${issue.path || '(場所不明)'} · ${issue.reason}`; row.title = issue.path || '';
+  reportIssues.push(issue);
+  const row = document.createElement('li');
+  const label = document.createElement('span'); label.className = 'issue-label'; label.textContent = issue.stage === 'read' ? '読み取りエラー' : issue.stage === 'discovery' ? '列挙エラー' : 'エラー';
+  const path = document.createElement('strong'); path.className = 'issue-path'; path.textContent = issue.path || '場所不明';
+  const reason = document.createElement('span'); reason.className = 'issue-reason'; reason.textContent = issue.reason;
+  row.append(label, path, reason);
   const list = document.getElementById('issues'); list.append(row);
   if (issue.path) {
     issuePaths.add(issue.path);
@@ -366,6 +457,9 @@ extern "C" {
     fn init_folder_lists();
     fn show_extension_picker();
     fn add_issue(issue: JsValue);
+    fn report_started(search_id: &str, request: JsValue);
+    fn report_finished(reason: &str, counts: JsValue);
+    fn init_report_actions();
 }
 
 #[derive(Default)]
@@ -449,10 +543,10 @@ fn location(kind: &str, data: &Value) -> String {
 }
 
 fn on_search() {
-    let roots: Vec<String> = serde_wasm_bindgen::from_value(selected_folders("root-folders"))
-        .unwrap_or_default();
-    let excluded: Vec<String> = serde_wasm_bindgen::from_value(selected_folders("excluded-folders"))
-        .unwrap_or_default();
+    let roots: Vec<String> =
+        serde_wasm_bindgen::from_value(selected_folders("root-folders")).unwrap_or_default();
+    let excluded: Vec<String> =
+        serde_wasm_bindgen::from_value(selected_folders("excluded-folders")).unwrap_or_default();
     let root = roots.first().cloned().unwrap_or_default();
     let additional: Vec<String> = roots.into_iter().skip(1).collect();
     let query = input("query");
@@ -469,11 +563,17 @@ fn on_search() {
         return;
     }
     if root.is_empty() || additional.iter().any(|directory| directory.is_empty()) {
-        set_text("root-error", "検索フォルダーの空欄を入力するか削除してください。");
+        set_text(
+            "root-error",
+            "検索フォルダーの空欄を入力するか削除してください。",
+        );
         return;
     }
     if excluded.iter().any(|directory| directory.is_empty()) {
-        set_text("excluded-error", "対象外フォルダーの空欄を入力するか削除してください。");
+        set_text(
+            "excluded-error",
+            "対象外フォルダーの空欄を入力するか削除してください。",
+        );
         return;
     }
     if extensions.is_empty() {
@@ -519,7 +619,10 @@ fn on_search() {
             };
             set_text(target, &message(error));
             set_status("入力を確認してください。");
-            set_text("empty-state", "検索を開始できませんでした。入力とエラーを確認してください。");
+            set_text(
+                "empty-state",
+                "検索を開始できませんでした。入力とエラーを確認してください。",
+            );
             STATE.with(|cell| {
                 let mut state = cell.borrow_mut();
                 state.running = false;
@@ -553,7 +656,10 @@ fn on_clear_index() {
     set_text("general-error", "");
     spawn_local(async move {
         match JsFuture::from(invoke("clear_search_index", JsValue::NULL)).await {
-            Ok(_) => set_text("copy-status", "検索用索引を削除しました。次回、索引を有効にすると再作成します。"),
+            Ok(_) => set_text(
+                "copy-status",
+                "検索用索引を削除しました。次回、索引を有効にすると再作成します。",
+            ),
             Err(error) => set_text("general-error", &message(error)),
         }
     });
@@ -567,7 +673,10 @@ fn on_event(payload: JsValue) {
     }
     let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
     match kind {
-        "started" => set_status("列挙中…"),
+        "started" => {
+            report_started(id, js(&event["request"]));
+            set_status("列挙中…");
+        }
         "progress" | "finished" => {
             let counts = &event["counts"];
             let count = |key: &str| counts[key].as_u64().unwrap_or(0);
@@ -590,13 +699,11 @@ fn on_event(payload: JsValue) {
             };
             set_text("counts", &summary);
             if kind == "progress" && !STATE.with(|cell| cell.borrow().cancelling) {
-                set_status(
-                    if event["phase"] == "discovery" {
-                        "列挙中…"
-                    } else {
-                        "検索中…"
-                    },
-                );
+                set_status(if event["phase"] == "discovery" {
+                    "列挙中…"
+                } else {
+                    "検索中…"
+                });
             }
         }
         "result" => {
@@ -612,22 +719,23 @@ fn on_event(payload: JsValue) {
     if kind == "finished" {
         rank_results();
         let reason = event["reason"].as_str().unwrap_or("failed");
+        report_finished(reason, js(&event["counts"]));
         let issues = event["counts"]["issueCount"].as_u64().unwrap_or(0);
         let results = event["counts"]["resultCount"].as_u64().unwrap_or(0);
-        set_status(
-            match reason {
-                "completed" if issues > 0 => "完了（一部エラーあり）",
-                "completed" if results == 0 => "完了 · 該当なし",
-                "completed" => "完了",
-                "cancelled" => "中断",
-                _ => "全体失敗",
-            },
-        );
+        set_status(match reason {
+            "completed" if issues > 0 => "完了（一部エラーあり）",
+            "completed" if results == 0 => "完了 · 該当なし",
+            "completed" => "完了",
+            "cancelled" => "中断",
+            _ => "全体失敗",
+        });
         if results == 0 {
             set_text(
                 "empty-state",
                 match reason {
-                    "completed" => "一致する結果はありませんでした。検索語や対象ファイルを確認してください。",
+                    "completed" => {
+                        "一致する結果はありませんでした。検索語や対象ファイルを確認してください。"
+                    }
                     "cancelled" => "検索は中断されました。条件を変えて再検索できます。",
                     _ => "検索を完了できませんでした。上のエラーを確認してください。",
                 },
@@ -650,6 +758,7 @@ pub fn start() {
     bind("clear-index", "click", clear.as_ref().unchecked_ref());
     clear.forget();
     init_result_filter();
+    init_report_actions();
     init_extension_summary();
     init_folder_lists();
     let search = Closure::<dyn FnMut()>::new(on_search);

@@ -52,6 +52,7 @@ fn main() {
         additional_directories,
         excluded_directories,
         query: args[2].clone(),
+        query_spec: None,
         recursive: true,
         extensions,
         use_index,

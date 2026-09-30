@@ -1,5 +1,6 @@
 use encoding_rs::SHIFT_JIS;
 use roxmltree::{Document, Node};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -16,6 +17,163 @@ pub struct Unit {
     pub source_kind: &'static str,
     pub location: Value,
     pub text: String,
+    pub meta: UnitMeta,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitMeta {
+    pub unit_key: String,
+    pub part_key: String,
+    pub group_key: String,
+    pub row: Option<u32>,
+    pub column: Option<u32>,
+    pub content_class: String,
+    pub anchor: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetMeta {
+    pub part_key: String,
+    pub sheet_name: String,
+    pub merge_ranges: Vec<CellRange>,
+    pub hidden_rows: Vec<u32>,
+    pub hidden_columns: Vec<ColumnRange>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CellRange {
+    pub first_row: u32,
+    pub first_column: u32,
+    pub last_row: u32,
+    pub last_column: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnRange {
+    pub first: u32,
+    pub last: u32,
+}
+
+#[derive(Debug, Default)]
+pub struct ExtractedDocument {
+    pub units: Vec<Unit>,
+    pub sheets: Vec<SheetMeta>,
+}
+
+impl Unit {
+    pub fn new(source_kind: &'static str, location: Value, text: String) -> Self {
+        Self {
+            source_kind,
+            location,
+            text,
+            meta: UnitMeta {
+                content_class: "body".into(),
+                ..UnitMeta::default()
+            },
+        }
+    }
+
+    fn in_part(mut self, part: &str) -> Self {
+        self.meta.part_key = part.to_owned();
+        self
+    }
+
+    fn excel_cell(part: &str, sheet: &str, address: &str, text: String) -> Self {
+        let mut unit = Self::new(
+            "cell",
+            json!({"sheetName": sheet, "cellAddress": address}),
+            text,
+        )
+        .in_part(part);
+        if let Some((row, column)) = parse_cell_address(address) {
+            unit.meta.row = Some(row);
+            unit.meta.column = Some(column);
+            unit.meta.group_key = format!("{part}#row:{row}");
+        }
+        unit
+    }
+}
+
+fn assign_keys(units: &mut [Unit]) {
+    for (index, unit) in units.iter_mut().enumerate() {
+        unit.meta.unit_key = (index + 1).to_string();
+        if unit.meta.group_key.is_empty() {
+            unit.meta.group_key = format!("unit:{}", index + 1);
+        }
+    }
+}
+
+fn parse_cell_address(address: &str) -> Option<(u32, u32)> {
+    let mut column = 0u32;
+    let mut boundary = 0;
+    for (index, ch) in address.char_indices() {
+        if !ch.is_ascii_alphabetic() {
+            break;
+        }
+        column = column
+            .checked_mul(26)?
+            .checked_add(u32::from(ch.to_ascii_uppercase() as u8 - b'A') + 1)?;
+        boundary = index + ch.len_utf8();
+    }
+    if boundary == 0 || column == 0 || column > 16_384 {
+        return None;
+    }
+    let row = address[boundary..].parse::<u32>().ok()?;
+    if row == 0 || row > 1_048_576 {
+        return None;
+    }
+    Some((row, column))
+}
+
+fn sheet_meta(doc: &Document<'_>, part: &str, name: &str) -> SheetMeta {
+    let mut sheet = SheetMeta {
+        part_key: part.to_owned(),
+        sheet_name: name.to_owned(),
+        ..SheetMeta::default()
+    };
+    for merge in doc.descendants().filter(|node| element(*node, "mergeCell")) {
+        let Some((first, last)) = attr(merge, "ref").and_then(|value| value.split_once(':')) else {
+            continue;
+        };
+        if let (Some((first_row, first_column)), Some((last_row, last_column))) =
+            (parse_cell_address(first), parse_cell_address(last))
+        {
+            if first_row <= last_row && first_column <= last_column {
+                sheet.merge_ranges.push(CellRange {
+                    first_row,
+                    first_column,
+                    last_row,
+                    last_column,
+                });
+            }
+        }
+    }
+    for row in doc.descendants().filter(|node| element(*node, "row")) {
+        if matches!(attr(row, "hidden"), Some("1" | "true")) {
+            if let Some(number) = attr(row, "r").and_then(|value| value.parse::<u32>().ok()) {
+                if (1..=1_048_576).contains(&number) {
+                    sheet.hidden_rows.push(number);
+                }
+            }
+        }
+    }
+    for column in doc.descendants().filter(|node| element(*node, "col")) {
+        if matches!(attr(column, "hidden"), Some("1" | "true")) {
+            if let (Some(first), Some(last)) = (
+                attr(column, "min").and_then(|value| value.parse::<u32>().ok()),
+                attr(column, "max").and_then(|value| value.parse::<u32>().ok()),
+            ) {
+                if first > 0 && first <= last && last <= 16_384 {
+                    sheet.hidden_columns.push(ColumnRange { first, last });
+                }
+            }
+        }
+    }
+    sheet
 }
 
 #[derive(Debug)]
@@ -230,18 +388,22 @@ pub fn text_units(bytes: &[u8]) -> Result<Vec<Unit>, ExtractError> {
                 message: "UTF-8 または Shift_JIS として読めません。".into(),
             })?
     };
-    Ok(text
+    let mut units: Vec<Unit> = text
         .lines()
         .enumerate()
-        .map(|(i, line)| Unit {
-            source_kind: "textLine",
-            location: json!({"lineNumber": i + 1}),
-            text: line.trim_end_matches('\r').to_owned(),
+        .map(|(i, line)| {
+            Unit::new(
+                "textLine",
+                json!({"lineNumber": i + 1}),
+                line.trim_end_matches('\r').to_owned(),
+            )
         })
-        .collect())
+        .collect();
+    assign_keys(&mut units);
+    Ok(units)
 }
 
-pub fn office_units(path: &Path, file_type: &str) -> Result<Vec<Unit>, ExtractError> {
+pub fn office_units(path: &Path, file_type: &str) -> Result<ExtractedDocument, ExtractError> {
     let metadata = std::fs::metadata(path)?;
     if metadata.len() > MAX_TOTAL {
         return Err(ExtractError::limit(
@@ -249,15 +411,23 @@ pub fn office_units(path: &Path, file_type: &str) -> Result<Vec<Unit>, ExtractEr
         ));
     }
     let archive = read_archive(File::open(path)?)?;
-    match file_type {
+    let mut document = match file_type {
         "xlsx" | "xlsm" => excel_units(&archive),
-        "pptx" => powerpoint_units(&archive),
-        "docx" => word_units(&archive),
+        "pptx" => powerpoint_units(&archive).map(|units| ExtractedDocument {
+            units,
+            sheets: vec![],
+        }),
+        "docx" => word_units(&archive).map(|units| ExtractedDocument {
+            units,
+            sheets: vec![],
+        }),
         _ => Err(ExtractError::unreadable("対応していない形式です。")),
-    }
+    }?;
+    assign_keys(&mut document.units);
+    Ok(document)
 }
 
-fn excel_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractError> {
+fn excel_units(archive: &HashMap<String, String>) -> Result<ExtractedDocument, ExtractError> {
     let workbook_part = main_part(archive, "workbook.xml")?;
     let workbook = parsed(archive, &workbook_part)?;
     let rels = relationships(archive, &workbook_part)?;
@@ -272,6 +442,7 @@ fn excel_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractEr
         }
     }
     let mut units = Vec::new();
+    let mut sheets = Vec::new();
     for sheet in workbook.descendants().filter(|n| element(*n, "sheet")) {
         let name = attr(sheet, "name").unwrap_or("(名称なし)");
         let id = attr(sheet, "id")
@@ -282,6 +453,7 @@ fn excel_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractEr
             .map(|(part, _)| part)
             .ok_or_else(|| ExtractError::unreadable("シートの参照先がありません。"))?;
         let doc = parsed(archive, part)?;
+        sheets.push(sheet_meta(&doc, part, name));
         for cell in doc.descendants().filter(|n| element(*n, "c")) {
             let address = attr(cell, "r").unwrap_or("");
             if address.is_empty() {
@@ -319,11 +491,7 @@ fn excel_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractEr
                     "e" => continue,
                     _ => value,
                 };
-            units.push(Unit {
-                source_kind: "cell",
-                location: json!({"sheetName": name, "cellAddress": address}),
-                text: value,
-            });
+            units.push(Unit::excel_cell(part, name, address, value));
         }
         let sheet_rels = relationships(archive, part)?;
         for link in doc
@@ -336,16 +504,16 @@ fn excel_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractEr
             };
             let drawing = parsed(archive, drawing_part)?;
             if element(link, "legacyDrawing") {
-                excel_vml(&drawing, name, &mut units);
+                excel_vml(&drawing, name, drawing_part, &mut units);
             } else {
-                excel_drawing(&drawing, name, &mut units);
+                excel_drawing(&drawing, name, drawing_part, &mut units);
             }
         }
     }
-    Ok(units)
+    Ok(ExtractedDocument { units, sheets })
 }
 
-fn excel_drawing(doc: &Document<'_>, sheet: &str, units: &mut Vec<Unit>) {
+fn excel_drawing(doc: &Document<'_>, sheet: &str, part: &str, units: &mut Vec<Unit>) {
     for anchor in doc.descendants().filter(|n| {
         n.is_element()
             && ["twoCellAnchor", "oneCellAnchor", "absoluteAnchor"].contains(&n.tag_name().name())
@@ -386,16 +554,14 @@ fn excel_drawing(doc: &Document<'_>, sheet: &str, units: &mut Vec<Unit>) {
             if let Some(anchor) = &position {
                 location["anchor"] = json!(anchor);
             }
-            units.push(Unit {
-                source_kind: "shape",
-                location,
-                text,
-            });
+            let mut unit = Unit::new("shape", location, text).in_part(part);
+            unit.meta.anchor = position.clone();
+            units.push(unit);
         }
     }
 }
 
-fn excel_vml(doc: &Document<'_>, sheet: &str, units: &mut Vec<Unit>) {
+fn excel_vml(doc: &Document<'_>, sheet: &str, part: &str, units: &mut Vec<Unit>) {
     for (index, shape) in doc
         .descendants()
         .filter(|n| element(*n, "shape"))
@@ -432,11 +598,9 @@ fn excel_vml(doc: &Document<'_>, sheet: &str, units: &mut Vec<Unit>) {
         if let (Some(row), Some(col)) = (row, col) {
             location["anchor"] = json!(format!("{}{}", column(col + 1), row + 1));
         }
-        units.push(Unit {
-            source_kind: "shape",
-            location,
-            text,
-        });
+        let mut unit = Unit::new("shape", location, text).in_part(part);
+        unit.meta.anchor = unit.location["anchor"].as_str().map(str::to_owned);
+        units.push(unit);
     }
 }
 
@@ -483,11 +647,14 @@ fn powerpoint_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, Extr
                 .filter(|s| !s.is_empty())
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("図形 {}", index + 1));
-            units.push(Unit {
-                source_kind: "shape",
-                location: json!({"slideNumber": i + 1, "shapeName": name}),
-                text,
-            });
+            units.push(
+                Unit::new(
+                    "shape",
+                    json!({"slideNumber": i + 1, "shapeName": name}),
+                    text,
+                )
+                .in_part(part),
+            );
         }
         for (index, frame) in doc
             .descendants()
@@ -508,7 +675,7 @@ fn powerpoint_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, Extr
                 for (col, cell) in tr.children().filter(|n| element(*n, "tc")).enumerate() {
                     let text = all_text(cell, "t");
                     if !text.is_empty() {
-                        units.push(Unit { source_kind: "slideTableCell", location: json!({"slideNumber": i + 1, "tableName": name, "row": row + 1, "column": col + 1}), text });
+                        units.push(Unit::new("slideTableCell", json!({"slideNumber": i + 1, "tableName": name, "row": row + 1, "column": col + 1}), text).in_part(part));
                     }
                 }
             }
@@ -525,13 +692,14 @@ fn word_units(archive: &HashMap<String, String>) -> Result<Vec<Unit>, ExtractErr
         .find(|n| element(*n, "body"))
         .ok_or_else(|| ExtractError::unreadable("Word 本文がありません。"))?;
     let mut units = Vec::new();
-    word_block(body, &[], &mut units)?;
+    word_block(body, &[], &part, &mut units)?;
     Ok(units)
 }
 
 fn word_block(
     container: Node<'_, '_>,
     path: &[Value],
+    part: &str,
     units: &mut Vec<Unit>,
 ) -> Result<(), ExtractError> {
     let mut paragraph = 0;
@@ -544,17 +712,19 @@ fn word_block(
                 continue;
             }
             if path.is_empty() {
-                units.push(Unit {
-                    source_kind: "paragraph",
-                    location: json!({"paragraphNumber": paragraph}),
-                    text,
-                });
+                units.push(
+                    Unit::new("paragraph", json!({"paragraphNumber": paragraph}), text)
+                        .in_part(part),
+                );
             } else {
-                units.push(Unit {
-                    source_kind: "wordTableParagraph",
-                    location: json!({"tablePath": path, "paragraphNumber": paragraph}),
-                    text,
-                });
+                units.push(
+                    Unit::new(
+                        "wordTableParagraph",
+                        json!({"tablePath": path, "paragraphNumber": paragraph}),
+                        text,
+                    )
+                    .in_part(part),
+                );
             }
         } else if element(node, "tbl") {
             if path.len() >= 16 {
@@ -565,7 +735,7 @@ fn word_block(
                 for (col, cell) in tr.children().filter(|n| element(*n, "tc")).enumerate() {
                     let mut nested_path = path.to_vec();
                     nested_path.push(json!({"table": table, "row": row + 1, "column": col + 1}));
-                    word_block(cell, &nested_path, units)?;
+                    word_block(cell, &nested_path, part, units)?;
                 }
             }
         }
@@ -576,6 +746,36 @@ fn word_block(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn excel_coordinates_and_rows_are_sparse_and_distinct() {
+        assert_eq!(parse_cell_address("A1"), Some((1, 1)));
+        assert_eq!(parse_cell_address("XFD1048576"), Some((1_048_576, 16_384)));
+        assert_eq!(parse_cell_address("XFE1"), None);
+        assert_eq!(parse_cell_address("A0"), None);
+        let mut units = vec![
+            Unit::excel_cell("xl/worksheets/sheet1.xml", "Sheet1", "A12", "顧客".into()),
+            Unit::excel_cell("xl/worksheets/sheet1.xml", "Sheet1", "D12", "必須".into()),
+            Unit::excel_cell("xl/worksheets/sheet2.xml", "Sheet2", "A12", "別".into()),
+        ];
+        assign_keys(&mut units);
+        assert_eq!(units[0].meta.group_key, units[1].meta.group_key);
+        assert_ne!(units[0].meta.group_key, units[2].meta.group_key);
+        assert_ne!(units[0].meta.unit_key, units[1].meta.unit_key);
+        assert_eq!(units[1].meta.column, Some(4));
+    }
+
+    #[test]
+    fn sheet_metadata_keeps_merge_and_hidden_ranges_without_expansion() {
+        let xml = r#"<worksheet><cols><col min="3" max="100" hidden="1"/></cols><sheetData><row r="12" hidden="1"/></sheetData><mergeCells><mergeCell ref="A12:D12"/></mergeCells></worksheet>"#;
+        let document = Document::parse(xml).unwrap();
+        let meta = sheet_meta(&document, "xl/worksheets/sheet1.xml", "Sheet1");
+        assert_eq!(meta.merge_ranges.len(), 1);
+        assert_eq!(meta.merge_ranges[0].last_column, 4);
+        assert_eq!(meta.hidden_rows, vec![12]);
+        assert_eq!(meta.hidden_columns.len(), 1);
+        assert_eq!(meta.hidden_columns[0].last, 100);
+    }
 
     #[test]
     fn text_units_decode_utf8_bom_and_shift_jis_without_replacement() {
@@ -607,7 +807,13 @@ mod tests {
         }
         xml.push_str("</body>");
         let document = Document::parse(&xml).expect("valid test XML");
-        let error = word_block(document.root_element(), &[], &mut Vec::new()).unwrap_err();
+        let error = word_block(
+            document.root_element(),
+            &[],
+            "word/document.xml",
+            &mut Vec::new(),
+        )
+        .unwrap_err();
         assert_eq!(error.code, "resourceLimit");
     }
 }

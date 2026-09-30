@@ -1,4 +1,7 @@
-use crate::{fuzzy, Unit};
+use crate::{
+    extract::{ExtractedDocument, SheetMeta, UnitMeta},
+    fuzzy, Unit,
+};
 use rusqlite::{params, Connection};
 use std::collections::HashSet;
 use std::fs;
@@ -6,6 +9,9 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 pub struct Index(Connection);
+const SCHEMA_VERSION: i64 = 2;
+pub const EXTRACTION_VERSION: i64 = 2;
+pub const DEFAULT_SCOPE: i64 = 0;
 
 fn database_path() -> Option<PathBuf> {
     let root = std::env::var_os("LOCALAPPDATA")
@@ -20,13 +26,31 @@ fn database_path() -> Option<PathBuf> {
     )
 }
 
-fn stamp(path: &Path) -> Option<(i64, i64)> {
+pub(crate) fn stamp(path: &Path) -> Option<(i64, i64)> {
     let metadata = fs::metadata(path).ok()?;
     let modified = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
     Some((
         i64::try_from(metadata.len()).ok()?,
         i64::try_from(modified.as_nanos()).ok()?,
     ))
+}
+
+fn initialize(connection: &Connection) -> rusqlite::Result<()> {
+    let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if version != SCHEMA_VERSION {
+        connection.execute_batch("DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS tokens; DROP TABLE IF EXISTS units; DROP TABLE IF EXISTS files;")?;
+    }
+    connection.execute_batch("\
+        CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, size INTEGER NOT NULL, modified INTEGER NOT NULL, extraction_version INTEGER NOT NULL, extraction_scope INTEGER NOT NULL, sheets TEXT NOT NULL);\
+        CREATE TABLE IF NOT EXISTS units(id INTEGER PRIMARY KEY, file_path TEXT NOT NULL, source_kind TEXT NOT NULL, location TEXT NOT NULL, text TEXT NOT NULL, loose TEXT NOT NULL, unit_key TEXT NOT NULL, part_key TEXT NOT NULL, group_key TEXT NOT NULL, row_number INTEGER, column_number INTEGER, content_class TEXT NOT NULL, anchor TEXT);\
+        CREATE INDEX IF NOT EXISTS units_file ON units(file_path);\
+        CREATE UNIQUE INDEX IF NOT EXISTS units_key ON units(file_path, unit_key);\
+        CREATE INDEX IF NOT EXISTS units_group ON units(file_path, group_key);\
+        CREATE TABLE IF NOT EXISTS grams(gram TEXT NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(gram, unit_id));\
+        CREATE INDEX IF NOT EXISTS grams_unit ON grams(unit_id);\
+        CREATE TABLE IF NOT EXISTS tokens(token TEXT NOT NULL, first TEXT NOT NULL, length INTEGER NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(token, unit_id));\
+        CREATE INDEX IF NOT EXISTS tokens_lookup ON tokens(first, length);\
+        PRAGMA user_version=2;")
 }
 
 impl Index {
@@ -56,19 +80,7 @@ impl Index {
             );
         }
         let connection = Connection::open(path)?;
-        let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version != 1 {
-            connection.execute_batch("DROP TABLE IF EXISTS grams; DROP TABLE IF EXISTS tokens; DROP TABLE IF EXISTS units; DROP TABLE IF EXISTS files;")?;
-        }
-        connection.execute_batch("\
-            CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, size INTEGER NOT NULL, modified INTEGER NOT NULL);\
-            CREATE TABLE IF NOT EXISTS units(id INTEGER PRIMARY KEY, file_path TEXT NOT NULL, source_kind TEXT NOT NULL, location TEXT NOT NULL, text TEXT NOT NULL, loose TEXT NOT NULL);\
-            CREATE INDEX IF NOT EXISTS units_file ON units(file_path);\
-            CREATE TABLE IF NOT EXISTS grams(gram TEXT NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(gram, unit_id));\
-            CREATE INDEX IF NOT EXISTS grams_unit ON grams(unit_id);\
-            CREATE TABLE IF NOT EXISTS tokens(token TEXT NOT NULL, first TEXT NOT NULL, length INTEGER NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(token, unit_id));\
-            CREATE INDEX IF NOT EXISTS tokens_lookup ON tokens(first, length);\
-            PRAGMA user_version=1;")?;
+        initialize(&connection)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -79,17 +91,27 @@ impl Index {
         Ok(Self(connection))
     }
 
-    pub fn current(&self, path: &Path) -> bool {
+    pub fn current(&self, path: &Path, scope: i64) -> bool {
         let Some((size, modified)) = stamp(path) else {
             return false;
         };
         self.0
             .query_row(
-                "SELECT size, modified FROM files WHERE path=?1",
+                "SELECT size, modified, extraction_version, extraction_scope FROM files WHERE path=?1",
                 [path.to_string_lossy().as_ref()],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?, row.get::<_, i64>(3)?)),
             )
-            .is_ok_and(|stored| stored == (size, modified))
+            .is_ok_and(|stored| stored == (size, modified, EXTRACTION_VERSION, scope))
+            && self.sheet_metadata(path).is_ok()
+    }
+
+    pub fn sheet_metadata(&self, path: &Path) -> rusqlite::Result<Vec<SheetMeta>> {
+        let data: String = self.0.query_row(
+            "SELECT sheets FROM files WHERE path=?1",
+            [path.to_string_lossy().as_ref()],
+            |row| row.get(0),
+        )?;
+        serde_json::from_str(&data).map_err(|_| rusqlite::Error::InvalidQuery)
     }
 
     pub fn prune_missing(&mut self) -> rusqlite::Result<()> {
@@ -121,10 +143,19 @@ impl Index {
         tx.commit()
     }
 
-    pub fn replace(&mut self, path: &Path, units: &[Unit]) -> rusqlite::Result<()> {
-        let Some((size, modified)) = stamp(path) else {
-            return Ok(());
-        };
+    pub fn replace(
+        &mut self,
+        path: &Path,
+        document: &ExtractedDocument,
+        expected_stamp: (i64, i64),
+        scope: i64,
+    ) -> rusqlite::Result<bool> {
+        if stamp(path) != Some(expected_stamp) {
+            return Ok(false);
+        }
+        let (size, modified) = expected_stamp;
+        let sheets =
+            serde_json::to_string(&document.sheets).map_err(|_| rusqlite::Error::InvalidQuery)?;
         let file_path = path.to_string_lossy();
         let tx = self.0.transaction()?;
         tx.execute(
@@ -137,10 +168,10 @@ impl Index {
         )?;
         tx.execute("DELETE FROM units WHERE file_path=?1", [file_path.as_ref()])?;
         tx.execute("DELETE FROM files WHERE path=?1", [file_path.as_ref()])?;
-        for unit in units {
+        for unit in &document.units {
             let loose = fuzzy::loose_key(&unit.text);
-            tx.execute("INSERT INTO units(file_path,source_kind,location,text,loose) VALUES(?1,?2,?3,?4,?5)",
-                params![file_path.as_ref(), unit.source_kind, unit.location.to_string(), unit.text, loose])?;
+            tx.execute("INSERT INTO units(file_path,source_kind,location,text,loose,unit_key,part_key,group_key,row_number,column_number,content_class,anchor) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+                params![file_path.as_ref(), unit.source_kind, unit.location.to_string(), unit.text, loose, unit.meta.unit_key, unit.meta.part_key, unit.meta.group_key, unit.meta.row, unit.meta.column, unit.meta.content_class, unit.meta.anchor])?;
             let id = tx.last_insert_rowid();
             for gram in fuzzy::grams(&loose, 3)
                 .into_iter()
@@ -162,11 +193,15 @@ impl Index {
                 )?;
             }
         }
+        if stamp(path) != Some(expected_stamp) {
+            return Ok(false);
+        }
         tx.execute(
-            "INSERT INTO files(path,size,modified) VALUES(?1,?2,?3)",
-            params![file_path.as_ref(), size, modified],
+            "INSERT INTO files(path,size,modified,extraction_version,extraction_scope,sheets) VALUES(?1,?2,?3,?4,?5,?6)",
+            params![file_path.as_ref(), size, modified, EXTRACTION_VERSION, scope, sheets],
         )?;
-        tx.commit()
+        tx.commit()?;
+        Ok(true)
     }
 
     pub fn candidates(
@@ -234,17 +269,38 @@ impl Index {
         }
         let mut statement = self
             .0
-            .prepare("SELECT source_kind, location, text FROM units WHERE id=?1")?;
+            .prepare("SELECT source_kind, location, text, unit_key, part_key, group_key, row_number, column_number, content_class, anchor FROM units WHERE id=?1")?;
         let mut result = Vec::with_capacity(ids.len());
         for id in ids {
             let unit = statement.query_row([id], |row| {
                 let kind: String = row.get(0)?;
                 let location: String = row.get(1)?;
                 let text: String = row.get(2)?;
+                let location =
+                    serde_json::from_str(&location).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                let row_number: Option<i64> = row.get(6)?;
+                let column_number: Option<i64> = row.get(7)?;
                 Ok(Unit {
-                    source_kind: source_kind(&kind),
-                    location: serde_json::from_str(&location).unwrap_or_default(),
+                    source_kind: source_kind(&kind)?,
+                    location,
                     text,
+                    meta: UnitMeta {
+                        unit_key: row.get(3)?,
+                        part_key: row.get(4)?,
+                        group_key: row.get(5)?,
+                        row: row_number
+                            .map(|value| {
+                                u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery)
+                            })
+                            .transpose()?,
+                        column: column_number
+                            .map(|value| {
+                                u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery)
+                            })
+                            .transpose()?,
+                        content_class: row.get(8)?,
+                        anchor: row.get(9)?,
+                    },
                 })
             })?;
             result.push(unit);
@@ -253,15 +309,16 @@ impl Index {
     }
 }
 
-fn source_kind(kind: &str) -> &'static str {
+fn source_kind(kind: &str) -> rusqlite::Result<&'static str> {
     match kind {
-        "fileName" => "fileName",
-        "cell" => "cell",
-        "shape" => "shape",
-        "slideTableCell" => "slideTableCell",
-        "paragraph" => "paragraph",
-        "wordTableParagraph" => "wordTableParagraph",
-        _ => "textLine",
+        "fileName" => Ok("fileName"),
+        "cell" => Ok("cell"),
+        "shape" => Ok("shape"),
+        "slideTableCell" => Ok("slideTableCell"),
+        "paragraph" => Ok("paragraph"),
+        "wordTableParagraph" => Ok("wordTableParagraph"),
+        "textLine" => Ok("textLine"),
+        _ => Err(rusqlite::Error::InvalidQuery),
     }
 }
 
@@ -279,4 +336,99 @@ pub fn clear() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::extract::{CellRange, SheetMeta};
+    use serde_json::json;
+    use std::time::SystemTime;
+
+    #[test]
+    fn old_index_schema_is_recreated() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE files(path TEXT PRIMARY KEY, size INTEGER, modified INTEGER); INSERT INTO files VALUES('old', 1, 1); PRAGMA user_version=1;").unwrap();
+        initialize(&connection).unwrap();
+        let version: i64 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn index_preserves_unit_and_sheet_metadata_and_invalidates_scope() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize(&connection).unwrap();
+        let mut index = Index(connection);
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "docs-search-index-{}-{suffix}.txt",
+            std::process::id()
+        ));
+        fs::write(&path, b"customer").unwrap();
+        let original = stamp(&path).unwrap();
+        let mut unit = Unit::new(
+            "cell",
+            json!({"sheetName":"Sheet1","cellAddress":"A12"}),
+            "customer".into(),
+        );
+        unit.meta = UnitMeta {
+            unit_key: "1".into(),
+            part_key: "xl/worksheets/sheet1.xml".into(),
+            group_key: "xl/worksheets/sheet1.xml#row:12".into(),
+            row: Some(12),
+            column: Some(1),
+            content_class: "body".into(),
+            anchor: None,
+        };
+        let document = ExtractedDocument {
+            units: vec![unit],
+            sheets: vec![SheetMeta {
+                part_key: "xl/worksheets/sheet1.xml".into(),
+                sheet_name: "Sheet1".into(),
+                merge_ranges: vec![CellRange {
+                    first_row: 12,
+                    first_column: 1,
+                    last_row: 12,
+                    last_column: 4,
+                }],
+                hidden_rows: vec![12],
+                hidden_columns: vec![],
+            }],
+        };
+        assert!(index
+            .replace(&path, &document, original, DEFAULT_SCOPE)
+            .unwrap());
+        assert!(index.current(&path, DEFAULT_SCOPE));
+        assert!(!index.current(&path, 1));
+        let units = index
+            .candidates(&path, &fuzzy::Query::new("customer"), false)
+            .unwrap();
+        assert_eq!(units.len(), 1);
+        assert_eq!(units[0].meta.group_key, document.units[0].meta.group_key);
+        assert_eq!(units[0].meta.row, Some(12));
+        assert_eq!(
+            index.sheet_metadata(&path).unwrap()[0].merge_ranges[0].last_column,
+            4
+        );
+        index
+            .0
+            .execute(
+                "UPDATE files SET sheets='broken' WHERE path=?1",
+                [path.to_string_lossy().as_ref()],
+            )
+            .unwrap();
+        assert!(!index.current(&path, DEFAULT_SCOPE));
+        fs::write(&path, b"different customer").unwrap();
+        assert!(!index.current(&path, DEFAULT_SCOPE));
+        fs::remove_file(path).unwrap();
+    }
 }

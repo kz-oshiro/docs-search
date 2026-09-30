@@ -296,7 +296,7 @@
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 1, "issueCount": 0 },
         "results": [
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 7 }, "textContains": "顧客ID", "matchType": "exact", "score": 100 }
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 7 }, "textContains": "顧客ID", "matchType": "exact", "matchCategory": "standard", "score": 100 }
         ],
         "issues": []
       }
@@ -309,9 +309,9 @@
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 6, "issueCount": 0 },
         "results": [
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId", "matchType": "exact", "score": 100 },
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "CustomerId", "matchType": "caseFolded", "score": 98 },
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 3 }, "textContains": "CUSTOMER_ID", "matchType": "identifier", "score": 90 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId", "matchType": "exact", "matchCategory": "standard", "score": 100 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "CustomerId", "matchType": "caseFolded", "matchCategory": "standard", "score": 98 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 3 }, "textContains": "CUSTOMER_ID", "matchType": "identifier", "matchCategory": "fuzzy", "score": 90 },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 4 }, "textContains": "customer_id", "matchType": "identifier", "score": 90 },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 5 }, "textContains": "customer-id", "matchType": "identifier", "score": 90 },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 6 }, "textContains": "customer id", "matchType": "separatorVariant", "score": 92 }
@@ -328,7 +328,7 @@
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 3, "issueCount": 0 },
         "results": [
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 7 }, "textContains": "顧客ID", "matchType": "exact", "score": 100 },
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 8 }, "textContains": "顧客ＩＤ", "matchType": "normalized", "score": 95 },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 8 }, "textContains": "顧客ＩＤ", "matchType": "normalized", "matchCategory": "fuzzy", "score": 95 },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 9 }, "textContains": "顧客 ID", "matchType": "separatorVariant", "score": 92 }
         ],
         "issues": []
@@ -342,14 +342,14 @@
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 8, "issueCount": 0 },
         "results": [
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId" },
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 1 }, "textContains": "customerId", "matchCategory": "standard" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 2 }, "textContains": "CustomerId" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 3 }, "textContains": "CUSTOMER_ID" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 4 }, "textContains": "customer_id" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 5 }, "textContains": "customer-id" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 6 }, "textContains": "customer id" },
           { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 10 }, "textContains": "customer", "matchType": "exact", "score": 100 },
-          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 11 }, "textContains": "custmer", "matchType": "editDistance", "score": 50 }
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 11 }, "textContains": "custmer", "matchType": "editDistance", "matchCategory": "fuzzy", "score": 50 }
         ],
         "issues": []
       }

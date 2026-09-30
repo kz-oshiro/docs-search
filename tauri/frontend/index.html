@@ -146,7 +146,7 @@
     <p id="general-error" class="notice notice-error" role="alert"></p>
     <p id="copy-status" class="notice notice-success" role="status"></p>
     <details id="issues-panel" class="issues-panel" hidden>
-      <summary>読み取りエラー <span id="issue-count">0</span> 件</summary>
+      <summary>検索中のエラー <span id="issue-count">0</span> 件 <span class="issues-hint issues-hint-closed">詳細を表示</span><span class="issues-hint issues-hint-open">詳細を閉じる</span></summary>
       <ul id="issues"></ul>
     </details>
     <section class="results-panel">
@@ -158,6 +158,16 @@
         <button id="result-filter-clear" type="button" disabled>絞り込みを解除</button>
       </div>
       <p id="result-filter-summary" class="result-filter-summary">絞り込み後 0 / 0 ファイル · 0 / 0 件</p>
+      <div class="export-actions" role="group" aria-label="検索結果の一括出力">
+        <label for="export-scope">出力対象</label>
+        <select id="export-scope"><option value="filtered">現在の絞り込み結果</option><option value="all">全結果</option></select>
+        <span id="export-summary">0 ファイル · 0 件を対象</span>
+        <button id="copy-results" type="button" disabled>TSVを一括コピー</button>
+        <button id="save-csv" type="button" disabled>CSV保存</button>
+        <button id="save-tsv" type="button" disabled>TSV保存</button>
+        <button id="save-report" type="button" disabled>調査記録を保存</button>
+      </div>
+      <p class="match-legend">一致検索：通常検索でも見つかる結果　／　あいまい検索：オンにしたときだけ見つかる結果</p>
       <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
     </section>
   </main>

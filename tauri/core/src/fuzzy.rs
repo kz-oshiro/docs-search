@@ -6,6 +6,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Clone, Debug)]
 pub struct Match {
     pub kind: &'static str,
+    pub category: &'static str,
     pub score: u8,
     pub range: [usize; 2],
 }
@@ -223,27 +224,40 @@ fn distance(a: &str, b: &str, limit: usize) -> Option<usize> {
 
 pub fn evaluate_selected(text: &str, query: &Query, fuzzy_search: bool) -> Option<Match> {
     if !fuzzy_search {
-        if let Some(range) = found_whole(text, &query.raw, str::to_owned) {
-            return Some(Match {
-                kind: "exact",
-                score: 100,
-                range,
-            });
+        return evaluate_standard(text, query);
+    }
+    evaluate(text, query).map(|mut matched| {
+        // Keep the strongest fuzzy-mode reason, but show whether normal search also finds this unit.
+        if evaluate_standard(text, query).is_some() {
+            matched.category = "standard";
         }
-        if let Some(range) = found_whole(text, &query.base, base) {
-            return Some(Match {
-                kind: "caseFolded",
-                score: 98,
-                range,
-            });
-        }
-        return found(text, &query.base, base).map(|range| Match {
-            kind: "substring",
-            score: 70,
+        matched
+    })
+}
+
+fn evaluate_standard(text: &str, query: &Query) -> Option<Match> {
+    if let Some(range) = found_whole(text, &query.raw, str::to_owned) {
+        return Some(Match {
+            kind: "exact",
+            category: "standard",
+            score: 100,
             range,
         });
     }
-    evaluate(text, query)
+    if let Some(range) = found_whole(text, &query.base, base) {
+        return Some(Match {
+            kind: "caseFolded",
+            category: "standard",
+            score: 98,
+            range,
+        });
+    }
+    found(text, &query.base, base).map(|range| Match {
+        kind: "substring",
+        category: "standard",
+        score: 70,
+        range,
+    })
 }
 
 pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
@@ -270,7 +284,12 @@ pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
                 } else {
                     (kind, score)
                 };
-                return Some(Match { kind, score, range });
+                return Some(Match {
+                    kind,
+                    category: "fuzzy",
+                    score,
+                    range,
+                });
             }
         }
     }
@@ -279,6 +298,7 @@ pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
             if token.0 == *query_token && query.tokens.len() == 1 {
                 return Some(Match {
                     kind: "identifier",
+                    category: "fuzzy",
                     score: 90,
                     range: token.1,
                 });
@@ -289,6 +309,7 @@ pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
             {
                 return Some(Match {
                     kind: "prefix",
+                    category: "fuzzy",
                     score: 80,
                     range: token.1,
                 });
@@ -306,6 +327,7 @@ pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
     ) {
         return Some(Match {
             kind: "substring",
+            category: "fuzzy",
             score: 70,
             range,
         });
@@ -319,6 +341,7 @@ pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
             {
                 return Some(Match {
                     kind: "editDistance",
+                    category: "fuzzy",
                     score: 50,
                     range,
                 });

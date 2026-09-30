@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+use docs_search_core::report::{self, Format, Report};
 use docs_search_core::{run_search, validate, EventKind, InputError, SearchRequest};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -97,7 +98,12 @@ fn cancel_search(search_id: String, state: tauri::State<'_, SearchState>) {
 
 #[tauri::command]
 fn clear_search_index(state: tauri::State<'_, SearchState>) -> Result<(), String> {
-    if state.0.lock().map_err(|_| "検索状態を取得できません。")?.is_some() {
+    if state
+        .0
+        .lock()
+        .map_err(|_| "検索状態を取得できません。")?
+        .is_some()
+    {
         return Err("検索中は索引を削除できません。".into());
     }
     docs_search_core::clear_search_index()
@@ -112,6 +118,30 @@ fn open_result(path: String) -> Result<(), String> {
     open::that(candidate).map_err(|_| "元ファイルを開けませんでした。".into())
 }
 
+#[tauri::command]
+fn format_report(report: Report) -> Result<String, String> {
+    report::table_text(&report, Format::Tsv)
+}
+
+#[tauri::command]
+async fn save_report(report: Report, format: Format) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = report::file_bytes(&report, format)?;
+        let extension = format.extension();
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter(extension.to_uppercase(), &[extension])
+            .set_file_name(format!("docs-search-results.{extension}"))
+            .save_file()
+        else {
+            return Ok(false);
+        };
+        std::fs::write(path, bytes).map_err(|_| "出力先へ書き込めませんでした。".to_owned())?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "出力処理を完了できませんでした。".to_owned())?
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SearchState(Mutex::new(None)))
@@ -120,7 +150,9 @@ fn main() {
             start_search,
             cancel_search,
             clear_search_index,
-            open_result
+            open_result,
+            format_report,
+            save_report
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

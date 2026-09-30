@@ -129,6 +129,8 @@ def main():
                 check(key in actual_hits and wanted["textContains"] in actual_hits[key]["previewText"], f"{prefix}: missing {wanted}")
                 if "matchType" in wanted:
                     check(actual_hits[key]["matchType"] == wanted["matchType"], f"{prefix}: match type {wanted}")
+                if "matchCategory" in wanted:
+                    check(actual_hits[key]["matchCategory"] == wanted["matchCategory"], f"{prefix}: match category {wanted}")
                 if "score" in wanted:
                     check(actual_hits[key]["score"] == wanted["score"], f"{prefix}: score {wanted}")
             actual_issues = {(relative(issue["path"]), issue["stage"], issue["code"]) for issue in issues}

@@ -1,6 +1,7 @@
 mod extract;
 mod fuzzy;
 mod index;
+pub mod report;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -141,6 +142,8 @@ pub struct SearchRequest {
     #[serde(default)]
     pub excluded_directories: Vec<String>,
     pub query: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_spec: Option<Value>,
     pub recursive: bool,
     #[serde(default = "default_extensions")]
     pub extensions: Vec<String>,
@@ -173,11 +176,22 @@ pub struct SearchHit {
     pub file_path: String,
     pub file_type: String,
     pub source_kind: String,
+    pub unit_key: String,
+    pub part_key: String,
+    pub group_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<u32>,
+    pub content_class: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<String>,
     pub location: Value,
     pub preview_text: String,
     pub preview_truncated: bool,
     pub match_ranges: Vec<[usize; 2]>,
     pub match_type: &'static str,
+    pub match_category: &'static str,
     pub score: u8,
 }
 
@@ -269,6 +283,12 @@ fn remove_nested_paths(mut paths: Vec<PathBuf>) -> Vec<PathBuf> {
 }
 
 fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
+    if request.query_spec.is_some() {
+        return Err(InputError {
+            field: "querySpec",
+            message: "高度な検索・一括検索は、この版ではまだ利用できません。",
+        });
+    }
     if request.query.trim().is_empty() {
         return Err(InputError {
             field: "query",
@@ -451,11 +471,19 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 file_path: display_path(path),
                 file_type: file_type.to_owned(),
                 source_kind: unit.source_kind.to_owned(),
+                unit_key: unit.meta.unit_key,
+                part_key: unit.meta.part_key,
+                group_key: unit.meta.group_key,
+                row: unit.meta.row,
+                column: unit.meta.column,
+                content_class: unit.meta.content_class,
+                anchor: unit.meta.anchor,
                 location: unit.location,
                 preview_text,
                 preview_truncated,
                 match_ranges: vec![range],
                 match_type: matched.kind,
+                match_category: matched.category,
                 score: matched.score,
             },
         });
@@ -568,32 +596,38 @@ pub fn run_search<F: FnMut(SearchEvent)>(
             sink.hit(
                 &path,
                 &file_type,
-                Unit {
-                    source_kind: "fileName",
-                    location: json!({}),
-                    text: name.into_owned(),
+                {
+                    let mut unit = Unit::new("fileName", json!({}), name.into_owned());
+                    unit.meta.unit_key = "0".into();
+                    unit.meta.group_key = "fileName".into();
+                    unit.meta.content_class = "fileName".into();
+                    unit
                 },
                 matched,
             );
         }
+        let cached_stamp = index::stamp(&path);
         if let Some(cache) = search_index.as_ref() {
-            if cache.current(&path) {
+            if cache.current(&path, index::DEFAULT_SCOPE) {
                 if let Ok(units) = cache.candidates(&path, &query, fuzzy_search) {
-                    for unit in units {
-                        if cancel.load(Ordering::Relaxed) {
-                            break;
+                    if cached_stamp.is_some() && cached_stamp == index::stamp(&path) {
+                        for unit in units {
+                            if cancel.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            if let Some(matched) =
+                                fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
+                            {
+                                sink.hit(&path, &file_type, unit, matched);
+                            }
                         }
-                        if let Some(matched) =
-                            fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
-                        {
-                            sink.hit(&path, &file_type, unit, matched);
-                        }
+                        sink.progress("search");
+                        continue;
                     }
-                    sink.progress("search");
-                    continue;
                 }
             }
         }
+        let expected_stamp = index::stamp(&path);
         let result = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
             fs::metadata(&path)
                 .map_err(extract::ExtractError::from)
@@ -612,14 +646,27 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                             "テキストファイルがサイズ上限を超えました。",
                         ));
                     }
-                    extract::text_units(&bytes)
+                    extract::text_units(&bytes).map(|units| extract::ExtractedDocument {
+                        units,
+                        sheets: vec![],
+                    })
                 })
         } else {
             extract::office_units(&path, &file_type)
         };
         match result {
-            Ok(units) => {
-                for unit in &units {
+            Ok(document) => {
+                if expected_stamp.is_none() || expected_stamp != index::stamp(&path) {
+                    sink.issue(SearchIssue {
+                        stage: "read",
+                        path: Some(display_path(&path)),
+                        code: "changedDuringRead",
+                        reason: "検索中にファイルが変更されました。再検索してください。".into(),
+                    });
+                    sink.progress("search");
+                    continue;
+                }
+                for unit in &document.units {
                     if cancel.load(Ordering::Relaxed) {
                         break;
                     }
@@ -633,8 +680,21 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                 }
                 if !cancel.load(Ordering::Relaxed) {
                     if let Some(cache) = search_index.as_mut() {
-                        if cache.replace(&path, &units).is_err() {
-                            search_index = None;
+                        match cache.replace(
+                            &path,
+                            &document,
+                            expected_stamp.unwrap(),
+                            index::DEFAULT_SCOPE,
+                        ) {
+                            Ok(true) => (),
+                            Ok(false) => sink.issue(SearchIssue {
+                                stage: "read",
+                                path: Some(display_path(&path)),
+                                code: "changedDuringRead",
+                                reason: "検索中にファイルが変更されました。再検索してください。"
+                                    .into(),
+                            }),
+                            Err(_) => search_index = None,
                         }
                     }
                 }
@@ -657,7 +717,24 @@ pub fn run_search<F: FnMut(SearchEvent)>(
 
 #[cfg(test)]
 mod tests {
-    use super::{match_ranges, normalize_fold};
+    use super::{match_ranges, normalize_fold, validate, SearchRequest};
+    use serde_json::json;
+
+    #[test]
+    fn reserved_query_spec_is_rejected_before_search() {
+        let request = SearchRequest {
+            root_directory: String::new(),
+            additional_directories: vec![],
+            excluded_directories: vec![],
+            query: "顧客".into(),
+            query_spec: Some(json!({"mode": "conditions"})),
+            recursive: true,
+            extensions: vec!["txt".into()],
+            use_index: false,
+            fuzzy_search: false,
+        };
+        assert_eq!(validate(&request).unwrap_err().field, "querySpec");
+    }
 
     #[test]
     fn match_ranges_follow_search_normalization_and_unicode_positions() {
