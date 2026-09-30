@@ -57,6 +57,11 @@ button:disabled { opacity: .48; cursor: default; }
 .extension-option { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 36px; margin: 0; padding: 6px 8px; border: 1px solid #d5e0df; border-radius: 6px; cursor: pointer; font-size: .76rem; font-weight: 500; }
 .extension-option:hover { border-color: #8ebcbb; }
 .extension-option:has(input:checked) { border-color: #a9d5d1; background: #eaf6f4; color: #075f63; }
+.search-option-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.search-option { display: flex; align-items: flex-start; gap: 9px; flex: 1 1 240px; min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid #d5e0df; border-radius: 7px; cursor: pointer; font-size: .82rem; }
+.search-option input { flex: none; margin-top: 2px; }
+.search-option small { display: block; margin-top: 3px; color: #60757b; font-size: .74rem; font-weight: 400; line-height: 1.4; }
+.search-option:has(input:checked) { border-color: #a9d5d1; background: #eaf6f4; }
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0; padding: 11px 17px; }
 #status { display: inline-flex; align-items: center; gap: 9px; color: #0a7175; font-size: .9rem; }
 #status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }

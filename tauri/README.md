@@ -11,7 +11,7 @@ Windows 向けの文書横断検索アプリです。Rust の検索コアがロ�
 | `frontend/` | Rust→WASM の画面制御と HTML/CSS |
 | `tests/` | 共通 `backend-cases.json` を実行するテストアダプター |
 
-検索対象は Office 文書とテキスト系の計93拡張子から選べます。`.vue`、`.mjs`、`.jsx`、`.tsx`、`.json` などを含む一覧と対象外の形式・箇所は [バックエンド仕様](../docs/backend.md) を参照してください。再帰検索、NFC・NFKC・識別子表記・かな種別を扱うあいまい検索、部分一致、限定した英字のタイプミス候補、場所と一致理由付きの結果、個別エラー、進捗、中断を提供します。検索用索引は端末内に自動保存され、画面から削除できます。隠しシート・隠しスライドを含み、Office 一時ファイルとシンボリックリンクを除きます。読んだ文書には書き込みません。
+検索対象は Office 文書とテキスト系の計93拡張子から選べます。`.vue`、`.mjs`、`.jsx`、`.tsx`、`.json` などを含む一覧と対象外の形式・箇所は [バックエンド仕様](../docs/backend.md) を参照してください。通常検索は NFC と大文字小文字を吸収した部分一致です。チェックボックスであいまい検索を有効にすると、NFKC・識別子表記・かな種別の違いや限定した英字のタイプミス候補も扱います。検索用索引も別のチェックボックスで作成・利用を選べます。両方とも初期状態はオフです。場所と一致理由付きの結果、個別エラー、進捗、中断を提供します。保存済みの索引は画面から削除できます。隠しシート・隠しスライドを含み、Office 一時ファイルとシンボリックリンクを除きます。読んだ文書には書き込みません。
 
 ## 動作条件とビルド
 
@@ -45,7 +45,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-
 成功後に残る `tauri\docs-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。版番号は Cargo/Tauri のメタデータと Git タグで管理します。GitHub CLI の認証が必要です。
 
 ```powershell
-$version = '2.0.5'  # 次に公開する版番号に置き換える
+$version = '2.0.6'  # 次に公開する版番号に置き換える
 git tag "v$version"
 git push origin "v$version"
 gh release create "v$version" .\tauri\docs-search-desktop.exe --verify-tag --title "docs-search v$version" --notes "Windows x64 実行ファイル"

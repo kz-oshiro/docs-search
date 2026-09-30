@@ -4,13 +4,15 @@ use std::sync::atomic::AtomicBool;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: docs-search-cli <directory> <query> [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--cancel-on-start]");
+        eprintln!("Usage: docs-search-cli <directory> <query> [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--use-index] [--fuzzy-search] [--cancel-on-start]");
         std::process::exit(2);
     }
     let mut extensions = default_extensions();
     let mut additional_directories = Vec::new();
     let mut excluded_directories = Vec::new();
     let mut cancel_on_start = false;
+    let mut use_index = false;
+    let mut fuzzy_search = false;
     let mut options = args[3..].iter();
     while let Some(option) = options.next() {
         match option.as_str() {
@@ -37,6 +39,8 @@ fn main() {
                 };
             }
             "--cancel-on-start" => cancel_on_start = true,
+            "--use-index" => use_index = true,
+            "--fuzzy-search" => fuzzy_search = true,
             _ => {
                 eprintln!("Unknown option: {option}");
                 std::process::exit(2);
@@ -50,6 +54,8 @@ fn main() {
         query: args[2].clone(),
         recursive: true,
         extensions,
+        use_index,
+        fuzzy_search,
     };
     let cancel = AtomicBool::new(false);
     if let Err(error) = run_search(request, "cli".into(), &cancel, |event| {

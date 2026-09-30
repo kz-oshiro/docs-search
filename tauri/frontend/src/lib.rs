@@ -276,6 +276,7 @@ export function bind(id, event, callback) {
 export function listen(callback) { return window.__TAURI__.event.listen('search-events', e => { for (const item of e.payload) callback(item); }); }
 export function invoke(command, args) { return window.__TAURI__.core.invoke(command, args); }
 export function input(id) { return document.getElementById(id).value; }
+export function checked(id) { return document.getElementById(id).checked; }
 export function selected_extensions() { return Array.from(document.querySelectorAll('input[name="extension"]:checked'), input => input.value); }
 export function set_text(id, value) { document.getElementById(id).textContent = value; }
 export function set_status(value) {
@@ -350,6 +351,7 @@ extern "C" {
     fn listen(callback: &Function) -> Promise;
     fn invoke(command: &str, args: JsValue) -> Promise;
     fn input(id: &str) -> String;
+    fn checked(id: &str) -> bool;
     fn selected_extensions() -> JsValue;
     fn selected_folders(id: &str) -> JsValue;
     fn set_text(id: &str, value: &str);
@@ -500,7 +502,7 @@ fn on_search() {
     set_text("counts", "結果 0 · 処理 0 · エラー 0");
     disabled("search", true);
     disabled("cancel", false);
-    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "recursive": true, "extensions": extensions}, "searchId": id});
+    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "recursive": true, "extensions": extensions, "useIndex": checked("use-index"), "fuzzySearch": checked("fuzzy-search")}, "searchId": id});
     spawn_local(async move {
         if let Err(error) = JsFuture::from(invoke("start_search", js(&args))).await {
             let data = value(error.clone());
@@ -551,7 +553,7 @@ fn on_clear_index() {
     set_text("general-error", "");
     spawn_local(async move {
         match JsFuture::from(invoke("clear_search_index", JsValue::NULL)).await {
-            Ok(_) => set_text("copy-status", "検索用索引を削除しました。次回の検索で再作成します。"),
+            Ok(_) => set_text("copy-status", "検索用索引を削除しました。次回、索引を有効にすると再作成します。"),
             Err(error) => set_text("general-error", &message(error)),
         }
     });

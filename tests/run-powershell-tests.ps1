@@ -20,7 +20,7 @@ try {
     $cases = Get-Content -LiteralPath (Join-Path $root 'backend-cases.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-True ($manifest.seed -eq $cases.seed) 'Generator seed and backend cases disagree'
     Assert-True ($manifest.files.Count -eq 33) "Expected 33 corpus files; got $($manifest.files.Count)"
-    Assert-True ($cases.cases.Count -eq 26) "Expected 26 backend cases; got $($cases.cases.Count)"
+    Assert-True ($cases.cases.Count -eq 27) "Expected 27 backend cases; got $($cases.cases.Count)"
     foreach ($name in @('spreadsheets/needle-book.xlsx', 'nested/quarterly-ledger.xlsm', 'nested/team-briefing.pptx', 'documents/operations-guide.docx', 'notes/research-log.txt')) {
         Assert-True (Test-Path -LiteralPath (Join-Path $corpus $name)) "Missing generated file: $name"
     }

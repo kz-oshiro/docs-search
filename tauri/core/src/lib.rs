@@ -144,6 +144,10 @@ pub struct SearchRequest {
     pub recursive: bool,
     #[serde(default = "default_extensions")]
     pub extensions: Vec<String>,
+    #[serde(default)]
+    pub use_index: bool,
+    #[serde(default)]
+    pub fuzzy_search: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -469,6 +473,8 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     let paths = validate_paths(&request)?;
     let excluded_keys: Vec<PathBuf> = paths.excluded.iter().map(|path| path_key(path)).collect();
     let query = fuzzy::Query::new(&request.query);
+    let use_index = request.use_index;
+    let fuzzy_search = request.fuzzy_search;
     let selected: HashSet<String> = request.extensions.iter().cloned().collect();
     let mut sink = Emitter {
         id: search_id,
@@ -543,7 +549,11 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
     }
     sink.progress("search");
-    let mut search_index = index::Index::open().ok();
+    let mut search_index = if use_index {
+        index::Index::open().ok()
+    } else {
+        None
+    };
     if let Some(cache) = search_index.as_mut() {
         let _ = cache.prune_missing();
     }
@@ -554,7 +564,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
         sink.counts.processed_files += 1;
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if let Some(matched) = fuzzy::evaluate(&name, &query) {
+        if let Some(matched) = fuzzy::evaluate_selected(&name, &query, fuzzy_search) {
             sink.hit(
                 &path,
                 &file_type,
@@ -568,12 +578,14 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
         if let Some(cache) = search_index.as_ref() {
             if cache.current(&path) {
-                if let Ok(units) = cache.candidates(&path, &query) {
+                if let Ok(units) = cache.candidates(&path, &query, fuzzy_search) {
                     for unit in units {
                         if cancel.load(Ordering::Relaxed) {
                             break;
                         }
-                        if let Some(matched) = fuzzy::evaluate(&unit.text, &query) {
+                        if let Some(matched) =
+                            fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
+                        {
                             sink.hit(&path, &file_type, unit, matched);
                         }
                     }
@@ -611,8 +623,10 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                     if cancel.load(Ordering::Relaxed) {
                         break;
                     }
-                    if fuzzy::could_match(&unit.text, &query) {
-                        if let Some(matched) = fuzzy::evaluate(&unit.text, &query) {
+                    if !fuzzy_search || fuzzy::could_match(&unit.text, &query) {
+                        if let Some(matched) =
+                            fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
+                        {
                             sink.hit(&path, &file_type, unit.clone(), matched);
                         }
                     }

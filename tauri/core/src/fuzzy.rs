@@ -221,6 +221,31 @@ fn distance(a: &str, b: &str, limit: usize) -> Option<usize> {
     (prev[b.len()] <= limit).then_some(prev[b.len()])
 }
 
+pub fn evaluate_selected(text: &str, query: &Query, fuzzy_search: bool) -> Option<Match> {
+    if !fuzzy_search {
+        if let Some(range) = found_whole(text, &query.raw, str::to_owned) {
+            return Some(Match {
+                kind: "exact",
+                score: 100,
+                range,
+            });
+        }
+        if let Some(range) = found_whole(text, &query.base, base) {
+            return Some(Match {
+                kind: "caseFolded",
+                score: 98,
+                range,
+            });
+        }
+        return found(text, &query.base, base).map(|range| Match {
+            kind: "substring",
+            score: 70,
+            range,
+        });
+    }
+    evaluate(text, query)
+}
+
 pub fn evaluate(text: &str, query: &Query) -> Option<Match> {
     let options: [(fn(&str) -> String, &str, &str, u8); 5] = [
         (str::to_owned, &query.raw, "exact", 100),

@@ -169,13 +169,19 @@ impl Index {
         tx.commit()
     }
 
-    pub fn candidates(&self, path: &Path, query: &fuzzy::Query) -> rusqlite::Result<Vec<Unit>> {
+    pub fn candidates(
+        &self,
+        path: &Path,
+        query: &fuzzy::Query,
+        fuzzy_search: bool,
+    ) -> rusqlite::Result<Vec<Unit>> {
         let needle = &query.loose;
         let gram_size = if needle.chars().count() >= 3 { 3 } else { 2 };
-        let query_grams = if needle.chars().any(|c| c.is_ascii_digit())
-            && needle
-                .chars()
-                .any(|c| c.is_whitespace() || matches!(c, '_' | '-' | '.' | '/'))
+        let query_grams = if !fuzzy_search
+            || (needle.chars().any(|c| c.is_ascii_digit())
+                && needle
+                    .chars()
+                    .any(|c| c.is_whitespace() || matches!(c, '_' | '-' | '.' | '/')))
         {
             Vec::new()
         } else {
@@ -208,7 +214,7 @@ impl Index {
                 ids.insert(row?);
             }
         }
-        if let Some(typo) = &query.typo {
+        if let Some(typo) = query.typo.as_ref().filter(|_| fuzzy_search) {
             let first = typo.chars().next().unwrap_or_default().to_string();
             let len = typo.chars().count() as i64;
             let limit = if len >= 11 { 2 } else { 1 };

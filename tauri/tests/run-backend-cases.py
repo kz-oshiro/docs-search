@@ -2,6 +2,7 @@
 """Run the shared stack-independent backend cases against the Tauri app's CLI."""
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -55,6 +56,8 @@ def main():
     spec = json.loads((DOCS_SEARCH / "tests" / "backend-cases.json").read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory(prefix="docs-search-tauri-") as temp:
         root = Path(temp) / "fixture"
+        cli_env = os.environ.copy()
+        cli_env["LOCALAPPDATA"] = str(Path(temp) / "local-app-data")
         subprocess.run([sys.executable, str(DOCS_SEARCH / "tests" / "generate-fixtures.py"), "--output", str(root), "--profile", "load"], check=True)
         for case in spec["cases"]:
             request = case.get("request") or case["steps"][0]["request"]
@@ -66,9 +69,13 @@ def main():
                 args.extend(["--exclude-directory", directory.replace("${fixtureRoot}", str(root))])
             if "extensions" in request:
                 args.extend(["--extensions", ",".join(request["extensions"])])
+            if request.get("useIndex"):
+                args.append("--use-index")
+            if request.get("fuzzySearch"):
+                args.append("--fuzzy-search")
             if case["id"] == "cancel-load-search":
                 args.append("--cancel-on-start")
-            run = subprocess.run(args, text=True, encoding="utf-8", capture_output=True)
+            run = subprocess.run(args, text=True, encoding="utf-8", capture_output=True, env=cli_env)
             events = [json.loads(line) for line in run.stdout.splitlines()]
             expected = case["expected"]
             prefix = case["id"]
@@ -79,6 +86,8 @@ def main():
             check(run.returncode == 0, f"{prefix}: {run.stderr}")
             check(events[0]["type"] == "started" and events[-1]["type"] == "finished", f"{prefix}: boundaries")
             check(events[0]["request"]["extensions"] == request.get("extensions", ["xlsx", "xlsm", "pptx", "docx", "txt"]), f"{prefix}: selected extensions")
+            check(events[0]["request"]["useIndex"] == request.get("useIndex", False), f"{prefix}: index option")
+            check(events[0]["request"]["fuzzySearch"] == request.get("fuzzySearch", False), f"{prefix}: fuzzy option")
             check(events[0]["request"]["additionalDirectories"] == [directory.replace("${fixtureRoot}", str(root)) for directory in request.get("additionalDirectories", [])], f"{prefix}: additional directories")
             check(events[0]["request"]["excludedDirectories"] == [directory.replace("${fixtureRoot}", str(root)) for directory in request.get("excludedDirectories", [])], f"{prefix}: excluded directories")
             check(sum(e["type"] == "started" for e in events) == 1 and sum(e["type"] == "finished" for e in events) == 1, f"{prefix}: terminal count")

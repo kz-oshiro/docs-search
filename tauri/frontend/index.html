@@ -133,6 +133,13 @@
         </details>
         <small id="extensions-error" class="error" role="alert"></small>
       </fieldset>
+      <fieldset class="field search-options">
+        <legend>検索オプション</legend>
+        <div class="search-option-list">
+          <label class="search-option"><input id="use-index" type="checkbox"><span>検索用索引を作成・利用<small>オンの場合、索引を端末内に保存し、次回の検索でも再利用します。</small></span></label>
+          <label class="search-option"><input id="fuzzy-search" type="checkbox"><span>あいまい検索<small>表記ゆれや一部のタイプミスも候補に含めます。</small></span></label>
+        </div>
+      </fieldset>
       <div class="actions"><button id="search" type="submit">検索</button><button id="cancel" type="button" disabled>中断</button></div>
     </form>
     <section class="summary" aria-live="polite"><strong id="status">待機中</strong><span id="counts">結果 0 · 処理 0 · エラー 0</span></section>
@@ -144,7 +151,7 @@
     </details>
     <section class="results-panel">
       <div class="results-heading"><h2>検索結果</h2><span>ファイル名から元ファイルを開けます</span></div>
-      <div class="index-actions"><span>検索用索引はこの端末に自動保存されます。</span><button id="clear-index" type="button">索引を削除</button></div>
+      <div class="index-actions"><span>保存済みの検索用索引</span><button id="clear-index" type="button">索引を削除</button></div>
       <div class="result-filters" role="group" aria-label="検索結果の絞り込み">
         <div class="filter-field"><label for="result-filter-text">ファイル名・パス</label><input id="result-filter-text" type="search" autocomplete="off" placeholder="結果内のファイルを絞り込む"></div>
         <div class="filter-field"><label for="result-filter-extension">拡張子</label><select id="result-filter-extension"><option value="">すべての拡張子</option></select></div>

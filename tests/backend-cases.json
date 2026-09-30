@@ -289,9 +289,22 @@
       "expected": { "accepted": false, "inputErrorField": "extensions", "events": [] }
     },
     {
+      "id": "basic-search-excludes-fuzzy-variants",
+      "operation": "startSearch",
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "顧客ID", "recursive": true, "extensions": ["md"] },
+      "expected": {
+        "accepted": true, "finished": "completed",
+        "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 1, "issueCount": 0 },
+        "results": [
+          { "file": "fuzzy/variants.md", "sourceKind": "textLine", "location": { "lineNumber": 7 }, "textContains": "顧客ID", "matchType": "exact", "score": 100 }
+        ],
+        "issues": []
+      }
+    },
+    {
       "id": "fuzzy-identifier-variants",
       "operation": "startSearch",
-      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customerId", "recursive": true, "extensions": ["md"] },
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customerId", "recursive": true, "extensions": ["md"], "useIndex": true, "fuzzySearch": true },
       "expected": {
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 6, "issueCount": 0 },
@@ -309,7 +322,7 @@
     {
       "id": "fuzzy-width-and-spacing",
       "operation": "startSearch",
-      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "顧客ID", "recursive": true, "extensions": ["md"] },
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "顧客ID", "recursive": true, "extensions": ["md"], "fuzzySearch": true },
       "expected": {
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 3, "issueCount": 0 },
@@ -324,7 +337,7 @@
     {
       "id": "fuzzy-typo-candidate",
       "operation": "startSearch",
-      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customer", "recursive": true, "extensions": ["md"] },
+      "request": { "rootDirectory": "${fixtureRoot}/search/fuzzy", "query": "customer", "recursive": true, "extensions": ["md"], "fuzzySearch": true },
       "expected": {
         "accepted": true, "finished": "completed",
         "counts": { "discoveredFiles": 1, "processedFiles": 1, "resultCount": 8, "issueCount": 0 },
