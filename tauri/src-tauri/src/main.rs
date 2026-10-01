@@ -1,7 +1,9 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+use docs_search_core::context::{self, ContextError, ContextRange, ContextTarget, ResultContext};
 use docs_search_core::report::{self, Format, Report};
 use docs_search_core::{run_search, validate, EventKind, InputError, SearchRequest};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
@@ -10,7 +12,23 @@ struct ActiveSearch {
     id: String,
     cancel: Arc<AtomicBool>,
 }
-struct SearchState(Mutex<Option<ActiveSearch>>);
+struct SearchSession {
+    id: String,
+    targets: HashMap<usize, ContextTarget>,
+}
+#[derive(Default)]
+struct SearchSessions {
+    active: Option<ActiveSearch>,
+    latest: Option<SearchSession>,
+}
+struct SearchState(Mutex<SearchSessions>);
+
+fn context_error(code: &'static str, message: &str) -> ContextError {
+    ContextError {
+        code,
+        message: message.into(),
+    }
+}
 
 #[tauri::command]
 async fn pick_folder() -> Option<String> {
@@ -42,7 +60,7 @@ fn start_search(
         field: "general",
         message: "検索状態を取得できません。",
     })?;
-    if current.is_some() {
+    if current.active.is_some() {
         return Err(InputError {
             field: "general",
             message: "前の検索が終了するまでお待ちください。",
@@ -55,15 +73,31 @@ fn start_search(
         });
     }
     let cancel = Arc::new(AtomicBool::new(false));
-    *current = Some(ActiveSearch {
+    current.latest = Some(SearchSession {
+        id: search_id.clone(),
+        targets: HashMap::new(),
+    });
+    current.active = Some(ActiveSearch {
         id: search_id.clone(),
         cancel: cancel.clone(),
     });
     let id = search_id.clone();
+    let use_index = request.use_index;
     std::thread::spawn(move || {
         let app_for_events = app.clone();
         let mut batch = Vec::with_capacity(128);
         let _ = run_search(request, id.clone(), &cancel, |event| {
+            if let EventKind::Result { hit } = &event.kind {
+                if let Some(target) = ContextTarget::from_hit(hit, use_index) {
+                    if let Some(state) = app_for_events.try_state::<SearchState>() {
+                        if let Ok(mut current) = state.0.lock() {
+                            if let Some(session) = current.latest.as_mut().filter(|s| s.id == id) {
+                                session.targets.insert(hit.result_id, target);
+                            }
+                        }
+                    }
+                }
+            }
             let flush = !matches!(&event.kind, EventKind::Result { .. });
             batch.push(event);
             if flush || batch.len() >= 128 {
@@ -76,8 +110,8 @@ fn start_search(
         }
         if let Some(state) = app.try_state::<SearchState>() {
             if let Ok(mut current) = state.0.lock() {
-                if current.as_ref().is_some_and(|s| s.id == id) {
-                    *current = None;
+                if current.active.as_ref().is_some_and(|s| s.id == id) {
+                    current.active = None;
                 }
             }
         }
@@ -88,7 +122,7 @@ fn start_search(
 #[tauri::command]
 fn cancel_search(search_id: String, state: tauri::State<'_, SearchState>) {
     if let Ok(current) = state.0.lock() {
-        if let Some(active) = &*current {
+        if let Some(active) = &current.active {
             if active.id == search_id {
                 active.cancel.store(true, Ordering::Relaxed);
             }
@@ -102,11 +136,60 @@ fn clear_search_index(state: tauri::State<'_, SearchState>) -> Result<(), String
         .0
         .lock()
         .map_err(|_| "検索状態を取得できません。")?
+        .active
         .is_some()
     {
         return Err("検索中は索引を削除できません。".into());
     }
     docs_search_core::clear_search_index()
+}
+
+#[tauri::command]
+async fn get_result_context(
+    search_id: String,
+    result_id: usize,
+    range: Option<ContextRange>,
+    state: tauri::State<'_, SearchState>,
+) -> Result<ResultContext, ContextError> {
+    let target = {
+        let current = state
+            .0
+            .lock()
+            .map_err(|_| context_error("contextUnavailable", "検索状態を取得できません。"))?;
+        current
+            .latest
+            .as_ref()
+            .filter(|session| session.id == search_id)
+            .and_then(|session| session.targets.get(&result_id))
+            .cloned()
+            .ok_or_else(|| {
+                context_error("contextUnavailable", "この結果の周辺情報は取得できません。")
+            })?
+    };
+    let context =
+        tauri::async_runtime::spawn_blocking(move || context::get_result_context(&target, range))
+            .await
+            .map_err(|_| {
+                context_error(
+                    "contextUnavailable",
+                    "周辺情報の取得を完了できませんでした。",
+                )
+            })??;
+    let current = state
+        .0
+        .lock()
+        .map_err(|_| context_error("contextUnavailable", "検索状態を取得できません。"))?;
+    if !current
+        .latest
+        .as_ref()
+        .is_some_and(|session| session.id == search_id)
+    {
+        return Err(context_error(
+            "contextUnavailable",
+            "新しい検索が始まりました。",
+        ));
+    }
+    Ok(context)
 }
 
 #[tauri::command]
@@ -144,12 +227,13 @@ async fn save_report(report: Report, format: Format) -> Result<bool, String> {
 
 fn main() {
     tauri::Builder::default()
-        .manage(SearchState(Mutex::new(None)))
+        .manage(SearchState(Mutex::new(SearchSessions::default())))
         .invoke_handler(tauri::generate_handler![
             pick_folder,
             start_search,
             cancel_search,
             clear_search_index,
+            get_result_context,
             open_result,
             format_report,
             save_report
@@ -158,7 +242,7 @@ fn main() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if let Some(state) = window.try_state::<SearchState>() {
                     if let Ok(current) = state.0.lock() {
-                        if let Some(active) = &*current {
+                        if let Some(active) = &current.active {
                             active.cancel.store(true, Ordering::Relaxed);
                         }
                     }

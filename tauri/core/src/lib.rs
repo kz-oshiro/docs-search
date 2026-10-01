@@ -1,6 +1,8 @@
+pub mod context;
 mod extract;
 mod fuzzy;
 mod index;
+mod query;
 pub mod report;
 
 use serde::{Deserialize, Serialize};
@@ -193,6 +195,30 @@ pub struct SearchHit {
     pub match_type: &'static str,
     pub match_category: &'static str,
     pub score: u8,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<SearchEvidence>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchEvidence {
+    pub term_id: String,
+    pub term: String,
+    pub unit_key: String,
+    pub part_key: String,
+    pub source_kind: String,
+    pub content_class: String,
+    pub location: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<u32>,
+    pub preview_text: String,
+    pub preview_truncated: bool,
+    pub match_ranges: Vec<[usize; 2]>,
+    pub match_type: &'static str,
+    pub match_category: &'static str,
+    pub score: u8,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -283,13 +309,15 @@ fn remove_nested_paths(mut paths: Vec<PathBuf>) -> Vec<PathBuf> {
 }
 
 fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
-    if request.query_spec.is_some() {
-        return Err(InputError {
-            field: "querySpec",
-            message: "高度な検索・一括検索は、この版ではまだ利用できません。",
-        });
-    }
-    if request.query.trim().is_empty() {
+    if let Some(spec) = &request.query_spec {
+        if !request.query.trim().is_empty() {
+            return Err(InputError {
+                field: "querySpec",
+                message: "通常検索語と高度な検索条件は同時に指定できません。",
+            });
+        }
+        query::parse(spec)?;
+    } else if request.query.trim().is_empty() {
         return Err(InputError {
             field: "query",
             message: "検索語を入力してください。",
@@ -436,6 +464,14 @@ fn supported(path: &Path, selected: &HashSet<String>) -> Option<String> {
     }
 }
 
+fn file_name_unit(name: String) -> Unit {
+    let mut unit = Unit::new("fileName", json!({}), name);
+    unit.meta.unit_key = "0".into();
+    unit.meta.group_key = "fileName".into();
+    unit.meta.content_class = "fileName".into();
+    unit
+}
+
 struct Emitter<F: FnMut(SearchEvent)> {
     id: String,
     sequence: usize,
@@ -485,8 +521,89 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 match_type: matched.kind,
                 match_category: matched.category,
                 score: matched.score,
+                evidence: vec![],
             },
         });
+    }
+    fn condition_hit(&mut self, path: &Path, file_type: &str, group: query::GroupMatch<'_>) {
+        let query::GroupMatch {
+            source_kind,
+            location,
+            unit_key,
+            part_key,
+            group_key,
+            row,
+            column,
+            content_class,
+            anchor,
+            match_category,
+            evidence: candidates,
+        } = group;
+        let evidence: Vec<SearchEvidence> = candidates
+            .into_iter()
+            .map(|candidate| {
+                let (preview_text, preview_truncated, range) =
+                    preview(&candidate.unit.text, candidate.matched.range);
+                SearchEvidence {
+                    term_id: candidate.term_id,
+                    term: candidate.term,
+                    unit_key: candidate.unit.meta.unit_key.clone(),
+                    part_key: candidate.unit.meta.part_key.clone(),
+                    source_kind: candidate.unit.source_kind.into(),
+                    content_class: candidate.unit.meta.content_class.clone(),
+                    location: candidate.unit.location.clone(),
+                    row: candidate.unit.meta.row,
+                    column: candidate.unit.meta.column,
+                    preview_text,
+                    preview_truncated,
+                    match_ranges: vec![range],
+                    match_type: candidate.matched.kind,
+                    match_category: candidate.matched.category,
+                    score: candidate.matched.score,
+                }
+            })
+            .collect();
+        let primary = &evidence[0];
+        self.counts.result_count += 1;
+        self.send(EventKind::Result {
+            hit: SearchHit {
+                result_id: self.counts.result_count,
+                file_path: display_path(path),
+                file_type: file_type.into(),
+                source_kind: source_kind.into(),
+                unit_key,
+                part_key,
+                group_key,
+                row,
+                column,
+                content_class,
+                anchor,
+                location,
+                preview_text: primary.preview_text.clone(),
+                preview_truncated: primary.preview_truncated,
+                match_ranges: primary.match_ranges.clone(),
+                match_type: primary.match_type,
+                match_category,
+                score: primary.score,
+                evidence,
+            },
+        });
+    }
+    fn condition_hits(
+        &mut self,
+        path: &Path,
+        file_type: &str,
+        units: &[&Unit],
+        spec: &query::Conditions,
+        fuzzy_search: bool,
+        cancel: &AtomicBool,
+    ) {
+        for group in query::evaluate(units, file_type, spec, fuzzy_search, cancel) {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            self.condition_hit(path, file_type, group);
+        }
     }
 }
 
@@ -499,6 +616,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     emit: F,
 ) -> Result<(), InputError> {
     let paths = validate_paths(&request)?;
+    let conditions = request.query_spec.as_ref().map(query::parse).transpose()?;
     let excluded_keys: Vec<PathBuf> = paths.excluded.iter().map(|path| path_key(path)).collect();
     let query = fuzzy::Query::new(&request.query);
     let use_index = request.use_index;
@@ -592,33 +710,56 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
         sink.counts.processed_files += 1;
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        if let Some(matched) = fuzzy::evaluate_selected(&name, &query, fuzzy_search) {
-            sink.hit(
-                &path,
-                &file_type,
-                {
-                    let mut unit = Unit::new("fileName", json!({}), name.into_owned());
-                    unit.meta.unit_key = "0".into();
-                    unit.meta.group_key = "fileName".into();
-                    unit.meta.content_class = "fileName".into();
-                    unit
-                },
-                matched,
-            );
+        let filename_unit = file_name_unit(name.to_string());
+        if let Some(spec) = &conditions {
+            if spec.scope != query::Scope::File {
+                sink.condition_hits(
+                    &path,
+                    &file_type,
+                    &[&filename_unit],
+                    spec,
+                    fuzzy_search,
+                    cancel,
+                );
+            }
+        } else if let Some(matched) = fuzzy::evaluate_selected(&name, &query, fuzzy_search) {
+            sink.hit(&path, &file_type, filename_unit.clone(), matched);
         }
         let cached_stamp = index::stamp(&path);
         if let Some(cache) = search_index.as_ref() {
             if cache.current(&path, index::DEFAULT_SCOPE) {
-                if let Ok(units) = cache.candidates(&path, &query, fuzzy_search) {
+                let cached = if conditions.is_some() {
+                    cache.all_units(&path)
+                } else {
+                    cache.candidates(&path, &query, fuzzy_search)
+                };
+                if let Ok(units) = cached {
                     if cached_stamp.is_some() && cached_stamp == index::stamp(&path) {
-                        for unit in units {
-                            if cancel.load(Ordering::Relaxed) {
-                                break;
-                            }
-                            if let Some(matched) =
-                                fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
-                            {
-                                sink.hit(&path, &file_type, unit, matched);
+                        if let Some(spec) = &conditions {
+                            let mut scoped = if spec.scope == query::Scope::File {
+                                vec![&filename_unit]
+                            } else {
+                                Vec::new()
+                            };
+                            scoped.extend(units.iter());
+                            sink.condition_hits(
+                                &path,
+                                &file_type,
+                                &scoped,
+                                spec,
+                                fuzzy_search,
+                                cancel,
+                            );
+                        } else {
+                            for unit in units {
+                                if cancel.load(Ordering::Relaxed) {
+                                    break;
+                                }
+                                if let Some(matched) =
+                                    fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
+                                {
+                                    sink.hit(&path, &file_type, unit, matched);
+                                }
                             }
                         }
                         sink.progress("search");
@@ -666,15 +807,25 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                     sink.progress("search");
                     continue;
                 }
-                for unit in &document.units {
-                    if cancel.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    if !fuzzy_search || fuzzy::could_match(&unit.text, &query) {
-                        if let Some(matched) =
-                            fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
-                        {
-                            sink.hit(&path, &file_type, unit.clone(), matched);
+                if let Some(spec) = &conditions {
+                    let mut scoped = if spec.scope == query::Scope::File {
+                        vec![&filename_unit]
+                    } else {
+                        Vec::new()
+                    };
+                    scoped.extend(document.units.iter());
+                    sink.condition_hits(&path, &file_type, &scoped, spec, fuzzy_search, cancel);
+                } else {
+                    for unit in &document.units {
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        if !fuzzy_search || fuzzy::could_match(&unit.text, &query) {
+                            if let Some(matched) =
+                                fuzzy::evaluate_selected(&unit.text, &query, fuzzy_search)
+                            {
+                                sink.hit(&path, &file_type, unit.clone(), matched);
+                            }
                         }
                     }
                 }

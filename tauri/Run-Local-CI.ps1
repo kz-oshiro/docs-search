@@ -10,6 +10,12 @@ try {
     python .\tauri\tests\run-backend-cases.py
     if ($LASTEXITCODE -ne 0) { throw 'バックエンドの共通ケースに失敗しました。' }
 
+    python .\tauri\tests\run-context-cases.py
+    if ($LASTEXITCODE -ne 0) { throw 'Excel 周辺検索の受け入れケースに失敗しました。' }
+
+    python .\tauri\tests\run-condition-cases.py
+    if ($LASTEXITCODE -ne 0) { throw '高度な検索の受け入れケースに失敗しました。' }
+
     cargo test --manifest-path .\tauri\core\Cargo.toml
     if ($LASTEXITCODE -ne 0) { throw '検索コアのテストに失敗しました。' }
 

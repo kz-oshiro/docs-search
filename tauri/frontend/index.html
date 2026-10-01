@@ -11,10 +11,22 @@
   <main>
     <header><div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div><p class="header-description">フォルダー内の文書を、まとめて検索。</p></header>
     <form id="search-form">
+      <div class="field search-mode-field"><label for="search-mode">検索方法</label><select id="search-mode"><option value="standard">通常検索</option><option value="conditions">高度な検索</option></select></div>
       <div class="search-fields">
         <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
-        <div class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
+        <div id="normal-query-field" class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
       </div>
+      <fieldset id="advanced-conditions" class="field advanced-conditions" hidden aria-describedby="advanced-error">
+        <legend>高度な検索条件</legend>
+        <p class="advanced-help">1行を1語句として扱います。空白や AND / OR の文字も語句の一部です。</p>
+        <div class="advanced-fields">
+          <div class="field"><label for="all-terms">すべて含む（AND）</label><textarea id="all-terms" rows="3" placeholder="顧客&#10;必須"></textarea></div>
+          <div class="field"><label for="any-terms">いずれか含む（OR）</label><textarea id="any-terms" rows="3" placeholder="空欄ならこの条件を使いません"></textarea></div>
+          <div class="field"><label for="not-terms">含まない（NOT）</label><textarea id="not-terms" rows="3" placeholder="除外する語句"></textarea></div>
+        </div>
+        <div class="field"><label for="condition-scope">判定範囲</label><select id="condition-scope"><option value="excelRow">同じ行（Excel）</option><option value="unit">同じ検索箇所</option><option value="file">同じファイル</option></select><small>「同じ行」では Excel のセルだけを行にまとめます。他の形式と図形は検索箇所ごとに判定します。除外語は表記の正規化と大文字・小文字を無視した部分一致で判定します。</small></div>
+        <small id="advanced-error" class="error" role="alert"></small>
+      </fieldset>
       <div class="field"><span class="field-label">対象外フォルダー</span><div id="excluded-folders" class="folder-list"></div><button id="add-excluded" class="folder-add" type="button" aria-label="対象外フォルダーを追加">追加</button><small id="excluded-error" class="error" role="alert"></small></div>
       <fieldset class="field" aria-describedby="extensions-error">
         <legend>対象ファイル</legend>

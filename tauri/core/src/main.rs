@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: docs-search-cli <directory> <query> [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--use-index] [--fuzzy-search] [--cancel-on-start]");
+        eprintln!("Usage: docs-search-cli <directory> <query> [--query-spec-json JSON] [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--use-index] [--fuzzy-search] [--cancel-on-start]");
         std::process::exit(2);
     }
     let mut extensions = default_extensions();
@@ -13,6 +13,7 @@ fn main() {
     let mut cancel_on_start = false;
     let mut use_index = false;
     let mut fuzzy_search = false;
+    let mut query_spec = None;
     let mut options = args[3..].iter();
     while let Some(option) = options.next() {
         match option.as_str() {
@@ -39,6 +40,19 @@ fn main() {
                 };
             }
             "--cancel-on-start" => cancel_on_start = true,
+            "--query-spec-json" => {
+                let Some(raw) = options.next() else {
+                    eprintln!("--query-spec-json requires JSON");
+                    std::process::exit(2);
+                };
+                query_spec = match serde_json::from_str(raw) {
+                    Ok(value) => Some(value),
+                    Err(_) => {
+                        eprintln!("--query-spec-json must be valid JSON");
+                        std::process::exit(2);
+                    }
+                };
+            }
             "--use-index" => use_index = true,
             "--fuzzy-search" => fuzzy_search = true,
             _ => {
@@ -52,7 +66,7 @@ fn main() {
         additional_directories,
         excluded_directories,
         query: args[2].clone(),
-        query_spec: None,
+        query_spec,
         recursive: true,
         extensions,
         use_index,

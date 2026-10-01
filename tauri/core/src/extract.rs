@@ -107,7 +107,7 @@ fn assign_keys(units: &mut [Unit]) {
     }
 }
 
-fn parse_cell_address(address: &str) -> Option<(u32, u32)> {
+pub(crate) fn parse_cell_address(address: &str) -> Option<(u32, u32)> {
     let mut column = 0u32;
     let mut boundary = 0;
     for (index, ch) in address.char_indices() {
@@ -518,18 +518,19 @@ fn excel_drawing(doc: &Document<'_>, sheet: &str, part: &str, units: &mut Vec<Un
         n.is_element()
             && ["twoCellAnchor", "oneCellAnchor", "absoluteAnchor"].contains(&n.tag_name().name())
     }) {
-        let position = child(anchor, "from").map(|from| {
+        let position = child(anchor, "from").and_then(|from| {
             let col = child(from, "col")
                 .and_then(|n| n.text())
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(0)
-                + 1;
+                .and_then(|s| s.parse::<u32>().ok())?
+                .checked_add(1)?;
             let row = child(from, "row")
                 .and_then(|n| n.text())
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(0)
-                + 1;
-            format!("{}{}", column(col), row)
+                .and_then(|s| s.parse::<u32>().ok())?
+                .checked_add(1)?;
+            if col > 16_384 || row > 1_048_576 {
+                return None;
+            }
+            Some(format!("{}{}", column(col as usize), row))
         });
         for (index, shape) in anchor
             .descendants()
@@ -595,8 +596,13 @@ fn excel_vml(doc: &Document<'_>, sheet: &str, part: &str, units: &mut Vec<Unit>)
             .and_then(|n| n.text())
             .and_then(|s| s.parse::<usize>().ok());
         let mut location = json!({"sheetName": sheet, "shapeName": name});
-        if let (Some(row), Some(col)) = (row, col) {
-            location["anchor"] = json!(format!("{}{}", column(col + 1), row + 1));
+        if let (Some(row), Some(col)) = (
+            row.and_then(|value| value.checked_add(1)),
+            col.and_then(|value| value.checked_add(1)),
+        ) {
+            if row <= 1_048_576 && col <= 16_384 {
+                location["anchor"] = json!(format!("{}{}", column(col), row));
+            }
         }
         let mut unit = Unit::new("shape", location, text).in_part(part);
         unit.meta.anchor = unit.location["anchor"].as_str().map(str::to_owned);

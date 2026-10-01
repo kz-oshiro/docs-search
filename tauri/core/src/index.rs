@@ -46,6 +46,7 @@ fn initialize(connection: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS units_file ON units(file_path);\
         CREATE UNIQUE INDEX IF NOT EXISTS units_key ON units(file_path, unit_key);\
         CREATE INDEX IF NOT EXISTS units_group ON units(file_path, group_key);\
+        CREATE INDEX IF NOT EXISTS units_context ON units(file_path, part_key, row_number, column_number);\
         CREATE TABLE IF NOT EXISTS grams(gram TEXT NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(gram, unit_id));\
         CREATE INDEX IF NOT EXISTS grams_unit ON grams(unit_id);\
         CREATE TABLE IF NOT EXISTS tokens(token TEXT NOT NULL, first TEXT NOT NULL, length INTEGER NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(token, unit_id));\
@@ -54,6 +55,12 @@ fn initialize(connection: &Connection) -> rusqlite::Result<()> {
 }
 
 impl Index {
+    /// Composite conditions need every unit in a candidate scope, including NOT evidence.
+    /// The initial implementation reads the complete indexed file to avoid false negatives.
+    pub fn all_units(&self, path: &Path) -> rusqlite::Result<Vec<Unit>> {
+        self.candidates(path, &fuzzy::Query::new(""), false)
+    }
+
     pub fn open() -> rusqlite::Result<Self> {
         match Self::open_inner() {
             Ok(index) => Ok(index),
@@ -112,6 +119,41 @@ impl Index {
             |row| row.get(0),
         )?;
         serde_json::from_str(&data).map_err(|_| rusqlite::Error::InvalidQuery)
+    }
+
+    pub(crate) fn cells_in_range(
+        &self,
+        path: &Path,
+        part: &str,
+        rows: (u32, u32),
+        columns: (u32, u32),
+    ) -> rusqlite::Result<Vec<(u32, u32, String)>> {
+        let mut statement = self.0.prepare(
+            "SELECT row_number, column_number, text FROM units \
+             WHERE file_path=?1 AND part_key=?2 AND source_kind='cell' \
+             AND row_number BETWEEN ?3 AND ?4 AND column_number BETWEEN ?5 AND ?6 \
+             ORDER BY id",
+        )?;
+        let rows = statement.query_map(
+            params![
+                path.to_string_lossy().as_ref(),
+                part,
+                rows.0,
+                rows.1,
+                columns.0,
+                columns.1
+            ],
+            |row| {
+                let row_number: i64 = row.get(0)?;
+                let column_number: i64 = row.get(1)?;
+                Ok((
+                    u32::try_from(row_number).map_err(|_| rusqlite::Error::InvalidQuery)?,
+                    u32::try_from(column_number).map_err(|_| rusqlite::Error::InvalidQuery)?,
+                    row.get(2)?,
+                ))
+            },
+        )?;
+        rows.collect()
     }
 
     pub fn prune_missing(&mut self) -> rusqlite::Result<()> {
@@ -270,8 +312,10 @@ impl Index {
         let mut statement = self
             .0
             .prepare("SELECT source_kind, location, text, unit_key, part_key, group_key, row_number, column_number, content_class, anchor FROM units WHERE id=?1")?;
-        let mut result = Vec::with_capacity(ids.len());
-        for id in ids {
+        let mut ordered_ids: Vec<i64> = ids.into_iter().collect();
+        ordered_ids.sort_unstable();
+        let mut result = Vec::with_capacity(ordered_ids.len());
+        for id in ordered_ids {
             let unit = statement.query_row([id], |row| {
                 let kind: String = row.get(0)?;
                 let location: String = row.get(1)?;
@@ -415,6 +459,16 @@ mod tests {
         assert_eq!(units.len(), 1);
         assert_eq!(units[0].meta.group_key, document.units[0].meta.group_key);
         assert_eq!(units[0].meta.row, Some(12));
+        assert_eq!(
+            index
+                .cells_in_range(&path, "xl/worksheets/sheet1.xml", (10, 14), (1, 5))
+                .unwrap(),
+            vec![(12, 1, "customer".into())]
+        );
+        assert!(index
+            .cells_in_range(&path, "xl/worksheets/sheet1.xml", (10, 14), (2, 5))
+            .unwrap()
+            .is_empty());
         assert_eq!(
             index.sheet_metadata(&path).unwrap()[0].merge_ranges[0].last_column,
             4

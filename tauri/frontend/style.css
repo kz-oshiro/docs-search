@@ -58,6 +58,14 @@ button:disabled { opacity: .48; cursor: default; }
 .extension-option:hover { border-color: #8ebcbb; }
 .extension-option:has(input:checked) { border-color: #a9d5d1; background: #eaf6f4; color: #075f63; }
 .search-option-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.search-mode-field { max-width: 260px; }
+.search-mode-field select, .advanced-conditions select { width: 100%; height: 44px; padding: 8px 12px; border: 1px solid #a9bdbf; border-radius: 7px; background: #fff; color: #20363c; font: inherit; }
+.advanced-conditions { margin: 0 0 14px; padding: 12px; border: 1px solid #d5e0df; border-radius: 7px; }
+.advanced-conditions[hidden], #normal-query-field[hidden] { display: none; }
+.advanced-help { margin: 0 0 10px; color: #60757b; font-size: .8rem; }
+.advanced-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.advanced-fields textarea { width: 100%; min-height: 85px; resize: vertical; padding: 8px 10px; border: 1px solid #a9bdbf; border-radius: 7px; font: inherit; }
+.advanced-conditions .field small { display: block; margin-top: 5px; color: #60757b; font-size: .74rem; }
 .search-option { display: flex; align-items: flex-start; gap: 9px; flex: 1 1 240px; min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid #d5e0df; border-radius: 7px; cursor: pointer; font-size: .82rem; }
 .search-option input { flex: none; margin-top: 2px; }
 .search-option small { display: block; margin-top: 3px; color: #60757b; font-size: .74rem; font-weight: 400; line-height: 1.4; }
@@ -135,8 +143,33 @@ h2 { margin: 0; color: #263f46; font-size: 1rem; }
 .location { width: fit-content; padding: 3px 7px; border-radius: 4px; background: #edf4f3; color: #44636a; font-size: .76rem; font-weight: 700; overflow-wrap: anywhere; }
 .preview { padding: 8px 10px; border-radius: 6px; background: #f7f9f8; font-size: .84rem; line-height: 1.55; overflow-wrap: anywhere; }
 .preview mark { padding: 1px 2px; border-radius: 2px; background: #ffe999; color: #3d330d; }
+.evidence-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.evidence-list li { display: grid; gap: 3px; padding: 7px 9px; border: 1px solid #dce8e6; border-radius: 5px; background: #fff; }
+.evidence-heading { color: #38565d; font-size: .75rem; font-weight: 700; }
+.evidence-preview { font-size: .78rem; overflow-wrap: anywhere; }
+.evidence-preview mark { background: #ffe999; }
+.excel-context-toggle { width: fit-content; min-height: 32px; padding: 5px 10px; font-size: .76rem; }
+.excel-context-unavailable { color: #60757b; font-size: .75rem; }
+.excel-context { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid #cddfdd; border-radius: 6px; background: #fff; font-size: .76rem; }
+.excel-context[hidden] { display: none; }
+.excel-context-error { border-color: #e7b8b6; background: #fff7f6; color: #95252a; }
+.excel-context-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.excel-context-controls strong { margin-right: auto; }
+.excel-context-controls button { min-height: 30px; padding: 4px 8px; font-size: .74rem; }
+.excel-context-controls span { color: #526b71; font-variant-numeric: tabular-nums; }
+.excel-context-scroll { max-width: 100%; overflow-x: auto; }
+.excel-context-table { width: 100%; min-width: 550px; border-collapse: collapse; table-layout: fixed; }
+.excel-context-table caption { caption-side: bottom; padding-top: 7px; color: #60757b; text-align: left; }
+.excel-context-table th, .excel-context-table td { width: 17%; min-width: 90px; padding: 6px 8px; border: 1px solid #d6e2e0; vertical-align: top; overflow-wrap: anywhere; }
+.excel-context-table th { width: 15%; background: #edf4f3; color: #38565d; font-weight: 700; }
+.excel-context-table td { min-height: 30px; white-space: pre-wrap; }
+.excel-context-table .excel-context-focus { outline: 2px solid #d49316; outline-offset: -2px; background: #fff4cd; }
+.excel-context-table .excel-context-merged { box-shadow: inset 0 0 0 1px #6caeab; }
+.excel-context-notes { display: grid; gap: 3px; color: #526b71; }
+.excel-context-notes p { margin: 0; overflow-wrap: anywhere; }
 #more { width: 100%; margin-top: 12px; }
 @media (max-width: 850px) { .search-fields { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .advanced-fields { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .result-filters { grid-template-columns: 1fr 1fr; } .result-filters button { grid-column: 1 / -1; } }
 @media (max-width: 620px) {
   main { padding: 18px 14px 24px; }

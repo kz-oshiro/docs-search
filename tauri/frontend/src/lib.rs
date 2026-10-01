@@ -63,6 +63,18 @@ export function init_extension_summary() {
   updateExtensionSummary();
 }
 export function show_extension_picker() { document.querySelector('.extension-picker').open = true; }
+export function init_search_mode() {
+  const mode = document.getElementById('search-mode');
+  function update() {
+    const advanced = mode.value === 'conditions';
+    document.getElementById('normal-query-field').hidden = advanced;
+    document.getElementById('advanced-conditions').hidden = !advanced;
+    document.getElementById('query').disabled = advanced;
+    set_text('query-error', ''); set_text('advanced-error', '');
+  }
+  mode.addEventListener('change', update);
+  update();
+}
 function refreshFolderLabels(container, label) {
   container.querySelectorAll('.folder-row').forEach((row, index) => {
     row.querySelector('.folder-input').setAttribute('aria-label', `${label} ${index + 1}`);
@@ -187,7 +199,8 @@ function makeReport() {
       location, locationData: hit.location,
       previewText: hit.previewText, previewTruncated: hit.previewTruncated,
       matchRanges: hit.matchRanges, matchType: hit.matchType,
-      matchCategory: hit.matchCategory, score: hit.score
+      matchCategory: hit.matchCategory, score: hit.score,
+      evidence: hit.evidence ?? []
     }))),
     issues: reportIssues
   };
@@ -290,6 +303,126 @@ function createGroup(group) {
   if (group.hasIssue) markGroupError(group);
   return row;
 }
+function excelColumn(number) {
+  let name = '';
+  for (let value = number; value > 0; value = Math.floor((value - 1) / 26)) {
+    name = String.fromCharCode(65 + ((value - 1) % 26)) + name;
+  }
+  return name;
+}
+function contextMergeAt(context, row, column) {
+  return context.merges.find(merge => merge.firstRow <= row && row <= merge.lastRow
+    && merge.firstColumn <= column && column <= merge.lastColumn);
+}
+function renderExcelContext(host, context, load) {
+  const firstColumn = context.firstColumn;
+  const lastColumn = firstColumn + context.columnCount - 1;
+  const controls = document.createElement('div'); controls.className = 'excel-context-controls';
+  const title = document.createElement('strong');
+  title.textContent = `${context.sheetName}!${context.focusAddress} ${context.focusKind === 'shape' ? '図形アンカー' : context.focusKind === 'excelRow' ? '一致行' : '一致セル'}の周辺`;
+  const previous = document.createElement('button'); previous.type = 'button'; previous.textContent = '← 前の列';
+  previous.disabled = firstColumn === 1;
+  previous.addEventListener('click', () => void load({ firstRow: context.firstRow,
+    firstColumn: Math.max(1, firstColumn - 5), rowCount: context.rowCount, columnCount: 5 }));
+  const next = document.createElement('button'); next.type = 'button'; next.textContent = '次の列 →';
+  next.disabled = lastColumn === 16384;
+  next.addEventListener('click', () => void load({ firstRow: context.firstRow,
+    firstColumn: Math.min(16380, firstColumn + 5), rowCount: context.rowCount, columnCount: 5 }));
+  const position = document.createElement('span'); position.textContent = `${excelColumn(firstColumn)}〜${excelColumn(lastColumn)} 列`;
+  controls.append(title, previous, position, next);
+  const scroller = document.createElement('div'); scroller.className = 'excel-context-scroll';
+  const table = document.createElement('table'); table.className = 'excel-context-table';
+  const caption = document.createElement('caption');
+  caption.textContent = '保存済みセル値。空欄は保存済みの値がありません。';
+  table.append(caption);
+  const header = document.createElement('tr');
+  const corner = document.createElement('th'); corner.scope = 'col'; corner.textContent = '行 / 列'; header.append(corner);
+  const hiddenRows = new Set(context.hiddenRows);
+  const hiddenColumns = new Set(context.hiddenColumns);
+  for (let column = firstColumn; column <= lastColumn; column++) {
+    const th = document.createElement('th'); th.scope = 'col';
+    th.textContent = excelColumn(column) + (hiddenColumns.has(column) ? ' (非表示)' : '');
+    header.append(th);
+  }
+  const thead = document.createElement('thead'); thead.append(header); table.append(thead);
+  const values = new Map(context.cells.map(cell => [`${cell.row}:${cell.column}`, cell]));
+  const evidenceAddresses = new Set(context.evidenceAddresses ?? []);
+  const body = document.createElement('tbody');
+  for (let row = context.firstRow; row < context.firstRow + context.rowCount; row++) {
+    const tr = document.createElement('tr');
+    const th = document.createElement('th'); th.scope = 'row';
+    th.textContent = String(row) + (hiddenRows.has(row) ? ' (非表示)' : ''); tr.append(th);
+    for (let column = firstColumn; column <= lastColumn; column++) {
+      const td = document.createElement('td');
+      const address = `${excelColumn(column)}${row}`;
+      const cell = values.get(`${row}:${column}`);
+      td.textContent = cell ? cell.text + (cell.truncated ? '…' : '') : '';
+      td.title = address;
+      if (address === context.focusAddress || evidenceAddresses.has(address)) td.classList.add('excel-context-focus');
+      const merge = contextMergeAt(context, row, column);
+      if (merge) {
+        td.classList.add('excel-context-merged');
+        td.title += ` · 結合 ${merge.anchorAddress}:${excelColumn(merge.lastColumn)}${merge.lastRow} · 起点 ${merge.anchorAddress}`;
+      }
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  table.append(body); scroller.append(table);
+  const notes = document.createElement('div'); notes.className = 'excel-context-notes';
+  for (const merge of context.merges) {
+    const note = document.createElement('p');
+    const range = `${merge.anchorAddress}:${excelColumn(merge.lastColumn)}${merge.lastRow}`;
+    const anchorOutside = merge.firstRow < context.firstRow || merge.firstColumn < firstColumn;
+    note.textContent = `結合 ${range} · 起点 ${merge.anchorAddress}`
+      + (anchorOutside && merge.anchorText !== null ? `: ${merge.anchorText}${merge.anchorTruncated ? '…' : ''}` : '');
+    notes.append(note);
+  }
+  host.replaceChildren(controls, scroller, notes);
+}
+function addExcelContext(item, hit) {
+  if (!['xlsx', 'xlsm'].includes(hit.fileType.toLowerCase())) return;
+  if (!['cell', 'shape', 'excelRow'].includes(hit.sourceKind)) return;
+  if (hit.sourceKind === 'shape' && !hit.anchor) {
+    const unavailable = document.createElement('span'); unavailable.className = 'excel-context-unavailable';
+    unavailable.textContent = '図形のアンカー位置がないため、周辺セルを表示できません。';
+    item.append(unavailable);
+    return;
+  }
+  const button = document.createElement('button'); button.type = 'button';
+  button.className = 'excel-context-toggle'; button.textContent = '周辺を表示'; button.setAttribute('aria-expanded', 'false');
+  const host = document.createElement('div'); host.className = 'excel-context'; host.hidden = true;
+  item.append(button, host);
+  let requestNumber = 0;
+  async function load(range) {
+    const searchId = reportSearchId;
+    if (!searchId) return;
+    const number = ++requestNumber;
+    host.hidden = false;
+    host.textContent = '周辺セルを読み込んでいます…';
+    button.textContent = '周辺を閉じる'; button.setAttribute('aria-expanded', 'true');
+    try {
+      const context = await window.__TAURI__.core.invoke('get_result_context',
+        { searchId, resultId: hit.resultId, range });
+      if (number !== requestNumber || searchId !== reportSearchId || !item.isConnected) return;
+      renderExcelContext(host, context, load);
+    } catch (error) {
+      if (number !== requestNumber || searchId !== reportSearchId || !item.isConnected) return;
+      host.textContent = error?.message ?? String(error);
+      host.classList.add('excel-context-error');
+    }
+  }
+  button.addEventListener('click', () => {
+    if (!host.hidden) {
+      requestNumber++;
+      host.hidden = true;
+      button.textContent = '周辺を表示'; button.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    host.classList.remove('excel-context-error');
+    void load(null);
+  });
+}
 function createMatch(group, { hit, location }) {
   const item = document.createElement('div'); item.className = 'match'; item.setAttribute('role', 'listitem');
   const heading = document.createElement('div'); heading.className = 'match-heading';
@@ -303,8 +436,23 @@ function createMatch(group, { hit, location }) {
   const labels = { exact: '完全一致', caseFolded: '表記揺れ', normalized: '表記揺れ', separatorVariant: '表記揺れ', identifier: '識別子一致', kanaVariant: '表記揺れ', prefix: '前方一致', substring: '部分一致', editDistance: 'タイプミス候補' };
   const reason = document.createElement('span'); reason.className = 'match-type'; reason.textContent = labels[hit.matchType] || '一致';
   heading.append(place, category, reason, copy);
-  const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
-  item.append(heading, preview);
+  item.append(heading);
+  if (hit.evidence?.length) {
+    const list = document.createElement('ul'); list.className = 'evidence-list';
+    for (const evidence of hit.evidence) {
+      const row = document.createElement('li');
+      const label = document.createElement('strong'); label.className = 'evidence-heading';
+      label.textContent = `${evidence.term} · ${evidence.locationText || '場所不明'}`;
+      const excerpt = document.createElement('span'); excerpt.className = 'evidence-preview';
+      renderPreview(excerpt, evidence);
+      row.append(label, excerpt); list.append(row);
+    }
+    item.append(list);
+  } else {
+    const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
+    item.append(preview);
+  }
+  addExcelContext(item, hit);
   copy.addEventListener('click', async () => {
     set_text('general-error', '');
     clearCopyStatus();
@@ -454,6 +602,7 @@ extern "C" {
     fn enable_more();
     fn init_result_filter();
     fn init_extension_summary();
+    fn init_search_mode();
     fn init_folder_lists();
     fn show_extension_picker();
     fn add_issue(issue: JsValue);
@@ -497,6 +646,8 @@ fn location(kind: &str, data: &Value) -> String {
     match kind {
         "fileName" => "ファイル名".into(),
         "cell" => format!("{}!{}", str_at("sheetName"), str_at("cellAddress")),
+        "excelRow" => format!("{} / 行 {}", str_at("sheetName"), num_at("row")),
+        "fileMatch" => "ファイル全体".into(),
         "shape" if data.get("slideNumber").is_some() => format!(
             "スライド {} / {}",
             num_at("slideNumber"),
@@ -549,17 +700,39 @@ fn on_search() {
         serde_wasm_bindgen::from_value(selected_folders("excluded-folders")).unwrap_or_default();
     let root = roots.first().cloned().unwrap_or_default();
     let additional: Vec<String> = roots.into_iter().skip(1).collect();
-    let query = input("query");
+    let advanced = input("search-mode") == "conditions";
+    let query = if advanced {
+        String::new()
+    } else {
+        input("query")
+    };
+    let query_spec = advanced.then(|| {
+        json!({
+            "mode": "conditions",
+            "scope": input("condition-scope"),
+            "all": input("all-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
+            "any": input("any-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
+            "not": input("not-terms").lines().map(str::to_owned).collect::<Vec<_>>()
+        })
+    });
     let extensions: Vec<String> =
         serde_wasm_bindgen::from_value(selected_extensions()).unwrap_or_default();
     set_text("root-error", "");
     set_text("excluded-error", "");
     set_text("query-error", "");
+    set_text("advanced-error", "");
     set_text("extensions-error", "");
     set_text("general-error", "");
     set_text("copy-status", "");
-    if query.trim().is_empty() {
+    if !advanced && query.trim().is_empty() {
         set_text("query-error", "検索語を入力してください。");
+        return;
+    }
+    if advanced && input("all-terms").trim().is_empty() && input("any-terms").trim().is_empty() {
+        set_text(
+            "advanced-error",
+            "「すべて含む」か「いずれか含む」に語句を入力してください。",
+        );
         return;
     }
     if root.is_empty() || additional.iter().any(|directory| directory.is_empty()) {
@@ -602,7 +775,7 @@ fn on_search() {
     set_text("counts", "結果 0 · 処理 0 · エラー 0");
     disabled("search", true);
     disabled("cancel", false);
-    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "recursive": true, "extensions": extensions, "useIndex": checked("use-index"), "fuzzySearch": checked("fuzzy-search")}, "searchId": id});
+    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "querySpec": query_spec, "recursive": true, "extensions": extensions, "useIndex": checked("use-index"), "fuzzySearch": checked("fuzzy-search")}, "searchId": id});
     spawn_local(async move {
         if let Err(error) = JsFuture::from(invoke("start_search", js(&args))).await {
             let data = value(error.clone());
@@ -614,6 +787,7 @@ fn on_search() {
                 "rootDirectory" | "additionalDirectories" => "root-error",
                 "excludedDirectories" => "excluded-error",
                 "query" => "query-error",
+                "querySpec" => "advanced-error",
                 "extensions" => "extensions-error",
                 _ => "general-error",
             };
@@ -707,9 +881,17 @@ fn on_event(payload: JsValue) {
             }
         }
         "result" => {
-            let hit = &event["hit"];
+            let mut hit = event["hit"].clone();
+            if let Some(evidence) = hit["evidence"].as_array_mut() {
+                for item in evidence {
+                    item["locationText"] = json!(location(
+                        item["sourceKind"].as_str().unwrap_or(""),
+                        &item["location"],
+                    ));
+                }
+            }
             add_hit(
-                js(hit),
+                js(&hit),
                 &location(hit["sourceKind"].as_str().unwrap_or(""), &hit["location"]),
             );
         }
@@ -760,6 +942,7 @@ pub fn start() {
     init_result_filter();
     init_report_actions();
     init_extension_summary();
+    init_search_mode();
     init_folder_lists();
     let search = Closure::<dyn FnMut()>::new(on_search);
     bind("search-form", "submit", search.as_ref().unchecked_ref());

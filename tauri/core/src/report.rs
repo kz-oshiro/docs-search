@@ -69,6 +69,8 @@ pub struct ReportRow {
     pub match_type: String,
     pub match_category: String,
     pub score: u8,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<Value>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -148,6 +150,8 @@ fn source_label(kind: &str) -> &str {
     match kind {
         "fileName" => "ファイル名",
         "cell" => "セル",
+        "excelRow" => "Excelの行",
+        "fileMatch" => "ファイル全体",
         "shape" => "図形",
         "slideTableCell" => "スライド表のセル",
         "paragraph" => "本文段落",
@@ -195,7 +199,12 @@ pub fn table_text(report: &Report, format: Format) -> Result<String, String> {
         Format::Json => return Err("表形式を指定してください。".into()),
     };
     let mut output = String::new();
-    output.push_str(&HEADERS.join(separator));
+    let advanced = report.request.query_spec.is_some();
+    let mut headers = HEADERS.to_vec();
+    if advanced {
+        headers.push("検索語と根拠");
+    }
+    output.push_str(&headers.join(separator));
     output.push_str("\r\n");
     for row in &report.rows {
         let fields = [
@@ -214,7 +223,24 @@ pub fn table_text(report: &Report, format: Format) -> Result<String, String> {
             match_label(&row.match_type),
             category_label(&row.match_category),
         ];
-        output.push_str(&fields.map(cell).join(separator));
+        let mut values = fields.map(cell).to_vec();
+        if advanced {
+            let evidence = row
+                .evidence
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{}: {} — {}",
+                        item["term"].as_str().unwrap_or(""),
+                        item["locationText"].as_str().unwrap_or(""),
+                        item["previewText"].as_str().unwrap_or("")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" | ");
+            values.push(cell(&evidence));
+        }
+        output.push_str(&values.join(separator));
         output.push_str("\r\n");
     }
     Ok(output)
@@ -288,6 +314,7 @@ mod tests {
                 match_type: "exact".into(),
                 match_category: "standard".into(),
                 score: 100,
+                evidence: vec![],
             }],
             issues: vec![],
         }
@@ -323,5 +350,28 @@ mod tests {
         let mut report = sample("顧客");
         report.counts.result_count = 2;
         assert!(table_text(&report, Format::Csv).is_err());
+    }
+
+    #[test]
+    fn advanced_report_keeps_terms_and_evidence() {
+        let mut report = sample("顧客番号");
+        report.request.query.clear();
+        report.request.query_spec = Some(json!({
+            "mode": "conditions", "scope": "excelRow",
+            "all": ["顧客", "必須"], "any": [], "not": []
+        }));
+        report.rows[0].source_kind = "excelRow".into();
+        report.rows[0].location = "Sheet1 / 行 1".into();
+        report.rows[0].evidence = vec![
+            json!({"termId": "all:1", "term": "顧客", "locationText": "Sheet1!A1", "previewText": "顧客番号"}),
+            json!({"termId": "all:2", "term": "必須", "locationText": "Sheet1!D1", "previewText": "必須"}),
+        ];
+        let csv = table_text(&report, Format::Csv).unwrap();
+        assert!(csv.lines().next().unwrap().ends_with("検索語と根拠"));
+        assert!(csv.contains("顧客: Sheet1!A1 — 顧客番号 | 必須: Sheet1!D1 — 必須"));
+        let saved: Value =
+            serde_json::from_slice(&file_bytes(&report, Format::Json).unwrap()).unwrap();
+        assert_eq!(saved["request"]["querySpec"]["scope"], "excelRow");
+        assert_eq!(saved["rows"][0]["evidence"][1]["termId"], "all:2");
     }
 }

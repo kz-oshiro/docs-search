@@ -45,7 +45,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-
 成功後に残る `tauri\docs-search-desktop.exe` は Git の履歴には含めません。ローカル CI と差分確認を終えたソースを `main` に push してから、そのコミットをタグ付けし、ローカルでビルドした実行ファイルを GitHub Release のアセットとして登録します。版番号は Cargo/Tauri のメタデータと Git タグで管理します。GitHub CLI の認証が必要です。
 
 ```powershell
-$version = '2.0.7'  # 次に公開する版番号に置き換える
+$version = '2.0.8'  # 次に公開する版番号に置き換える
 git tag "v$version"
 git push origin "v$version"
 gh release create "v$version" .\tauri\docs-search-desktop.exe --verify-tag --title "docs-search v$version" --notes "Windows x64 実行ファイル"
@@ -64,19 +64,29 @@ v2.0.0 と v2.0.1 は移動前の名称 `doc-search-desktop.exe` で公開され
 
 検索終了後は「現在の絞り込み結果」または「全結果」を選び、TSVの一括コピー、CSV/TSV保存、JSON調査記録の保存ができます。画面にまだ描画されていない結果も対象です。CSVはUTF-8 BOM付き、TSVはUTF-8で保存します。JSONには検索条件・終了状態・全体集計・Issue一覧と選択された結果を含みます。検索中は出力操作を使えません。保存先の選択を取り消しても検索結果は残ります。
 
-検索単位には部品・Excel物理行・セル座標などの内部識別情報を付け、索引にも保存します。保存済みの旧形式の索引は次に索引を有効にした検索で元文書から再構築します。新しい検索モードはまだ画面に出さず、通常検索の意味を維持します。
+検索単位には部品・Excel物理行・セル座標などの内部識別情報を付け、索引にも保存します。保存済みの旧形式の索引は次に索引を有効にした検索で元文書から再構築します。通常検索の意味は維持します。
+
+「検索方法」で高度な検索を選ぶと、「すべて含む」「いずれか含む」「含まない」を改行区切りで入力できます。判定範囲は検索箇所、Excelの同じ行、ファイル全体から選びます。同じ行では別セルの語句をまとめて1件とし、各語句の根拠を結果内に表示します。除外語は同じ範囲全体から探します。通常検索欄は従来どおり1語句として扱います。
+
+Excel のセル一致とアンカー付き図形一致には「周辺を表示」が付きます。開くと一致位置を含む最大5行×5列の保存済みセル値を表で示し、「前の列」「次の列」で横へ移動できます。結合範囲と起点、非表示の行・列を表示します。周辺情報は開いた時に取得し、元ファイルが検索後に変わった場合はその結果内で再検索を促します。アンカーのない図形には取得できない理由を表示します。
 
 Office 以外の対応拡張子は UTF-8、UTF-8 BOM、Shift_JIS（Windows-31J 相当）に対応し、保存されたテキストを行単位で検索します。ファイルごとに UTF-8 BOM、UTF-8、Shift_JIS の順で判定するため、異なる文字コードのファイルが同じフォルダーにあっても検索できます。タグやコードの構文解析・実行はしません。読み取れないファイルは個別のエラーとして表示して検索を続けます。暗号化ファイル、壊れたファイル、ZIP/XML の展開上限に達したファイルは検索できません。ZIP の XML 部品は 1 部品 32 MiB、合計 128 MiB、部品数 4096 を上限とします。実ファイルの互換性をすべて保証するものではありません。
 
 ## テスト
 
+追加機能の順序と現状は [実装計画](../docs/implementation-plan.md) と [進捗レポート](../docs/implementation-status.md) に記録します。以下は段階ごとの確認方針です。
+
 一括出力の確認項目・手順・期待結果は [検索結果の一括出力の確認方針](../docs/result-export-test-plan.md) に記載しています。
 検索単位と索引の共通基盤は [P0の確認方針](../docs/search-foundation-test-plan.md) に記載しています。
+Excel 周辺セルの確認項目・手順・期待結果は [P2の確認方針](../docs/excel-context-test-plan.md) に記載しています。
+高度な検索の確認項目・手順・期待結果は [P3の確認方針](../docs/condition-search-test-plan.md) に記載しています。
 
-`docs-search` を作業ディレクトリとして、共通生成データと全 27 ケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
+`docs-search` を作業ディレクトリとして、共通生成データの27ケースとP2・P3の専用CLIケースを確認します。テストデータは一時ディレクトリに作成し、終了時に削除します。
 
 ```powershell
 python .\tauri\tests\run-backend-cases.py
+python .\tauri\tests\run-context-cases.py
+python .\tauri\tests\run-condition-cases.py
 cargo test --manifest-path .\tauri\core\Cargo.toml
 cargo check --manifest-path .\tauri\frontend\Cargo.toml --target wasm32-unknown-unknown
 ```

@@ -9,6 +9,12 @@
 | `backend-cases.json` | バックエンドの操作、検索入力、期待結果を記述した共通契約 |
 | `test_generator.py` | 同一シードのバイト一致、Office ZIP/XML、ケースの参照先を確認 |
 | `run-powershell-tests.ps1` | 共通データを一時生成して PowerShell 実装の Excel 検索を確認し、終了時に削除 |
+| `generate-context-fixture.py` | P2 周辺セルの独立した疎な Excel 文書を指定先へ生成。既存ファイルは上書きしない |
+| `generate-conditions-fixture.py` | P3 条件検索の Excel・テキスト文書を指定先へ生成。既存ディレクトリは上書きしない |
+
+P2の自動確認は[`tauri/tests/run-context-cases.py`](../tauri/tests/run-context-cases.py)を使います。疎なExcelデータを一時生成し、セル・図形の場所と索引初回/再利用の一致をCLIで検証します。周辺表の取得規則はRust単体テストで確認し、GUI操作は別に扱います。
+
+P3の自動確認は[`tauri/tests/run-condition-cases.py`](../tauri/tests/run-condition-cases.py)を使います。専用データを一時生成し、条件範囲、根拠、索引・あいまい検索の4通り、入力拒否、読み取りエラーをCLIで検証します。
 
 ## 生成と実行
 
