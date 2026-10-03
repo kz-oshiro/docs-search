@@ -1,6 +1,6 @@
 # v3.0.0 Playwright UI試験とユーザー確認の境界
 
-2026-10-03。Playwrightの導入・テストコード・文書整備の方針。導入時点ではテスト実行・WASM/Windowsビルドを未実施だったが、同日の後続検証でヘッドレスUI 51件とWindows Releaseビルドが成功した。アプリ起動・GUI・公開は未実施。[導入時の実装報告](implementation-report-playwright.md)と[最新の検証記録](validation-v3.0.0.md)を併せて読む。
+2026-10-03。Playwrightの導入・テストコード・文書整備の方針。導入時点ではテスト実行・WASM/Windowsビルドを未実施だったが、同日の後続検証でヘッドレスUI 51件とWindows Releaseビルドが成功し、v3.0.0を公開した。実アプリ起動・GUIは未実施。[導入時の実装報告](implementation-report-playwright.md)と[最新の検証記録](validation-v3.0.0.md)を併せて読む。
 
 ## 確認境界と実行依頼の意味
 

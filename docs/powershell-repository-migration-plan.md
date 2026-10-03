@@ -1,6 +1,6 @@
 # PowerShell 版の docs-search-ps への移行計画
 
-作成日: 2026-10-03。M0〜M3のローカル移行と静的確認後、PowerShell版の自動テスト・配布ZIP作成・[v1.0.0公開](https://github.com/kz-oshiro/docs-search-ps/releases/tag/v1.0.0)が完了した。Rust版も自動テスト・Windowsビルドを完了し、v3.0.0の公開準備まで進めた。実アプリGUIは未確認。以下の初回記録と手順は履歴として保持し、最新の結果は移行先の [移行記録](https://github.com/kz-oshiro/docs-search-ps/blob/main/docs/migration-record.md)とRust側の [検証記録](validation-v3.0.0.md)を参照する。
+作成日: 2026-10-03。M0〜M3のローカル移行と静的確認後、PowerShell版の自動テスト・配布ZIP作成・[v1.0.0公開](https://github.com/kz-oshiro/docs-search-ps/releases/tag/v1.0.0)、Rust版の自動テスト・Windowsビルド・[v3.0.0公開](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を完了した。両リポジトリのmain反映により移行の公開も完了した。実アプリGUIは未確認。以下の初回記録と手順は履歴として保持し、最新の結果は移行先の [移行記録](https://github.com/kz-oshiro/docs-search-ps/blob/main/docs/migration-record.md)とRust側の [検証記録](validation-v3.0.0.md)を参照する。
 
 2026-10-03 の文書レビューで、再開手順、独立したケース原本の説明、自動テストと配布ビルドの入口、過去の検証結果と現在の未実施範囲を修正した。再開時は移行記録を先に読み、依頼された M4 / M5 の未完了手順から進む。完了済みの M0〜M3 を繰り返さない。
 

@@ -88,6 +88,6 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Automa
 
 生成器検証→共通→周辺→条件→Office/順位/一括→イシュー→索引→Rust単体/公開API→WASM型検査→ヘッドレスPlaywrightの順。UI試験の初回準備は [こちら](playwright-ui-test-plan.md#実装と準備)。失敗時は原因と修正を記録し、失敗した確認を再実施して残りを続行する。テスト/CLIのコンパイルと試験用WASM生成は必要だが、Windows配布ビルド・実アプリ起動は含まない。`Run-Local-CI.ps1` はこの入口の後にWindows配布ビルドを追加する従来の用途を保つ。
 
-自動テストとWindows配布ビルドの結果は[検証記録](validation-v3.0.0.md)を参照する。実アプリ起動/GUI、性能測定、実Office文書の網羅的互換性、コミット/push/タグ/Release/イシュー操作は未実施。折りたたみ・絞り込みの描画、編集ダイアログ/最新セッションtoken、クリップボード/保存先選択、フォルダー復元、テーマ、アイコン、周辺書式の見た目の成功を自動試験から推定しない。
+自動テスト・Windows配布ビルドとv3.0.0のcommit/push/タグ/Releaseは完了した。結果は[検証記録](validation-v3.0.0.md)を参照する。ヘッドレスUIではDOM・状態・要求引数を確認した。実アプリ起動/GUI、性能測定、実Office文書の網羅的互換性、イシュー完了操作は未実施。実EXEでの編集セッションtoken、Windowsクリップボード/保存先選択と、テーマ・アイコン・周辺書式などの見た目の成功を自動試験から推定しない。
 
 PDF、旧Officeバイナリ形式、OCR、クラウド専用API、正規表現/括弧式、Office編集、履歴、設計書の意味的差分表示はこの版の対象外。テキスト編集後のコード/JSON等の構文検証もしない。検索全体の一貫したスナップショットや、サイズ/mtimeが変わらない外部更新の検知は保証しない。

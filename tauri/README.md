@@ -1,6 +1,6 @@
 # docs-search Tauri 実装
 
-ソース版: **v3.0.0**。[Rust要求仕様](../docs/rust-requirements-v3.0.0.md)を機能・上限・テスト対応の基準とし、[検証記録](../docs/validation-v3.0.0.md)へ今回の自動確認を記録します。
+ソース/配布版: **[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)**。[Rust要求仕様](../docs/rust-requirements-v3.0.0.md)を機能・上限・テスト対応の基準とし、[検証記録](../docs/validation-v3.0.0.md)に自動確認と公開結果、[リリースノート](../docs/release-notes-v3.0.0.md)に変更点を記録しています。
 
 Windows 向けの文書横断検索アプリです。Rust の検索コアがローカル文書を読み取り、Tauri がデスクトップ画面との境界を担当し、画面の検索状態と操作は Rust からビルドした WebAssembly で動きます。テーマ設定は JavaScript で保存・復元します。Office や PowerShell を検索処理に使用しません。
 

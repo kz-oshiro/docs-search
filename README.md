@@ -2,7 +2,7 @@
 
 Rust コアと Rust→WebAssembly の画面を持つ、Windows 向けの Tauri 文書検索ツールです。起動・開発は [Tauri 実装の README](./tauri/README.md) を参照してください。PowerShell 版は独立リポジトリ [docs-search-ps](https://github.com/kz-oshiro/docs-search-ps) で管理します。
 
-現在のソース版は **v3.0.0** です。[Rust要求仕様](./docs/rust-requirements-v3.0.0.md)にP0〜P6・既存イシュー・設定をまとめ、要求IDと自動テストの対応を記載しています。[検証記録](./docs/validation-v3.0.0.md)に今回の結果と対象外の範囲を記録します。ソースの版番号と配布済み実行ファイルの版は別です。
+現在のRust版は **[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)** です。2026-10-03にWindows実行ファイルを公開しました。[Rust要求仕様](./docs/rust-requirements-v3.0.0.md)にP0〜P6・既存イシュー・設定をまとめ、要求IDと自動テストの対応を記載しています。[リリースノート](./docs/release-notes-v3.0.0.md)と [検証記録](./docs/validation-v3.0.0.md)に変更点・確認結果・未確認の範囲を記録しています。
 
 Rust/CLIとヘッドレスPlaywrightの自動確認（実アプリ起動・Windows配布ビルドなし）は次を実行します。初回は [UI試験の準備](./docs/playwright-ui-test-plan.md#実装と準備)が必要です。
 

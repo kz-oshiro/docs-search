@@ -2,6 +2,8 @@
 
 実施日: 2026-10-03。対象: [Rust要求仕様 v3.0.0](rust-requirements-v3.0.0.md)。実アプリ起動/GUIは今回の依頼対象外。ヘッドレスPlaywrightは自動試験に含めた。
 
+公開済み: **[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)**。ソースコミット`f96af8605840306a50c76c34356b13ca3e62bf1a`。正式Releaseとアップロード済みEXEのサイズ・SHA-256を確認した。公開後の文書更新には実行ソースの変更を含めていない。
+
 最新追記: 2026-10-03の再実行で **Rust64件（17性質×各1,024ケース）、CLI受け入れ、WASM型検査、Playwright 51件、Windows Releaseビルドが成功**。固定seedは3000002。U31で見つけた一括入力プレビューの重複要求も修正・再確認した。実施記録と成果物のSHA-256は末尾の「最新の自動テスト・Windows配布ビルド」を参照する。
 
 公開前レビュー: 上記の生ログとPlaywright JSON、EXEのサイズ・SHA-256、Cargo/Tauriの版番号、U31修正とTauri境界・編集/一括検索/順位の関連実装を照合した。Playwrightは成功51・スキップ0・失敗0・flaky0。ビルド後に実行ソースの変更はなく、公開を止める不備は見つからなかった。READMEの未実行記述を修正し、[v3.0.0リリースノート](release-notes-v3.0.0.md)を追加した。実行ソースを変更していないため、レビューだけによるテスト・ビルドの再実行は行っていない。
@@ -113,4 +115,15 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Build.ps1
 
 自動テストログは [automated-tests.log](../outputs/v3-rust-verification-20261003-164727-98e0872d/automated-tests.log)、順位比較は [ranking-comparison.json](../outputs/v3-rust-verification-20261003-164727-98e0872d/ranking-comparison.json)、ビルドログは [windows-build.log](../outputs/v3-rust-verification-20261003-164727-98e0872d/windows-build.log) に保存した。Playwrightの生成物は `outputs/ui-tests/20261003-164805-bfb96c4ad6eb4169b16050187a4b56ac/` にある。これらの`outputs/`記録はGit除外のローカル成果物である。
 
-今回も実アプリ起動・GUI・性能測定・旧PowerShell実装の回帰・コミット/push/タグ/Release/GitHubイシュー操作は実施していない。ビルド成功はアプリ起動やOS連携の確認を意味しない。
+このテスト・ビルドを終えた時点では実アプリ起動・GUI・性能測定・旧PowerShell実装の回帰・コミット/push/タグ/Release/GitHubイシュー操作は実施していなかった。ビルド成功はアプリ起動やOS連携の確認を意味しない。
+
+## 2026-10-03 レビューと公開
+
+公開前レビューで生ログ・コード・版番号・配布EXEを照合し、公開を止める不備は見つからなかった。READMEの未実行記述とPowerShell移行状況を更新した。実行ソースとテスト内容は上記の最終成功時から変更していない。
+
+- ソースコミット`f96af8605840306a50c76c34356b13ca3e62bf1a`をmainへpushし、同じコミットを指す注釈付きタグ`v3.0.0`をpushした。
+- 2026-10-03 17:09:17 JSTに [GitHub Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を公開した。draft=false、prerelease=false、Latest=v3.0.0をAPIで確認した。
+- 公開アセット`docs-search-desktop.exe`（asset ID `607423986`）はuploaded、13,120,512 bytes。GitHubのdigest `sha256:3bd1f22ccc818ef9ef1a532e141e9b6b4d2b655b0c3e7dd8854c7cb859714eee`がローカルSHA-256と一致した。
+- remote mainとタグの対象コミット、`origin/main...HEAD`のahead/behind `0 0`、クリーンな作業ツリーを確認した。公開後の進捗文書更新は別コミットで反映する。
+
+実アプリ起動・対話的GUI・OS連携・見た目、性能と実Office互換性の追加評価、イシュー完了操作は引き続き未実施。PowerShell版は別リポジトリでv1.0.0を公開済みである。
