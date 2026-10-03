@@ -6,6 +6,7 @@
 
 | 公開版 | 変更点 | 検証・公開の記録 |
 | --- | --- | --- |
+| v3.0.2 | [リリースノート](release-notes-v3.0.2.md) | [検証記録](validation-v3.0.2.md) |
 | v3.0.1 | [リリースノート](release-notes-v3.0.1.md) | [検証記録](validation-v3.0.1.md) |
 | v3.0.0 | [リリースノート](release-notes-v3.0.0.md) | [検証記録](validation-v3.0.0.md) |
 | v2.0.7 | [リリースノート](release-notes-v2.0.7.md) | 同リリースノート内 |
