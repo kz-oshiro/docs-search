@@ -38,7 +38,7 @@
 ```text
 cargo xtask setup
 cargo xtask ui
-cargo xtask ui --case "^U23:"
+cargo xtask ui --case "U23:"
 cargo xtask test
 ```
 

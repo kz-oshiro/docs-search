@@ -39,7 +39,7 @@ workers = max(1, min(6, max(1, floor(n * 0.5)), floor(n * max(0, 0.8 - u))))
 | --- | --- | --- |
 | 負荷連動の選択と全件実行 | `cargo xtask ui`、続いて `cargo xtask test` のレポートと `ui/workers.json` / `ui/results.json` を照合 | 54件成功、skipped/unexpected/flaky 0。policyから求めたworkersとUIの `config.workers` が一致。複数workerでもテーマ/ストレージ/要求/遅延応答/起動失敗ケースの状態が混ざらない |
 | 前提不足でもバックエンドを継続 | Playwright設定のみを専用検証checkoutで意図的な構文エラーにして `cargo xtask ci` | Playwright工程failed。バックエンド/検証基盤は終了まで続き、ログが残る。全体終了コード1、desktop-build skipped。前提不足も成功にしない |
-| 選択実行 | `cargo xtask ui --case "^U23:"` | 選択ケースだけを実行し、同じCPU計測と計画読込みを使う。全体合格の証拠には使用しない |
+| 選択実行 | `cargo xtask ui --case "U23:"` | 選択ケースだけを実行し、同じCPU計測と計画読込みを使う。全体合格の証拠には使用しない |
 
 ## アプリケーション結合試験
 

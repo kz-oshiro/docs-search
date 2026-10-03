@@ -17,7 +17,7 @@ cargo xtask setup
 ```text
 cargo xtask test
 cargo xtask ui
-cargo xtask ui --case "^U23:"
+cargo xtask ui --case "U23:"
 ```
 
 `test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、ランナー内で別のビルドをしません。CLI の LOCALAPPDATA は子プロセスごとに独立しています。共通 load データは実行内で共有し、変更する文書と索引は別の一時領域に置きます。
