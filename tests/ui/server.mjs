@@ -4,8 +4,8 @@ import path from 'node:path';
 
 if (!process.env.DOCS_SEARCH_UI_SITE) throw new Error('DOCS_SEARCH_UI_SITE is required.');
 const root = await fs.realpath(process.env.DOCS_SEARCH_UI_SITE);
-await fs.access(path.join(root, 'pkg', 'docs_search_ui_bg.wasm'));
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.wasm': 'application/wasm' };
+for (const asset of ['index.html', 'boot.js', 'app.js', 'view.js', 'tauri.js']) await fs.access(path.join(root, asset));
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 http.createServer(async (request, response) => {
   if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405).end(); return; }
   try {

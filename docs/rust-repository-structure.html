@@ -316,7 +316,7 @@
 
     <nav aria-label="ページ内目次">
       <a href="#architecture">全体像</a>
-      <a href="#crates">3つのRust crate</a>
+      <a href="#crates">Cargo workspace と画面</a>
       <a href="#search-flow">検索の流れ</a>
       <a href="#modules">コアのモジュール</a>
       <a href="#repository">リポジトリ</a>
@@ -337,12 +337,12 @@
           <div class="flow-arrow" aria-hidden="true">↓</div>
           <div class="layer front">
             <div>
-              <span class="layer-label">画面・WASM</span>
+              <span class="layer-label">画面・JavaScript</span>
               <h3><code>frontend/</code></h3>
             </div>
             <div class="layer-body">
-              <p><code>index.html</code> と CSS が画面を定義し、Rust→WASM の <code>src/lib.rs</code> が検索状態とイベント処理を担います。</p>
-              <p>WASM内のJavaScript連携コードがDOM更新やTauri API呼び出しを行います。<code>boot.js</code> がWASMを起動します。</p>
+              <p><code>index.html</code> と CSS が画面を定義し、HTML/CSS/JavaScript の <code>app.js</code> が検索状態とイベント処理を担います。</p>
+              <p>view.js と tauri.jsがDOM更新やTauri API呼び出しを行います。<code>boot.js</code> がapp.js を起動します。</p>
               <span class="direction">検索要求 → Tauri IPC の <code>start_search</code></span>
             </div>
           </div>
@@ -392,7 +392,7 @@
       <section id="crates">
         <div class="section-heading">
           <div>
-            <h2>3つのRust crate</h2>
+            <h2>Cargo workspace と画面</h2>
             <p class="section-note">crateの依存から、責務の境界が読み取れます。</p>
           </div>
         </div>
@@ -410,13 +410,13 @@
             <a href="../src-tauri/Cargo.toml">Cargo.toml</a> · <a href="../src-tauri/src/main.rs">コマンドと状態</a>
           </article>
           <article class="panel crate">
-            <span class="badge">WEBASSEMBLY UI</span>
-            <h3><code>docs-search-ui</code></h3>
-            <p><code>frontend/</code> にある画面制御。WASMにコンパイルされ、Tauri IPCを通してデスクトップ側と話します。</p>
-            <a href="../frontend/Cargo.toml">Cargo.toml</a> · <a href="../frontend/src/lib.rs">画面制御</a>
+            <span class="badge">ES MODULES UI</span>
+            <h3><code>frontend/</code></h3>
+            <p><code>frontend/</code> にある画面制御。ES modules として読み込まれ、Tauri IPCを通してデスクトップ側と話します。</p>
+            <a href="../frontend/index.html">HTML</a> · <a href="../frontend/app.js">画面制御</a>
           </article>
         </div>
-        <p class="note" style="margin-top:12px">依存境界: <code>src-tauri → core</code>。WASM画面は <code>docs-search-core</code> を直接リンクせず、TauriのIPCで通信します。このため、検索はデスクトップ側で動き、WASM側は入力・画面状態・表示を担当します。</p>
+        <p class="note" style="margin-top:12px">Rust workspaceはcore/src-tauri/xtask/test-supportの4パッケージ。frontendは別のJS資材です。xtask → test-support、core → test-supportはdev-dependencyのみで、製品へはリンクしません。<a href="../Cargo.toml">workspace設定</a> · <a href="../xtask/src/main.rs">実行入口</a> · <a href="../test-support/src/common.rs">生成器</a>。依存境界: <code>src-tauri → core</code>。JavaScript画面は <code>docs-search-core</code> を直接リンクせず、TauriのIPCで通信します。このため、検索はデスクトップ側で動き、画面側は入力・画面状態・表示を担当します。</p>
       </section>
 
       <section id="search-flow">
@@ -448,7 +448,7 @@
             <p>結果を最大128件単位でまとめ、その他の境界イベントとともに <code>search-events</code> を送ります。</p>
           </article>
           <article class="flow-step">
-            <h3>WASMが表示を更新</h3>
+            <h3>JavaScriptが表示を更新</h3>
             <p>イベントが現在の検索IDに属するかを確認し、件数・進捗・ファイルごとの結果・Issueを画面に反映します。</p>
           </article>
         </div>
@@ -559,13 +559,14 @@
         </div>
         <div class="panel tree">
 <pre><code>docs-search/
-├─ core/                  Rust検索コア・CLI・Rustテスト
-├─ frontend/              Rust→WASM・HTML・CSS・JavaScript
+├─ Cargo.toml / Cargo.lock / rust-toolchain.toml
+├─ core/                  Rust検索コア・CLI・単体/API/CLI試験
+├─ frontend/              HTML・CSS・JavaScript
 ├─ src-tauri/             Windowsアプリ・Tauri設定・アイコン
-├─ scripts/               ビルド・自動試験・データ生成の入口
+├─ xtask/                 Cargoからのビルド・試験・生成の入口
+├─ test-support/          独立した開発用生成器・XML資材
 ├─ tests/
-│  ├─ fixtures/           文書生成器・ケース原本・生成器検証
-│  ├─ cli/                CLI受け入れランナー
+│  ├─ fixtures/           ケース原本（生成器はtest-support）
 │  └─ ui/                 ヘッドレスPlaywright
 ├─ docs/
 │  ├─ specifications/     要求仕様・GUI・バックエンド・境界契約
@@ -577,7 +578,7 @@
 │  └─ rust-repository-structure.html
 ├─ outputs/               Git管理外のデータ・記録・成果物
 └─ Generate-Test-Data.cmd 保存用テストデータ生成</code></pre>
-          <p class="tree-note"><code>target/</code> と <code>outputs/build/.frontend-build/</code> はビルド生成物です。<code>core/src/main.rs</code> はGUIを起動せず検索イベントをJSONで出すCLIエントリです。</p>
+          <p class="tree-note"><code>target/</code> と <code>target/frontend-dist/</code> はビルド生成物です。<code>core/src/main.rs</code> はGUIを起動せず検索イベントをJSONで出すCLIエントリです。</p>
         </div>
       </section>
 
@@ -592,23 +593,23 @@
           <article class="panel build-card">
             <h3>デスクトップ版のビルド</h3>
             <ol class="sequence">
-              <li><code>Build-Frontend.ps1</code> がRust画面をWASMへコンパイルし、JavaScript接続ファイルを生成。</li>
-              <li>HTML・CSS・テーマ関連ファイルを <code>outputs/build/.frontend-build/</code> に配置。</li>
-              <li>Cargo/TauriがWASM画面とRustコアをWindows実行ファイルにまとめる。</li>
-              <li><code>Build.ps1</code> は一時画面・Cargo release生成物を片付け、EXEを <code>outputs/build/</code> に残す。</li>
+              <li><code>cargo xtask build</code> が frontend の8資材を内容に変更があった場合だけ staging。</li>
+              <li>HTML・CSS・テーマ関連ファイルを <code>target/frontend-dist/</code> に配置。</li>
+              <li>Cargo/TauriがJavaScript画面とRustコアをWindows実行ファイルにまとめる。</li>
+              <li>debug/release cache を保持し、成功 EXE と SHA256 を実行別 <code>outputs/runs/</code> に保存。</li>
             </ol>
           </article>
           <article class="panel build-card">
             <h3>自動確認の構成</h3>
             <ol class="sequence">
               <li>共通データ・CLI受け入れランナーがコアの入出力を確認。</li>
-              <li>CargoのRustテストとWASM向け型検査がエンジンと画面のコードを確認。</li>
-              <li>Playwrightが実際のHTML/CSS/WASM画面をヘッドレス操作。Tauri IPC境界はテスト用モックを使う。</li>
+              <li>CargoのRustテストと生成器/実CLI検証がエンジンと画面のコードを確認。</li>
+              <li>Playwrightが実際のHTML/CSS/JavaScript画面をヘッドレス操作。Tauri IPC境界はテスト用モックを使う。</li>
               <li>実アプリGUI、Windows OS連携、配布ビルドは自動テスト入口と別の範囲。</li>
             </ol>
           </article>
         </div>
-        <p class="note" style="margin-top:12px">このページはソース構造の読み取り結果です。作成にあたりテスト、ビルド、アプリ起動は実行していません。現在の公開・検証状況は <a href="releases/validation-v3.0.0.md">v3.0.0検証記録</a>を参照してください。</p>
+        <p class="note" style="margin-top:12px">このページはソース構造の読み取り結果です。作成にあたりテスト、ビルド、アプリ起動は実行していません。移行前の公開・検証状況は <a href="releases/validation-v3.0.0.md">v3.0.0検証記録</a>を参照してください。</p>
       </section>
 
       <section id="start-here">
@@ -621,7 +622,7 @@
         <div class="reading">
           <a href="../core/src/lib.rs">検索の入口<span>要求、イベント、検索全体の進行</span></a>
           <a href="../src-tauri/src/main.rs">Tauri連携<span>コマンド、状態、IPCイベント</span></a>
-          <a href="../frontend/src/lib.rs">画面の動き<span>WASMイベントと結果表示</span></a>
+          <a href="../frontend/app.js">画面の動き<span>検索イベントと結果表示</span></a>
           <a href="development.md">開発・実行手順<span>必要環境、ビルド、自動確認</span></a>
           <a href="specifications/rust-requirements-v3.0.0.md">Rust要求仕様<span>機能と受け入れ条件</span></a>
           <a href="specifications/boundary.md">境界契約<span>画面と検索処理の責務</span></a>
@@ -651,5 +652,6 @@
       empty.hidden = visible !== 0;
     });
   </script>
+<p style="padding:24px">Cargo集約/WASM撤去後の実装は未検証です。<a href="test-plans/cargo-native-ui-test-plan.md">現行の検証手順</a>と<a href="reports/implementation-report-cargo-native-ui.md">実装報告</a>を参照してください。test-supportは開発専用、root Cargo.lockとtargetを共有します。</p>
 </body>
 </html>

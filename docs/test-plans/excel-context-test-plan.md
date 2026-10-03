@@ -1,5 +1,7 @@
 # Excel 周辺セル P2 の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
 実装対象は `.xlsx` / `.xlsm` のセル一致と、アンカーを取得できた図形一致の「周辺を表示」です。検証は次の実装確認段階で行います。この文書は確認項目、手順、期待結果を固定します。
@@ -8,20 +10,20 @@
 
 ## 準備
 
-`docs-search` 直下で最新のコードを対象にします。自動テストのみの依頼では、次の入口で共通検索ケース、Rust単体テスト、WASM型検査とヘッドレスPlaywrightを実行します。
+`docs-search` 直下で最新のコードを対象にします。自動テストのみの依頼では、次の入口で共通検索ケース、Rust単体テスト、JS構文確認とヘッドレスPlaywrightを実行します。
 
-この入口は[`run-context-cases.py`](../../tests/cli/run-context-cases.py)も実行し、セル・図形の検索位置と索引初回/再利用の同値性を専用の一時データで検証します。周辺表のDOM・列移動・要求はヘッドレスPlaywrightで確認します。実アプリのOS連携・見た目は別の確認範囲です。
+この入口は[`cli_context.rs`](../../core/tests/cli_context.rs)も実行し、セル・図形の検索位置と索引初回/再利用の同値性を専用の一時データで検証します。周辺表のDOM・列移動・要求はヘッドレスPlaywrightで確認します。実アプリのOS連携・見た目は別の確認範囲です。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使います。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使います。
 
 周辺表示用の独立した Excel 文書を作ります。出力先が既にある場合は別名にし、既存データを上書きしません。`outputs/` は Git の除外対象です。
 
 ```powershell
-python .\tests\fixtures\generate-context-fixture.py --output .\outputs\context-p2-new\row-window.xlsx
+cargo xtask fixtures --kind context --output .\outputs\context-p2-new\row-window.xlsx
 ```
 
 GUI 確認はデスクトップアプリを起動して実施します。GUI テストの実施が依頼文に明示されていなければ、実施前に確認を取ります。検索フォルダーに `outputs\context-p2-new`、拡張子に `.xlsx` を指定します。

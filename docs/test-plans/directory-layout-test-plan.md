@@ -1,21 +1,14 @@
-# ディレクトリ整理の試験方針
+# Cargo 集約後の配置確認
 
-対象: [実装報告](../reports/implementation-report-directory-layout.md)。配置変更後の実行試験は未実施。コマンドはリポジトリルートで実行する。
+今回の実行確認は未実施。[移行検証方針](cargo-native-ui-test-plan.md)を優先する。旧配置変更の記録は[当時の報告](../reports/implementation-report-directory-layout.md)で保存する。
 
-## 確認項目・手順・期待結果
+| 手順 | 期待結果 |
+|---|---|
+| root Cargo metadata、README、構造ガイドの参照を確認 | core/src-tauri/xtask/test-support のworkspace、root lock、既定core/test-support。frontendにRust crateなし |
+| cargo xtask setup / test | Python/PowerShell/WASM生成なし、実CLIと必須ヘッドレスUIを実行。索引は子プロセスの一時LOCALAPPDATA |
+| cargo xtask build / ci | frontend8資材のみをstaging。cache保持。現在成功したEXEとSHA256を実行別に保存 |
+| cargo xtask fixtures と --profile load / --kind issues | 新規保存先を表示。acceptance33/load148、既存非空先を拒否 |
+| Generate-Test-Data.cmd を明示した手動範囲で実行 | Cargoの入口だけを呼び、既存データを変更せず保存先を表示 |
+| outputs / 旧target / node_modules を確認 | 過去の保存データ・キャッシュ・PS成果物アーカイブを自動削除しない |
 
-| 確認項目 | 手順 | 期待結果 |
-| --- | --- | --- |
-| 全自動試験 | `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1` | 共通生成器、CLI受け入れ、Rust単体/公開API、WASM型検査、実WASMのヘッドレスPlaywrightが新配置で成功。パス不在による失敗なし |
-| 配布ビルドを含む確認 | ビルドまで依頼された場合、`powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` | 全自動試験後に `outputs/build/docs-search-desktop.exe` を生成。一時画面と従来どおりのCargo release生成物を片付ける。既存outputsの試験記録・保存文書は保持 |
-| 保存データ生成 | `Generate-Test-Data.cmd -NoOpen` と `Generate-Test-Data.cmd -Profile load -NoOpen`（PowerShellでは先頭に `.\`） | 毎回別の `outputs/test-data/` 配下へacceptance 33文書、load 148文書を生成。ケース原本は27件で一致し、既存データを上書きしない。フォルダーを開かない |
-| 省略時出力先 | `outputs/test-data/generated/` が未作成の場合だけ `python .\tests\fixtures\generate-fixtures.py` | カレントディレクトリに依存せず既定の生成先へ出力。非空の既定先へ再実行すると拒否し、既存データを維持。既存なら削除せずこの確認を未実施として記録 |
-| 実行中アプリ | 実アプリ確認を許可された場合だけ、新配置のEXEを起動してBuild.ps1の事前検出を確認 | 起動中はビルド前に終了案内を表示。閉じた後はビルド可能 |
-
-配布ビルド込みの依頼ではRun-Local-CI.ps1を1回実行し、全自動試験を重複実行しない。途中で失敗した場合は原因を直して依頼範囲を再確認する。履歴のv3.0.0成功記録を今回の成功結果に流用しない。
-
-## 依存準備・判定境界
-
-新配置でNode依存がない場合、[Playwright準備](playwright-ui-test-plan.md#実装と準備)に従って `tests/ui/` でnpm ciとChromium導入を行う。自動試験には必要なWASM生成を含める。旧node_modulesやCargo targetを自動で移動・削除しない。
-
-ヘッドレスPlaywrightはDOM・状態・要求引数とテキスト記録で判定し、スクリーンショット・画像比較・動画・トレースを使わない。実アプリ起動・OS連携・見た目は別の確認であり、明示依頼または事前許可が必要。通常の自動試験でGUI確認は行わない。
+テスト/ビルド/起動/GUI/リモート反映は実装依頼だけでは行わない。GUI確認を別途依頼された場合にだけ実EXEの接続・OS操作・見た目を確認する。

@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "docs-search",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "identifier": "local.docssearch.app",
-  "build": { "frontendDist": "../outputs/build/.frontend-build" },
+  "build": { "frontendDist": "../target/frontend-dist" },
   "app": {
     "withGlobalTauri": true,
     "windows": [{ "title": "docs-search", "width": 1100, "height": 760, "minWidth": 760, "minHeight": 520 }],
-    "security": { "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; object-src 'none'" }
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; object-src 'none'" }
   },
   "bundle": { "active": false, "icon": ["icons/icon.ico", "icons/icon.png"] }
 }

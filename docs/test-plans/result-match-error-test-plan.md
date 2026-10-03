@@ -1,16 +1,18 @@
 # 結果ラベル・エラー表示の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
 この方針は `matchCategory` と検索結果・エラー欄の表示変更に適用する。リポジトリの `AGENTS.md` に従い、GUI テストは依頼または事前確認がある場合だけ実施する。
 
 ## 自動確認と配布ビルド
 
-自動テストのみの依頼では、リポジトリ直下で下表の入口を実行する。Windows配布ビルドまで依頼された場合は、同じ自動一式を含む `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` に代える。
+自動テストのみの依頼では、リポジトリ直下で下表の入口を実行する。Windows配布ビルドまで依頼された場合は、同じ自動一式を含む `cargo xtask ci` に代える。
 
 | 確認項目 | 手順 | 期待結果 |
 | --- | --- | --- |
-| 既存検索の回帰 | `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1` を実行する。 | 共通バックエンドケース、Rustテスト、WASM型検査、試験用WASM生成、ヘッドレスUI試験が成功する。結果件数・順位・強調範囲が変わらない。 |
+| 既存検索の回帰 | `cargo xtask test` を実行する。 | 共通バックエンドケース、Rustテスト、JS構文確認、UI資材staging、ヘッドレスUI試験が成功する。結果件数・順位・強調範囲が変わらない。 |
 | 一致区分 | 共通ケース `basic-search-excludes-fuzzy-variants`、`fuzzy-identifier-variants`、`fuzzy-width-and-spacing`、`fuzzy-typo-candidate` の結果を照合する。 | 通常検索の結果は `standard`。あいまい検索オンでも通常検索で見つかる原文・大小文字差・部分一致は `standard`。幅差、識別子差、タイプミスなど通常検索で見つからない結果は `fuzzy`。`matchType` と `score` の既存の期待値は維持する。 |
 
 ## GUI

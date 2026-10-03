@@ -1,5 +1,7 @@
 # 高度な検索 P3 の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
 対象は AND・OR・除外語と、検索箇所 / Excelの同じ行 / ファイル全体の判定です。この実装段階ではテスト・ビルド・GUI起動を実施していません。次の検証では、以下の確認項目・手順・期待結果を先に把握してから進めます。
@@ -8,20 +10,20 @@
 
 ## 準備
 
-`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行します。試験用WASM生成とヘッドレスPlaywrightを含みます。
+`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行します。UI資材stagingとヘッドレスPlaywrightを含みます。
 
-この入口は[`run-condition-cases.py`](../../tests/cli/run-condition-cases.py)も実行し、下表のCLI項目を独立した一時データで検証します。条件入力・根拠・出力対象のDOMと要求はヘッドレスPlaywrightで確認します。実アプリのOS連携・見た目は別の確認範囲です。
+この入口は[`cli_conditions.rs`](../../core/tests/cli_conditions.rs)も実行し、下表のCLI項目を独立した一時データで検証します。条件入力・根拠・出力対象のDOMと要求はヘッドレスPlaywrightで確認します。実アプリのOS連携・見た目は別の確認範囲です。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使います。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使います。
 
 専用データは既存の `outputs/` に新しい名前で生成します。生成器は存在する出力先を上書きしません。
 
 ```powershell
-python .\tests\fixtures\generate-conditions-fixture.py --output .\outputs\conditions-p3-new
+cargo xtask fixtures --kind conditions --output .\outputs\conditions-p3-new
 ```
 
 CLI では空の通常検索語を渡し、条件JSONを `--query-spec-json` に渡します。例:

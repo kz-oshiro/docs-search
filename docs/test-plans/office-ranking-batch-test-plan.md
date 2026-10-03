@@ -1,32 +1,34 @@
 # P4〜P6: Office検索範囲・順位・一括検索の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
 作成日: 2026-10-03。対象: [実装計画](../plans/implementation-plan.md)のP4a・P4b・P5・P6、要求A-16〜A-18。
-追記: v3.0.0の自動テストのみは `scripts/Run-Automated-Tests.ps1` を使う。要求対応と実施結果は [Rust要求仕様](../specifications/rust-requirements-v3.0.0.md)と [検証記録](../releases/validation-v3.0.0.md)を参照。下記の未実施は初回実装時点の記録。
+追記: v3.0.0の自動テストのみは `cargo xtask test` を使う。要求対応と実施結果は [Rust要求仕様](../specifications/rust-requirements-v3.0.0.md)と [検証記録](../releases/validation-v3.0.0.md)を参照。下記の未実施は初回実装時点の記録。
 今回の実装では以下のテスト、ビルド、アプリ起動、GUI、コミット・リモート反映は**未実施**。
 実装内容と制限は[実装報告](../reports/implementation-report-p4-p6.md)を先に読む。
 
 ## 次の担当モデルの実行順
 
 1. `AGENTS.md`、本方針、実装報告、既存P0〜P3の確認方針を読む。既存のチェックアウト差分を保存・確認する。
-2. 自動テストのみの依頼では、ルートから次を実行する。試験用WASM生成とヘッドレスPlaywrightを含む。
+2. 自動テストのみの依頼では、ルートから次を実行する。UI資材stagingとヘッドレスPlaywrightを含む。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使う。順位記録も保存する場合は、次の3の入口と配布ビルド手順を使う。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使う。順位記録も保存する場合は、次の3の入口と配布ビルド手順を使う。
 
-自動入口は生成器検証、共通27ケース、P2・P3、P4〜P6、イシュー、索引、Rustコア、WASM型検査、ヘッドレスUIの順。ローカルCIはその後にWindowsビルドを加える。配布ビルド前に既存アプリが起動している場合は終了する。P4〜P6は `tests/fixtures/generate-office-search-fixture.py` と `tests/cli/run-office-search-cases.py` を使う。保存先が既存なら生成器は拒否し、共通fixtureの件数・期待値は変更しない。
+自動入口は共通load生成、Rust単体/API/proptest、生成器検証、共通27、P2/P3、P4〜P6、イシュー、索引、ヘッドレスUIの順。ローカルCIはその後にWindowsビルドを加える。配布ビルド前に既存アプリが起動している場合は終了する。P4〜P6は `test-support/src/specialized.rs` と `core/tests/cli_office.rs` を使う。保存先が既存なら生成器は拒否し、共通fixtureの件数・期待値は変更しない。
 
 3. P5の固定20クエリについて結果と根拠の保存も依頼された場合、2の自動テスト入口に代えて次を使う。保存先は既存ファイルを上書きしない新しいパスを使う。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1 -RankingReport .\outputs\p4-p6-check-YYYYMMDD-HHMMSS\ranking-comparison.json
+cargo xtask test
 ```
 
-この入口は自動一式の同じ実行内で順位記録を保存する。配布ビルドも依頼された場合は、成功後に `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Build.ps1` を実行し、成功した自動一式をローカルCIで繰り返さない。既存スクリプトを書き換える必要はない。成功したテスト・未実施の性能/実アプリGUI・検出した不一致を分けて報告する。
+この入口は自動一式の同じ実行内で順位記録を保存する。配布ビルドも依頼された場合は、成功後に `cargo xtask build` を実行し、成功した自動一式をローカルCIで繰り返さない。既存スクリプトを書き換える必要はない。成功したテスト・未実施の性能/実アプリGUI・検出した不一致を分けて報告する。
 
 ## 自動確認の項目・手順・期待結果
 

@@ -1,5 +1,7 @@
 # あいまい検索の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 実装後のテスト担当者はこの方針を読み、既存の共通ケースと追加ケースを実行する。検索用索引とあいまい検索は独立したチェックボックスで、初期状態は両方オフ。あいまい検索の各項目ではチェックをオンにする。索引オンの初回検索と2回目以降を分けて確認する。GUI テストを実施する場合はリポジトリの `AGENTS.md` に従う。
 
 | 確認項目 | 手順 | 期待結果 |
@@ -16,7 +18,7 @@
 | エラー・中断 | 読めないファイルを混ぜ、検索中に中断する | 個別エラーを表示し、通知済み結果を維持する。終了集計と通知件数が一致する。 |
 | 負荷 | `tests/README.md` の load データと多数セルの Excel で初回・再検索・短語検索を測る | 編集距離を全セルに適用せず、再検索が抽出処理を再実行しない。検索中も中断と画面操作が可能。索引容量と所要時間を記録する。 |
 
-静的確認では `git diff --check` と仕様・コード・結果ラベルの対応を確認する。自動テストのみの依頼では、リポジトリルートから `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1` を使う。共通ケース、Rustテスト、WASM型検査、試験用WASM生成とヘッドレスPlaywrightを含む。Windows配布ビルドまで依頼された場合は、この入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使う。
+静的確認では `git diff --check` と仕様・コード・結果ラベルの対応を確認する。自動テストのみの依頼では、リポジトリルートから `cargo xtask test` を使う。共通ケース、Rustテスト、JS構文確認、UI資材stagingとヘッドレスPlaywrightを含む。Windows配布ビルドまで依頼された場合は、この入口に代えて `cargo xtask ci` を使う。
 
 チェックボックスの初期値・要求オプション・理由ラベル・強調・完了後の並べ替え・索引削除のブラウザー内状態は [Playwright方針](playwright-ui-test-plan.md)の自動項目で確認する。実アプリのOS連携・見た目はM1〜M5に従い、明示依頼または事前確認がある場合に実施する。
 

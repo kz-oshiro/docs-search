@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const artifacts = process.env.DOCS_SEARCH_UI_ARTIFACTS;
 if (!artifacts || !process.env.DOCS_SEARCH_UI_SITE) {
-  throw new Error('Run scripts/Run-Ui-Tests.ps1 to build the real WASM frontend and allocate a new output directory.');
+  throw new Error('Run cargo xtask ui to stage the real frontend and allocate a new output directory.');
 }
 
 export default defineConfig({

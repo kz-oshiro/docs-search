@@ -1,0 +1,10 @@
+[package]
+name = "xtask"
+version = "3.0.1"
+edition = "2021"
+publish = false
+
+[dependencies]
+docs-search-test-support = { path = "../test-support" }
+serde.workspace = true
+serde_json.workspace = true

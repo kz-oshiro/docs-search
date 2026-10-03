@@ -1,0 +1,14 @@
+[workspace]
+members = ["core", "src-tauri", "xtask", "test-support"]
+default-members = ["core", "test-support"]
+resolver = "2"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+zip = { version = "4.6", default-features = false, features = ["deflate"] }
+encoding_rs = "0.8.42"
+roxmltree = "0.21.1"
+sha2 = "0.10"
+flate2 = "1"
+crc32fast = "1"

@@ -1,5 +1,7 @@
 # v3.0.0 Playwright UI試験とユーザー確認の境界
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 2026-10-03。Playwrightの導入・テストコード・文書整備の方針。導入時点ではテスト実行・WASM/Windowsビルドを未実施だったが、同日の後続検証でヘッドレスUI 51件とWindows Releaseビルドが成功し、v3.0.0を公開した。実アプリ起動・GUIは未実施。[導入時の実装報告](../reports/implementation-report-playwright.md)と[最新の検証記録](../releases/validation-v3.0.0.md)を併せて読む。
 
 ## 確認境界と実行依頼の意味
@@ -7,54 +9,37 @@
 | 担当 | 確認すること | 結果から断定しないこと |
 | --- | --- | --- |
 | Rust単体/公開API・CLI | 実文書の抽出・検索・索引・順位・編集・出力の意味 | 画面操作、実アプリのOS連携 |
-| Playwright | 実HTML/CSS/JSとRust→WASM画面への操作、DOM・状態・境界へ渡す要求 | 実Rust/Tauriとの接続、実ファイル更新、OS権限、実WebView2の互換性 |
+| Playwright | 実HTML/CSS/JavaScript画面への操作、DOM・状態・境界へ渡す要求 | 実Rust/Tauriとの接続、実ファイル更新、OS権限、実WebView2の互換性 |
 | ユーザーの限定した手動確認 | 実EXEの連携、OSダイアログ、見た目・DPI・アイコン | 自動試験全体の実施をユーザーへ移さない |
 
-今後の「自動テスト」にはヘッドレスPlaywrightを常時含める。`Run-Automated-Tests.ps1` は従来のRust/CLI/WASM型検査の後にUI試験を実行する。ヘッドレス画面操作と、その準備に必要なWASM生成は自動テストの依頼範囲であり、GUI確認の再許可を求めない。対話的ブラウザー操作、実アプリ起動/GUI、ユーザー確認の代行には従来どおり明示依頼または事前許可が必要。
+今後の「自動テスト」にはヘッドレスPlaywrightを常時含める。`cargo xtask test` はRust単体/API/生成器/CLIの後にUI試験を実行する。ヘッドレス画面操作と、その準備に必要なUI資材stagingは自動テストの依頼範囲であり、GUI確認の再許可を求めない。対話的ブラウザー操作、実アプリ起動/GUI、ユーザー確認の代行には従来どおり明示依頼または事前許可が必要。
 
-実装依頼ではコード・文書・静的確認までで止める。この文書の追加は今回の試験実行許可ではない。Windows配布ビルドは別の依頼範囲。`Run-Local-CI.ps1` は自動一式→配布ビルドを維持する。
+実装依頼ではコード・文書・静的確認までで止める。この文書の追加は今回の試験実行許可ではない。Windows配布ビルドは別の依頼範囲。`cargo xtask ci` は自動一式→配布ビルドを維持する。
 
 スクリーンショット・画像比較・動画・トレースはすべて無効。`--ui`、`--headed`、`--debug`、画像/トレースを有効にする追加引数は通常手順に含めない。AIが画像を撮影・読み込みして成功判定する運用をしない。[Playwright公式設定](https://playwright.dev/docs/test-configuration)、[Tauriの試験方式](https://v2.tauri.app/develop/tests/)。
 
 ## 実装と準備
 
 - [UI試験パッケージ](../../tests/ui/package.json)はNode.js 20以上、`@playwright/test` 1.63.0固定、lockfile管理。Chromiumだけを使う。
-- [画面生成](../../scripts/Build-Frontend.ps1)を配布ビルドと共用する。実際のwasm-bindgen初期化から操作し、画面関数やDOMをテスト用に再実装しない。
+- [資材staging](../../xtask/src/main.rs)を配布ビルドと共用する。実際のboot.js/app.js初期化から操作し、画面関数やDOMをテスト用に再実装しない。
 - [境界モック](../../tests/ui/support/tauri-mock.mjs)を画面起動前に注入し、`invoke` と `search-events` のバッチ購読だけ置換する。要求引数を記録し、固定値・拒否・取消・遅延応答を投入する。未登録要求・想定外購読・未解決応答を失敗にする。
-- searchIdは実WASMの要求から取得し、イベントに単調増加sequenceを付ける。古いIDは明示的に注入する。searchId/sequenceを検証したことと、実Tauriの配送保証を混同しない。
+- searchIdは実フロントエンドの要求から取得し、イベントに単調増加sequenceを付ける。古いIDは明示的に注入する。searchId/sequenceを検証したことと、実Tauriの配送保証を混同しない。
 - 検索語の正規化や検索・順位計算、CSV生成をモック内へ再実装しない。プレビュー/出力内容もバックエンドからの固定応答として扱う。fixtureの更新時は `core/src/lib.rs`、`context.rs`、`edit.rs`、`ranking.rs` のcamelCase公開フィールドと照合する。
 - BrowserContextはケースごとに独立。ロケールja-JP、タイムゾーンAsia/Tokyo、通常幅1100px/最小幅760px、1 worker、再試行なし。購読準備・DOM・要求履歴を待ち、固定sleepを使わない。
 - テスト内のクリップボード代替へ文字列を記録する。保存・フォルダー選択・元ファイル起動は境界の応答のみで、利用者の文書・設定・LOCALAPPDATA・索引へ触れない。
 
 初回の依存準備（次の検証担当が実施）:
 
-```powershell
-Push-Location .\tests\cli\ui
-try {
-    npm.cmd ci
-    if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
-    npm.cmd exec -- playwright install chromium
-    if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed' }
-} finally { Pop-Location }
+```text
+cargo xtask setup
+cargo xtask ui
+cargo xtask ui --case "^U23:"
+cargo xtask test
 ```
 
-Rustのwasm32ターゲットとwasm-bindgen-cli 0.2.129も必要。[既存のビルド準備](../development.md#動作条件とビルド)を参照する。通常の入口は依存を自動インストールせず、不足したら準備手順を示して終了する。
+Rust 1.91.1 を toolchain ファイルで固定する。WASM target / wasm-bindgen-cli は不要。通常入口は依存を自動インストールせず、不足を失敗/理由付き skipped として記録する。選択実行は診断用で、全体合格には全件を使う。
 
-リポジトリ直下でUIだけを検証する場合:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Ui-Tests.ps1
-```
-
-失敗ケースだけの再確認は同じ入口に `-Case '^U23:'` のようにケース名の正規表現を渡す。選択実行は全体合格の証拠にはせず、修正後は依頼された一式を実行する。
-
-全自動試験が依頼された場合:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
-```
-
-画面は新規 `outputs/ui-tests/日時-GUID/site/` に生成し、専用Cargoキャッシュ `outputs/ui-tests-cache/target/` を使う。配布ビルドの `.frontend-build`、Cargo release、EXEには触れない。HTTPサーバーは127.0.0.1:43861のみで待ち受け、既存サーバーを再利用しない。同時に別のUI試験が動いていれば停止してから再実行する。サーバーはPlaywrightが起動・終了を管理する。
+画面の8資材は新規 `outputs/runs/<ID>/site/` にコピーする。HTTPサーバーは127.0.0.1:43861のみで待ち受け、既存サーバーは再利用しない。同時に別のUI試験が動いていれば停止してから再実行する。サーバーはPlaywrightが起動・終了を管理する。
 
 ## 自動確認項目・手順・期待結果
 
@@ -75,22 +60,24 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Auto
 
 R3-19/R3-20のブラウザー内操作とR3-16〜R3-18の画面部分を対象とする。生の通知が描画されることは、実コアがその通知を生成する証拠ではない。実配布アプリの機能成功は下の確認を合わせて報告する。
 
+U40〜U42に資材/WASM要求なし、起動資材失敗、CRLF条件要求を追加する。既存51件の期待値は継続し、合計54件は今回未実行。
+
 ## 結果と失敗診断
 
-各実行の `outputs/ui-tests/日時-GUID/results.json` にケースの成否・期待値/実測値を保存する。失敗だけ `test-results/` に `ui-failure.txt` を添付し、直近の要求/イベント、状態、関連alert、先頭5結果のテキスト、例外・資材失敗を記録する。独自添付は最大64,000文字。Playwrightが残すテキストのerror contextも画像ではない。HTMLレポートを自動で開かない。
+各実行の `outputs/runs/<ID>/ui/results.json` にケースの成否・期待値/実測値を保存する。失敗だけ `test-results/` に `ui-failure.txt` を添付し、直近の要求/イベント、状態、関連alert、先頭5結果のテキスト、例外・資材失敗を記録する。独自添付は最大64,000文字。Playwrightが残すテキストのerror contextも画像ではない。HTMLレポートを自動で開かない。
 
 AIの報告は失敗したID・期待値/実測値・修正・再確認結果を中心とし、全文DOMやJSON一式を会話へ貼らない。画像/トレースを取得して診断を始めない。ブラウザー例外、console error、HTTP失敗、想定外モック要求、未解決遅延応答は合格にしない。失敗時も新しい期待値を実装に合わせて安易に変更しない。
 
-生成した画面・診断・専用CargoキャッシュはGit除外のoutputs配下へ残す。履歴を消すための自動再帰削除は行わない。
+生成した画面・診断はGit除外のoutputs配下へ残す。履歴を消すための自動再帰削除は行わない。
 
 ## ユーザー確認票（実アプリの最終5項目）
 
 自動一式と、依頼された配布ビルドを次の担当モデルが完了してから使う。ユーザーにはこの限定票を渡し、テスト全体の実施を求めない。実GUIをAIが操作する場合は明示依頼/許可が必要。ユーザーによる確認結果も自動試験の結果とは分けて記録する。
 
-検証担当は明示したGUI確認の範囲で、既存データを上書きしない新規保存先へ [イシュー用生成器](../../tests/fixtures/generate-issue-fixture.py) を使い、編集対象を試験用コピーにする。実行例の出力先は存在しないことを確認し、既存なら新しい名前に変える。
+検証担当は明示したGUI確認の範囲で、既存データを上書きしない新規保存先へ [イシュー用生成器](../../test-support/src/specialized.rs) を使い、編集対象を試験用コピーにする。実行例の出力先は存在しないことを確認し、既存なら新しい名前に変える。
 
 ```powershell
-python .\tests\fixtures\generate-issue-fixture.py --output .\outputs\ui-manual-YYYYMMDD-HHMMSS
+cargo xtask fixtures --kind issues --output .\outputs\ui-manual-YYYYMMDD-HHMMSS
 ```
 
 | 項目 | 操作 | 期待結果 | 確認結果 |

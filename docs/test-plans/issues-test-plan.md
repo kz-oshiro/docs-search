@@ -1,22 +1,24 @@
 # 既存イシュー一括対応の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
-v3.0.0の自動テストのみは `scripts/Run-Automated-Tests.ps1` を使う。[Rust要求仕様](../specifications/rust-requirements-v3.0.0.md)と [検証記録](../releases/validation-v3.0.0.md)に要求対応・現在の結果をまとめる。以下の未実施は初回実装時点の記録。
+v3.0.0の自動テストのみは `cargo xtask test` を使う。[Rust要求仕様](../specifications/rust-requirements-v3.0.0.md)と [検証記録](../releases/validation-v3.0.0.md)に要求対応・現在の結果をまとめる。以下の未実施は初回実装時点の記録。
 
 2026-10-03の #1〜#9 に適用する。実装報告は [こちら](../reports/implementation-report-issues.md)。今回の作業は実装・静的確認までで、下記の自動テスト・ビルド・データ生成・GUIは未実施。次の担当モデルは先にこの方針、[P4〜P6](office-ranking-batch-test-plan.md)、[テーマ設定](theme-settings-test-plan.md)、現在の `AGENTS.md` を読む。
 
 ## 自動テスト・ビルド
 
-自動テストのみの依頼では、リポジトリ直下から次を実行する。試験用WASM生成とヘッドレスPlaywrightを含む。実アプリGUIの許可待ちでも依頼済みの自動確認を進める。
+自動テストのみの依頼では、リポジトリ直下から次を実行する。UI資材stagingとヘッドレスPlaywrightを含む。実アプリGUIの許可待ちでも依頼済みの自動確認を進める。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使う。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使う。
 
-自動入口に含まれる `run-issue-cases.py` は、独立した一時ディレクトリと `LOCALAPPDATA` を使用し、通常・索引初回・再利用の経路を比較する。既存共通27ケース・P2/P3・P4〜P6・Rust・WASM型検査・ヘッドレスUIも維持する。実アプリGUIとWindows配布ビルドが未実施ならその範囲を分けて報告する。
+自動入口に含まれる `cli_issues.rs` は、独立した一時ディレクトリと `LOCALAPPDATA` を使用し、通常・索引初回・再利用の経路を比較する。既存共通27ケース・P2/P3・P4〜P6・Rust・JS構文確認・ヘッドレスUIも維持する。実アプリGUIとWindows配布ビルドが未実施ならその範囲を分けて報告する。
 
 | 確認項目 | 手順 | 期待結果 |
 | --- | --- | --- |
@@ -37,7 +39,7 @@ Windows配布ビルドまで依頼された場合は、上の入口に代えて 
 GUIが明示依頼または許可された後、新しい出力先へ以下を実行する。生成器は既存ディレクトリへの上書きを拒否する。既存の試験用文書を編集に使わず、このコピーを使用する。
 
 ```powershell
-python .\tests\fixtures\generate-issue-fixture.py --output .\outputs\issues-check-20261003
+cargo xtask fixtures --kind issues --output .\outputs\issues-check-20261003
 ```
 
 `left/same` と `right/same` は同名別パスのフォルダー、`multiple.txt` はkeep/skip混在、`long.txt` は省略と同語・BOM、`sjis.txt` はShift_JIS、`pages` は205ファイル。`excel/layout.xlsx` は逆順のシート名/部品名/行/列とRGB書式、結合・非表示・非表示ふりがなを持つ。実アプリのGUIとCLIの証拠を区別する。

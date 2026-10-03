@@ -1,6 +1,7 @@
 @echo off
 setlocal
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0scripts\Generate-Test-Data.ps1" %*
+cd /d "%~dp0"
+cargo xtask fixtures --open %*
 if errorlevel 1 (
     echo.
     echo Test data generation failed. Review the error above.

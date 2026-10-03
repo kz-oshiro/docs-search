@@ -11,7 +11,7 @@
   } catch {
     canSave = false;
   }
-  // This script runs in the head, before the search screen or WASM is initialized.
+  // This script runs in the head, before the search screen is initialized.
   document.documentElement.dataset.theme = theme;
 
   function initSettings() {

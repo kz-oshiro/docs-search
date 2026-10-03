@@ -1,6 +1,8 @@
 # Rust 要求仕様 v3.0.0
 
-制定日: 2026-10-03。対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、Rust→WASM 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、この版の機能基準には含めない。Cargo 3パッケージと Tauri の製品版番号を `3.0.0` に揃える。仕様の版を確定したことと Windows 配布物のビルド・公開は別である。
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
+制定日: 2026-10-03。対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、HTML/CSS/JavaScript 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、この版の機能基準には含めない。Cargo workspaceの4パッケージと Tauri の製品版番号を `3.0.0` に揃える。仕様の版を確定したことと Windows 配布物のビルド・公開は別である。
 
 本書はここまでの要求を Rust 実装向けに整理した基準である。[全体仕様](requirements.md)の A-01〜A-27、[バックエンド](backend.md)、[境界契約](boundary.md)、[GUI](gui.md)が詳細を定める。P0〜P6とイシュー #1〜#9、テーマ設定を含み、追加の製品機能は要求しない。過去の実装報告の「未実施」は報告時点の記録とし、今回の検証結果は [v3.0.0 検証記録](../releases/validation-v3.0.0.md)へ集約する。
 
@@ -13,7 +15,7 @@
 | `core/src/lib.rs` と抽出・照合・索引・条件・一括・順位モジュール | 入力検証、列挙、読み取り、通知と集計。画面なしで公開APIとCLIを検査できる |
 | `core/src/context.rs` / `edit.rs` / `report.rs` | 周辺情報、明示したテキスト編集、出力。検索とは操作・失敗の範囲を分ける |
 | `src-tauri/src/main.rs` | 検索セッション、イベント転送、最新結果IDからの操作、OSダイアログ・起動・保存 |
-| `frontend/src/lib.rs`、HTML/CSS/テーマJS | 入力、表示、絞り込み、折りたたみ、設定と保存復元 |
+| `frontend/app.js`、HTML/CSS/テーマJS | 入力、表示、絞り込み、折りたたみ、設定と保存復元 |
 
 ## 機能要求
 
@@ -68,12 +70,12 @@
 
 | 要求 | 自動テストコード |
 | --- | --- |
-| R3-01〜R3-07 | [公開API受け入れ](../../core/tests/requirements_v3.rs)の同じIDのテスト、[共通27ケース](../../tests/cli/run-backend-cases.py)、`extract.rs` / `fuzzy.rs` の単体試験 |
-| R3-08 | [索引専用CLI](../../tests/cli/run-index-cases.py)、`index.rs`、[Excel旧抽出版](../../tests/cli/run-issue-cases.py)、P2/P3/P4の直接/初回/再利用比較 |
-| R3-09 | 公開API上限テスト、`query.rs`、[条件CLI](../../tests/cli/run-condition-cases.py) |
-| R3-10〜R3-11 | 公開APIの一括/中断/通知整合、`batch.rs`、[Office・順位・一括CLI](../../tests/cli/run-office-search-cases.py) |
+| R3-01〜R3-07 | [公開API受け入れ](../../core/tests/requirements_v3.rs)の同じIDのテスト、[共通27ケース](../../core/tests/cli_backend.rs)、`extract.rs` / `fuzzy.rs` の単体試験 |
+| R3-08 | [索引専用CLI](../../core/tests/cli_index.rs)、`index.rs`、[Excel旧抽出版](../../core/tests/cli_issues.rs)、P2/P3/P4の直接/初回/再利用比較 |
+| R3-09 | 公開API上限テスト、`query.rs`、[条件CLI](../../core/tests/cli_conditions.rs) |
+| R3-10〜R3-11 | 公開APIの一括/中断/通知整合、`batch.rs`、[Office・順位・一括CLI](../../core/tests/cli_office.rs) |
 | R3-12〜R3-15 | 公開APIの個別エラー/資源制限/位置順/読取専用、`extract.rs` / `ranking.rs`、Office CLI固定20クエリ、イシューCLI |
-| R3-16 | `context.rs` の窓/結合/非表示/書式試験、[周辺CLI](../../tests/cli/run-context-cases.py)の直接/初回/再利用・変更/削除試験 |
+| R3-16 | `context.rs` の窓/結合/非表示/書式試験、[周辺CLI](../../core/tests/cli_context.rs)の直接/初回/再利用・変更/削除試験 |
 | R3-17 | `edit.rs` のBOM/CRLF/Unicode/省略抜粋/外部変更/Shift_JIS/根拠選択試験（Windowsでは実際の置換処理を通る） |
 | R3-18 | `report.rs` のCSV/TSV/JSON/根拠/行列試験 |
 | R3-19〜R3-20 | [Playwright方針](../test-plans/playwright-ui-test-plan.md)のU01〜U39をヘッドレスChromiumで51件実行し成功。実アプリ/OS連携と見た目はM1〜M5 |
@@ -83,10 +85,10 @@
 最新の [P4〜P6方針](../test-plans/office-ranking-batch-test-plan.md)、[イシュー方針](../test-plans/issues-test-plan.md)、[テーマ方針](../test-plans/theme-settings-test-plan.md)の確認項目を引き継ぐ。Rustの自動テスト専用入口は次のとおり。順位の比較記録もこの1回で保存できる。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1 -RankingReport .\outputs\v3-check-YYYYMMDD-HHMMSS\ranking-comparison.json
+cargo xtask test
 ```
 
-生成器検証→共通→周辺→条件→Office/順位/一括→イシュー→索引→Rust単体/公開API→WASM型検査→ヘッドレスPlaywrightの順。UI試験の初回準備は [こちら](../test-plans/playwright-ui-test-plan.md#実装と準備)。失敗時は原因と修正を記録し、失敗した確認を再実施して残りを続行する。テスト/CLIのコンパイルと試験用WASM生成は必要だが、Windows配布ビルド・実アプリ起動は含まない。`Run-Local-CI.ps1` はこの入口の後にWindows配布ビルドを追加する従来の用途を保つ。
+共通load生成→Rust単体/公開API/proptest→生成器検証→共通→周辺→条件→Office/順位/一括→イシュー→索引→ヘッドレスPlaywrightの順。UI試験の初回準備は [こちら](../test-plans/playwright-ui-test-plan.md#実装と準備)。失敗時は原因と修正を記録し、失敗した確認を再実施して残りを続行する。テスト/CLIのコンパイルとUI資材stagingは必要だが、Windows配布ビルド・実アプリ起動は含まない。`cargo xtask ci` はこの入口の後にWindows配布ビルドを追加する従来の用途を保つ。
 
 自動テスト・Windows配布ビルドとv3.0.0のcommit/push/タグ/Releaseは完了した。結果は[検証記録](../releases/validation-v3.0.0.md)を参照する。ヘッドレスUIではDOM・状態・要求引数を確認した。実アプリ起動/GUI、性能測定、実Office文書の網羅的互換性、イシュー完了操作は未実施。実EXEでの編集セッションtoken、Windowsクリップボード/保存先選択と、テーマ・アイコン・周辺書式などの見た目の成功を自動試験から推定しない。
 

@@ -1,6 +1,6 @@
 [package]
 name = "docs-search-core"
-version = "3.0.0"
+version = "3.0.1"
 edition = "2021"
 
 [dependencies]
@@ -19,4 +19,5 @@ name = "docs-search-cli"
 path = "src/main.rs"
 
 [dev-dependencies]
+docs-search-test-support = { path = "../test-support" }
 proptest = { version = "1.11", default-features = false, features = ["std", "handle-panics"] }

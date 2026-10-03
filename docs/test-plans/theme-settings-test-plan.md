@@ -1,5 +1,7 @@
 # テーマ設定の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 > 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
 
 v3.0.0の [要求整理](../specifications/rust-requirements-v3.0.0.md)と [自動検証記録](../releases/validation-v3.0.0.md)を追加した。以下の未実施はテーマ実装時点の記録で、今回も実画面でのテーマ操作/復元とアイコン表示はGUI対象外。
@@ -13,8 +15,8 @@ v3.0.0の [要求整理](../specifications/rust-requirements-v3.0.0.md)と [自�
 - `theme.js` が検索画面の描画前に `docs-search.theme` を WebView の `localStorage` から読み、`html` の `data-theme` に設定する。変更時は画面へ反映してから同じキーへ保存する。
 - 読み書きが禁止されていても検索画面の起動を妨げない。保存できない場合は設定内で、この起動中だけ反映する旨を示す。
 - `theme.css` の変数で背景、文字、主要ボタン、リンク、チェックボックス、フォーカス、選択状態、通常の枠線を切り替える。エラーの赤、警告、検索一致の黄色、一致区分とファイル形式の色は意味を維持する。
-- `Build-Frontend.ps1` が `theme.js` と `theme.css` を画面生成先へコピーする。`Build.ps1` はこれを `outputs/build/.frontend-build/` へ生成してデスクトップアプリに取り込み、ヘッドレスUI試験は独立した `outputs/ui-tests/` の生成先を使う。
-- 公式アイコンは A 案（書類＋虫眼鏡）をサンオレンジで実装する。SVG を編集元とし、標準ライブラリだけの `make-icon.py` で透過・アンチエイリアス付きの ICO（16・20・24・32・48・64・128・256px）と PNG（256px）を生成する。`tauri.conf.json` で ICO/PNG を明示する。画面のテーマ設定では Windows のアイコン色を切り替えない。
+- Cargo xtask が theme.js/theme.css を含む8資材を staging する。配布ビルドは target/frontend-dist、ヘッドレスUIは実行別 outputs/runs/<ID>/site を使う。
+- 公式アイコンは A 案（書類＋虫眼鏡）をサンオレンジで実装する。SVG を編集元とし、`test-support/src/icons.rs` と `cargo xtask icons` で透過・アンチエイリアス付きの ICO（16・20・24・32・48・64・128・256px）と PNG（256px）を生成する。`tauri.conf.json` で ICO/PNG を明示する。画面のテーマ設定では Windows のアイコン色を切り替えない。
 - オレンジ系ではアイコン・色見本の明るい色と、白文字を載せるボタンや白背景に表示するリンクの濃い色を分ける。
 
 | テーマ | ブランド色 | ボタン・リンク | 濃色 | 背景 | 文字 |
@@ -34,21 +36,21 @@ v3.0.0の [要求整理](../specifications/rust-requirements-v3.0.0.md)と [自�
 | 保存と初期化 | 起動時と変更時の処理、ストレージ例外処理、HTML の読み込み順を読む。 | 保存値は画面描画前に適用する。読み書き例外で処理を中断せず、不正値はサンオレンジへ戻る。有効な以前の保存値を引き継ぐ。 |
 | 検索との独立 | 設定欄の位置とイベント、既存の検索・結果処理との差分を確認する。 | 設定は検索フォーム外。変更処理は `data-theme` とテーマ保存だけを行い、検索実行や結果の作り直しをしない。 |
 | 意味を持つ色 | CSS の通常結果とエラー結果、進捗状態の指定を読む。 | `.has-error` と `.excel-context-error` の枠を通常テーマで上書きしない。警告・失敗の進捗色は保持する。 |
-| 資材の取り込み | HTML、`Build.ps1`、`Build-Frontend.ps1` のファイル参照と呼び出しを確認する。 | 新しい JS/CSS の参照先と共通の画面生成処理のコピー対象が存在する。 |
+| 資材の取り込み | HTML、`xtask/src/main.rs` のファイル参照と呼び出しを確認する。 | 新しい JS/CSS の参照先と共通の画面生成処理のコピー対象が存在する。 |
 | 公式アイコン | SVG の色・形、ICO の画像一覧、PNG の寸法、Tauri のアイコン参照を確認する。 | サンオレンジ・白・茶色の A 案。ICO に8サイズがあり、PNG は256pxの RGBA。参照先が存在する。Windows 上の表示成功とは分けて報告する。 |
 | 差分の形式 | `git diff --check`、`node --check .\frontend\theme.js` で静的に確認する。 | 差分の空白エラーと JavaScript の構文エラーがない。これだけでは動作成功を主張しない。 |
 
 ## 自動テストとビルド（未実施）
 
-自動テストのみの依頼では、リポジトリ直下で次を実行する。試験用WASM生成とヘッドレスPlaywrightを含む。現在の作業ツリーに別機能の実装もある場合、その最新の確認方針も先に読む。実アプリGUIの許可待ちでも、依頼済みの自動テストとビルドは進める。
+自動テストのみの依頼では、リポジトリ直下で次を実行する。UI資材stagingとヘッドレスPlaywrightを含む。現在の作業ツリーに別機能の実装もある場合、その最新の確認方針も先に読む。実アプリGUIの許可待ちでも、依頼済みの自動テストとビルドは進める。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使う。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使う。
 
-期待結果は、既存の検索回帰、Rust・WASM型検査・ヘッドレスUIの成功。テーマの選択・ブラウザー内の保存復元・例外経路はヘッドレスUIで確認する。配布ビルドを実施した場合は設定ファイルと公式アイコンが実行ファイルへ取り込まれる。実WebView2の保存復元・GUIの読みやすさ・Windowsのアイコン表示は実アプリの確認結果として別に報告する。
+期待結果は、既存の検索回帰、Rust・JS構文確認・ヘッドレスUIの成功。テーマの選択・ブラウザー内の保存復元・例外経路はヘッドレスUIで確認する。配布ビルドを実施した場合は設定ファイルと公式アイコンが実行ファイルへ取り込まれる。実WebView2の保存復元・GUIの読みやすさ・Windowsのアイコン表示は実アプリの確認結果として別に報告する。
 
 ## GUI（未実施、実施前に許可が必要）
 

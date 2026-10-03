@@ -1,0 +1,19 @@
+{
+  "extended/sample.vue": "<template><p>Beacon Vue sample</p></template>\n",
+  "extended/sample.mjs": "export const label = \"Beacon MJS sample\";\n",
+  "extended/sample.jsx": "export const Sample = () => <p>Beacon JSX sample</p>;\n",
+  "extended/sample.tsx": "export const Sample = () => <p>Beacon TSX sample</p>;\n",
+  "extended/sample.json": "{\"label\":\"Beacon JSON sample\"}\n",
+  "extended/sample.md": "# Beacon Markdown sample\n",
+  "extended/sample.csv": "label,value\nBeacon CSV sample,1\n",
+  "extended/sample.py": "label = \"Beacon Python sample\"\n",
+  "extended/sample.yaml": "label: Beacon YAML sample\n",
+  "extended/sample.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text>Beacon SVG sample</text></svg>\n",
+  "extended/sample.ipynb": "{\"cells\":[{\"cell_type\":\"markdown\",\"source\":[\"Beacon notebook sample\"]}],\"metadata\":{},\"nbformat\":4,\"nbformat_minor\":5}\n",
+  "fuzzy/variants.md": "customerId\nCustomerId\nCUSTOMER_ID\ncustomer_id\ncustomer-id\ncustomer id\n顧客ID\n顧客ＩＤ\n顧客 ID\ncustomer\ncustmer\nID\nNO\n1/2\n12\n",
+  "code/sample.jsp": "<%@ page contentType=\"text/html\" %>\n<p>Beacon JSP sample</p>\n",
+  "code/sample.xhtml": "<?xml version=\"1.0\"?>\n<html><body>Beacon XHTML sample</body></html>\n",
+  "code/sample.html": "<!doctype html>\n<p>Beacon HTML sample</p>\n",
+  "code/sample.js": "const label = \"Beacon JS sample\";\n",
+  "code/sample.java": "class Sample { String label = \"Beacon Java sample\"; }\n"
+}

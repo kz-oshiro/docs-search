@@ -1,16 +1,18 @@
 # P0 検索単位・索引基盤の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 対象: [実装計画 P0](../plans/implementation-plan.md)。実装時点では未実施だったが、後に[v2.0.6 の公開記録](../releases/release-notes-v2.0.6.md)に自動確認の成功を記録した。GUI 操作は未確認。新しい変更の検証では、以下の確認項目・手順・期待結果を把握してから実行する。現在の状態は[進捗レポート](../reports/implementation-status.md)を参照する。
 
 ## 自動確認の順序
 
-`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行する。Rust/CLI・WASM型検査に加え、試験用WASM生成とヘッドレスPlaywrightを含む。
+`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行する。Rust/CLI・JS構文確認に加え、UI資材stagingとヘッドレスPlaywrightを含む。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+cargo xtask test
 ```
 
-Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Local-CI.ps1` を使う。
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `cargo xtask ci` を使う。
 
 | 確認項目 | 手順 | 期待結果 |
 | --- | --- | --- |
@@ -20,6 +22,6 @@ Windows配布ビルドまで依頼された場合は、上の入口に代えて 
 | 索引往復 | メモリ内SQLiteの単体ケースを実行 | `unitKey`、`partKey`、`groupKey`、座標とシート情報が保存・再読込後も一致。抽出範囲が違う索引は再利用されない |
 | 旧索引と変更検出 | 旧版の索引を用意して検索し、読み取り中のファイル更新・削除も確認 | 旧索引は元文書から再構築される。サイズ・更新日時で検出できた変更は `changedDuringRead` として報告し、不完全な抽出を索引へ確定しない |
 | 索引の有無による同値性 | 共通生成文書の同じ検索語を索引なし、初回索引あり、再利用索引ありでCLI実行し、`resultId`と通知順以外を比較 | ヒットの場所・抜粋・一致方式・件数・新しい識別情報が一致する。索引なしでは保存済み索引を読み書きしない |
-| 条件入力（P3以降） | [P3の自動ケース](../../tests/cli/run-condition-cases.py)で有効な条件、通常語との併用、不正な条件を確認 | 有効な `querySpec` は受理し、併用・不正入力は開始前に拒否する。通常の `query` の解釈は変わらない。P0初期段階の「予約入力をすべて拒否」は現行の合格条件にしない |
+| 条件入力（P3以降） | [P3の自動ケース](../../core/tests/cli_conditions.rs)で有効な条件、通常語との併用、不正な条件を確認 | 有効な `querySpec` は受理し、併用・不正入力は開始前に拒否する。通常の `query` の解釈は変わらない。P0初期段階の「予約入力をすべて拒否」は現行の合格条件にしない |
 
 ブラウザー内の表示・操作は [Playwright UI試験方針](playwright-ui-test-plan.md)の自動項目で確認する。実アプリのOS連携・見た目は同方針のM1〜M5へ絞り、明示依頼または事前確認がある場合に実施する。実アプリGUIの結果は自動確認と区別して報告する。

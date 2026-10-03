@@ -1,0 +1,11 @@
+{
+  "types-start": "<Types xmlns=\"${0}\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>",
+  "sheet-type": "<Override PartName=\"/xl/worksheets/sheet${0}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>",
+  "root-rel": "<Relationships xmlns=\"${0}\"><Relationship Id=\"rId1\" Type=\"${1}/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
+  "workbook-start": "<workbook xmlns=\"${0}\" xmlns:r=\"${1}\"><sheets>",
+  "sheet": "<sheet name=\"${0}\" sheetId=\"${1}\" r:id=\"rId${2}\"/>",
+  "rels-start": "<Relationships xmlns=\"${0}\">",
+  "sheet-rel": "<Relationship Id=\"rId${0}\" Type=\"${1}/worksheet\" Target=\"worksheets/sheet${2}.xml\"/>",
+  "row": "<row r=\"${0}\">${1}</row>",
+  "worksheet": "<worksheet xmlns=\"${0}\"><sheetData>${1}</sheetData></worksheet>"
+}

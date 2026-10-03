@@ -1,4 +1,4 @@
-// Installed before theme.js, boot.js and the real wasm-bindgen start function.
+// Installed before theme.js, boot.js and the real frontend entry point.
 // Only the Tauri/OS boundary is replaced. No rendering or search logic lives here.
 export function installTauriMock(options = {}) {
   const calls = [], events = [], faults = [], clipboard = [];
@@ -69,7 +69,7 @@ export function installTauriMock(options = {}) {
       });
       events.push(...structuredClone(payload));
       const callback = listeners.get('search-events');
-      if (!callback) throw new Error('WASM event listener is not ready.');
+      if (!callback) throw new Error('Frontend event listener is not ready.');
       callback({ event: 'search-events', payload });
     },
   };

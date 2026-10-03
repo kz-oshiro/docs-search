@@ -1,0 +1,12 @@
+{
+  "top-row": "<row r=\"1\">${0}</row>",
+  "bottom-row": "<row r=\"1048576\">${0}</row>",
+  "worksheet": "<worksheet xmlns=\"${0}\" xmlns:r=\"${1}\"><dimension ref=\"A1:XFD1048576\"/><cols><col min=\"4\" max=\"4\" hidden=\"1\"/></cols><sheetData>${2}</sheetData><mergeCells count=\"1\"><mergeCell ref=\"C12:D12\"/></mergeCells><drawing r:id=\"rIdDrawing\"/></worksheet>",
+  "shape": "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"${0}\" name=\"${1}\"/></xdr:nvSpPr><xdr:txBody><a:p><a:r><a:t>${2}</a:t></a:r></a:p></xdr:txBody></xdr:sp>",
+  "drawing": "<xdr:wsDr xmlns:xdr=\"${0}\" xmlns:a=\"${1}\"><xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:row>11</xdr:row></xdr:from>${2}</xdr:oneCellAnchor><xdr:absoluteAnchor>${3}</xdr:absoluteAnchor></xdr:wsDr>",
+  "types": "<Types xmlns=\"${0}\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/></Types>",
+  "root-rel": "<Relationships xmlns=\"${0}\"><Relationship Id=\"rId1\" Type=\"${1}/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
+  "workbook": "<workbook xmlns=\"${0}\" xmlns:r=\"${1}\"><sheets><sheet name=\"Context\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>",
+  "workbook-rels": "<Relationships xmlns=\"${0}\"><Relationship Id=\"rId1\" Type=\"${1}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>",
+  "sheet-rels": "<Relationships xmlns=\"${0}\"><Relationship Id=\"rIdDrawing\" Type=\"${1}/drawing\" Target=\"../drawings/drawing1.xml\"/></Relationships>"
+}

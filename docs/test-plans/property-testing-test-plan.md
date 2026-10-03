@@ -1,5 +1,7 @@
 # proptest の確認方針
 
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+
 作成日: 2026-10-03。対象は [Rust要求仕様 v3.0.0](../specifications/rust-requirements-v3.0.0.md) の検索コア。固定の具体例・Office fixture・CLI受け入れを保持し、入力の組合せを生成して検証する性質テストを追加する。GUI・Windows配布ビルド・公開は今回対象外。
 
 ## 設計と依存関係
@@ -32,11 +34,11 @@
 
 ## 実行・失敗の再現
 
-既存の `scripts/Run-Automated-Tests.ps1` の `cargo test --locked` で性質テストも走る。既定は各256成功ケース（17性質で4,352ケース）で、保存済み失敗seedの再実行はこの件数と別に行う。`PROPTEST_CASES` で増減、`PROPTEST_RNG_SEED` で固定seedを指定できる。手順と設定の意味は [公式Config](https://docs.rs/proptest/1.11.0/proptest/test_runner/struct.Config.html) を参照。
+既存の `cargo xtask test` の `cargo test --locked` で性質テストも走る。既定は各256成功ケース（17性質で4,352ケース）で、保存済み失敗seedの再実行はこの件数と別に行う。`PROPTEST_CASES` で増減、`PROPTEST_RNG_SEED` で固定seedを指定できる。手順と設定の意味は [公式Config](https://docs.rs/proptest/1.11.0/proptest/test_runner/struct.Config.html) を参照。
 
 ```powershell
-# 既定件数。固定ケース・CLI・WASM型検査も含む
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1
+# 既定件数。固定ケース・CLI・JS構文確認も含む
+cargo xtask test
 
 # 17性質を指定seed/件数だけで実行する例
 $env:PROPTEST_CASES = '1024'
@@ -51,6 +53,6 @@ cargo test --locked --manifest-path .\core\Cargo.toml --lib r3_
 
 初回に本文 `a_` / 検索語 `a!` で、あいまい最終評価がidentifier一致を返す一方、`could_match` が落とす不整合を検出した。固定回帰と保存seedを追加し、最終評価の意味を変えず候補判定へ単一token/前方一致を含める。索引もraw検索語のN-gramに含まれないtoken一致を候補へ加え、区切りだけの語が保存gramにないため落ちる問題を防ぐ。
 
-[索引CLI](../../tests/cli/run-index-cases.py)へ `a!` / `alpha!` / `__` を追加し、直接/索引初回/再利用の実際の結果が同じであることを確認する。通常検索や固定27ケースの期待値は変更しない。実施結果とログは [v3.0.0検証記録](../releases/validation-v3.0.0.md)に追記する。
+[索引CLI](../../core/tests/cli_index.rs)へ `a!` / `alpha!` / `__` を追加し、直接/索引初回/再利用の実際の結果が同じであることを確認する。通常検索や固定27ケースの期待値は変更しない。実施結果とログは [v3.0.0検証記録](../releases/validation-v3.0.0.md)に追記する。
 
 性質テストは定めた生成範囲・件数での検証であり、全Unicode/全ファイル形式の証明ではない。Excel/Officeの互換性は既存fixture、OS権限の網羅・性能・GUIは別の確認範囲とする。
