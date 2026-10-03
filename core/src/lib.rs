@@ -13,8 +13,10 @@ mod property_tests;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use unicode_casefold::UnicodeCaseFold;
@@ -514,6 +516,72 @@ fn file_name_unit(name: String) -> Unit {
     unit
 }
 
+fn read_text(path: &Path) -> Result<Vec<u8>, extract::ExtractError> {
+    let mut file = fs::File::open(path)?;
+    if file.metadata()?.len() > MAX_TEXT_BYTES {
+        return Err(extract::ExtractError::limit(
+            "テキストファイルがサイズ上限を超えました。",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.by_ref()
+        .take(MAX_TEXT_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_TEXT_BYTES {
+        return Err(extract::ExtractError::limit(
+            "テキストファイルがサイズ上限を超えました。",
+        ));
+    }
+    Ok(bytes)
+}
+
+#[derive(Default)]
+enum RevisionSource {
+    #[default]
+    Unavailable,
+    Extracted(Vec<u8>),
+    Indexed((i64, i64)),
+}
+
+#[derive(Default)]
+struct SearchRevision {
+    source: RevisionSource,
+    value: OnceCell<Option<String>>,
+}
+
+impl SearchRevision {
+    fn extracted(bytes: Vec<u8>) -> Self {
+        Self {
+            source: RevisionSource::Extracted(bytes),
+            value: OnceCell::new(),
+        }
+    }
+
+    fn indexed(stamp: Option<(i64, i64)>) -> Self {
+        Self {
+            source: stamp.map_or(RevisionSource::Unavailable, RevisionSource::Indexed),
+            value: OnceCell::new(),
+        }
+    }
+
+    fn get(&self, path: &Path) -> Option<&str> {
+        self.value
+            .get_or_init(|| match &self.source {
+                RevisionSource::Unavailable => None,
+                RevisionSource::Extracted(bytes) => Some(edit::revision(bytes)),
+                RevisionSource::Indexed(expected) => {
+                    if index::stamp(path) != Some(*expected) {
+                        return None;
+                    }
+                    let bytes = read_text(path).ok()?;
+                    let revision = edit::revision(&bytes);
+                    (index::stamp(path) == Some(*expected)).then_some(revision)
+                }
+            })
+            .as_deref()
+    }
+}
+
 struct Emitter<F: FnMut(SearchEvent)> {
     id: String,
     sequence: usize,
@@ -526,7 +594,7 @@ struct Emitter<F: FnMut(SearchEvent)> {
     reused_files: usize,
     same_row_terms: usize,
     modified_at: Option<f64>,
-    edit_revision: Option<String>,
+    edit_revision: SearchRevision,
 }
 
 fn document_order(unit: &Unit) -> Vec<u64> {
@@ -591,6 +659,12 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
     fn hit(&mut self, path: &Path, file_type: &str, unit: Unit, matched: fuzzy::Match) {
         self.term_hit(path, file_type, unit, matched, None);
     }
+    fn edit_anchor(&self, path: &Path, unit: &Unit, range: [usize; 2]) -> Option<edit::EditAnchor> {
+        if unit.source_kind != "textLine" {
+            return None;
+        }
+        edit::anchor(unit, range, self.edit_revision.get(path))
+    }
     fn publish(&mut self, hit: SearchHit) {
         if let Some(id) = &hit.term_id {
             self.batch_counts.entry(id.clone()).or_default().1 += 1;
@@ -614,6 +688,7 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
         }
         self.file_hits.clear();
         self.same_row_terms = 0;
+        self.edit_revision = SearchRevision::default();
     }
     fn term_hit(
         &mut self,
@@ -629,7 +704,7 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
             source_match_ranges: vec![matched.range],
             document_order: document_order(&unit),
             modified_at: self.modified_at,
-            edit_anchor: edit::anchor(&unit, matched.range, self.edit_revision.as_deref()),
+            edit_anchor: self.edit_anchor(path, &unit, matched.range),
             term_id: term.map(|term| term.id.clone()),
             term: term.map(|term| term.text.clone()),
             result_id: self.counts.result_count,
@@ -675,11 +750,7 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 SearchEvidence {
                     source_match_ranges: vec![candidate.matched.range],
                     document_order: document_order(candidate.unit),
-                    edit_anchor: edit::anchor(
-                        candidate.unit,
-                        candidate.matched.range,
-                        self.edit_revision.as_deref(),
-                    ),
+                    edit_anchor: self.edit_anchor(path, candidate.unit, candidate.matched.range),
                     term_id: candidate.term_id,
                     term: candidate.term,
                     unit_key: candidate.unit.meta.unit_key.clone(),
@@ -800,7 +871,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         reused_files: 0,
         same_row_terms: 0,
         modified_at: None,
-        edit_revision: None,
+        edit_revision: SearchRevision::default(),
     };
     sink.send(EventKind::Started { request });
     sink.progress("discovery");
@@ -888,23 +959,21 @@ pub fn run_search<F: FnMut(SearchEvent)>(
             .and_then(|metadata| metadata.modified().ok())
             .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|duration| duration.as_secs_f64() * 1000.0);
+        let cached_stamp = index::stamp(&path);
         sink.edit_revision = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
-            fs::metadata(&path)
-                .ok()
-                .filter(|metadata| metadata.len() <= MAX_TEXT_BYTES)
-                .and_then(|_| fs::read(&path).ok())
-                .map(|bytes| edit::revision(&bytes))
+            SearchRevision::indexed(cached_stamp)
         } else {
-            None
+            SearchRevision::default()
         };
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         let filename_unit = file_name_unit(name.to_string());
         if let Some(spec) = &batch {
+            let prepared = fuzzy::PreparedText::new(&filename_unit.text);
             for term in &spec.terms {
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
-                if let Some(matched) = spec.matched(term, &filename_unit.text, fuzzy_search) {
+                if let Some(matched) = spec.matched_prepared(term, &prepared, fuzzy_search) {
                     sink.term_hit(
                         &path,
                         &file_type,
@@ -928,7 +997,6 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         } else if let Some(matched) = fuzzy::evaluate_selected(&name, &query, fuzzy_search) {
             sink.hit(&path, &file_type, filename_unit.clone(), matched);
         }
-        let cached_stamp = index::stamp(&path);
         if let Some(cache) = search_index.as_ref() {
             if cache.current(&path, extraction_scope) {
                 let cached = if conditions.is_some() || batch.is_some() {
@@ -941,12 +1009,13 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                         sink.reused_files += 1;
                         if let Some(spec) = &batch {
                             for unit in &units {
+                                let prepared = fuzzy::PreparedText::new(&unit.text);
                                 for term in &spec.terms {
                                     if cancel.load(Ordering::Relaxed) {
                                         break;
                                     }
                                     if let Some(matched) =
-                                        spec.matched(term, &unit.text, fuzzy_search)
+                                        spec.matched_prepared(term, &prepared, fuzzy_search)
                                     {
                                         sink.term_hit(
                                             &path,
@@ -998,29 +1067,15 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         let expected_stamp = index::stamp(&path);
         sink.extracted_files += 1;
         let result = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
-            fs::metadata(&path)
-                .map_err(extract::ExtractError::from)
-                .and_then(|m| {
-                    if m.len() > MAX_TEXT_BYTES {
-                        Err(extract::ExtractError::limit(
-                            "テキストファイルがサイズ上限を超えました。",
-                        ))
-                    } else {
-                        fs::read(&path).map_err(extract::ExtractError::from)
-                    }
+            read_text(&path).and_then(|bytes| {
+                let units = extract::text_units(&bytes)?;
+                sink.edit_revision = SearchRevision::extracted(bytes);
+                Ok(extract::ExtractedDocument {
+                    units,
+                    sheets: vec![],
+                    issues: vec![],
                 })
-                .and_then(|bytes| {
-                    if bytes.len() as u64 > MAX_TEXT_BYTES {
-                        return Err(extract::ExtractError::limit(
-                            "テキストファイルがサイズ上限を超えました。",
-                        ));
-                    }
-                    extract::text_units(&bytes).map(|units| extract::ExtractedDocument {
-                        units,
-                        sheets: vec![],
-                        issues: vec![],
-                    })
-                })
+            })
         } else {
             extract::office_units_with_options(&path, &file_type, extraction_options)
         };
@@ -1042,11 +1097,14 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                 }
                 if let Some(spec) = &batch {
                     for unit in &document.units {
+                        let prepared = fuzzy::PreparedText::new(&unit.text);
                         for term in &spec.terms {
                             if cancel.load(Ordering::Relaxed) {
                                 break;
                             }
-                            if let Some(matched) = spec.matched(term, &unit.text, fuzzy_search) {
+                            if let Some(matched) =
+                                spec.matched_prepared(term, &prepared, fuzzy_search)
+                            {
                                 sink.term_hit(&path, &file_type, unit.clone(), matched, Some(term));
                             }
                         }

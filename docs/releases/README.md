@@ -2,7 +2,7 @@
 
 配布ファイルは[最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)を参照する。文書と版情報の扱いは[文書作成ガイド](../documentation.md#更新ルール)に従う。
 
-変更点は[GitHub Releasesの一覧](https://github.com/kz-oshiro/docs-search/releases)で案内する。記録生成コマンドの導入後は、検証・公開記録を各Releaseに添付する自動生成の `validation.md` / `validation.json` で案内する。導入状態と手順は[生成・公開手順](../development.md#記録の自動生成と公開)を参照する。
+変更点は[GitHub Releasesの一覧](https://github.com/kz-oshiro/docs-search/releases)で案内する。今後の検証・公開記録は、各Releaseに添付する自動生成の `validation.md` / `validation.json` で案内する。実装・検証状況と手順は[生成・公開手順](../development.md#記録の自動生成と公開)を参照する。
 
 過去の手書き記録は以下に保存する。
 

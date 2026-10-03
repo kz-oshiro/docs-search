@@ -1,0 +1,4 @@
+interface:
+  display_name: "docs-search 文書整備"
+  short_description: "仕様と計画と実行記録の置き場所を揃え文書と参照を更新する"
+  default_prompt: "$docs-search-doc-maintenance を使って、この変更に関係する文書の本文と参照を整合させてください。"

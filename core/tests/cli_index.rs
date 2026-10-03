@@ -27,6 +27,53 @@ fn set_modified(path: &std::path::Path, time: SystemTime) {
         .set_times(fs::FileTimes::new().set_modified(time))
         .unwrap();
 }
+
+#[test]
+fn indexed_many_candidates_preserve_order_ranges_and_edit_revisions() {
+    let cli = Cli::new("index-many-candidates");
+    fs::create_dir(&cli.root).unwrap();
+    let path = cli.root.join("sample.txt");
+    let contents: String = (0..1_501)
+        .map(|number| format!("👩‍💻 customer {number}\r\n"))
+        .collect();
+    let original = format!("\u{feff}{contents}");
+    write(&path, &original).unwrap();
+    let direct = search(&cli, "customer", false, false);
+    assert_eq!(direct.hits.len(), 1_501);
+    for (number, hit) in direct.hits.iter().enumerate() {
+        assert_eq!(hit["location"]["lineNumber"], serde_json::json!(number + 1));
+        assert_eq!(hit["sourceMatchRanges"], serde_json::json!([[4, 12]]));
+        assert_eq!(
+            hit["editAnchor"]["sourceRevision"],
+            docs_search_core::edit::revision(original.as_bytes())
+        );
+    }
+    for fuzzy in [false, true] {
+        for _ in 0..2 {
+            let indexed = search(&cli, "customer", true, fuzzy);
+            assert_eq!(indexed.hits, direct.hits);
+        }
+    }
+    let missing = search(&cli, "notfound", true, false);
+    assert!(missing.hits.is_empty());
+    assert_eq!(missing.stats(), (0, 1));
+    write(&path, "replacement customer\n").unwrap();
+    let changed = search(&cli, "customer", true, true);
+    assert_eq!(changed.hits.len(), 1);
+    assert_eq!(changed.stats(), (1, 0));
+    assert_eq!(search(&cli, "customer", true, true).hits, changed.hits);
+    fs::remove_file(&path).unwrap();
+    assert!(search(&cli, "customer", true, true).hits.is_empty());
+    let db = Connection::open(cli.db()).unwrap();
+    for table in ["files", "units", "grams", "tokens"] {
+        assert_eq!(
+            db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+}
 #[test]
 fn index_freshness_optout_and_recovery() {
     let mut cli = Cli::new("index");

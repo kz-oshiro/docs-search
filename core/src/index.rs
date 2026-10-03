@@ -2,7 +2,7 @@ use crate::{
     extract::{ExtractedDocument, SheetMeta, UnitMeta},
     fuzzy, Unit,
 };
-use rusqlite::{params, Connection};
+use rusqlite::{params, params_from_iter, Connection};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,6 +12,8 @@ pub struct Index(Connection);
 const SCHEMA_VERSION: i64 = 2;
 pub const EXTRACTION_VERSION: i64 = 4;
 pub const DEFAULT_SCOPE: i64 = 0;
+const UNIT_COLUMNS: &str = "source_kind, location, text, unit_key, part_key, group_key, row_number, column_number, content_class, anchor";
+const FETCH_BATCH_SIZE: usize = 500;
 
 fn database_path() -> Option<PathBuf> {
     let root = std::env::var_os("LOCALAPPDATA")
@@ -51,6 +53,7 @@ fn initialize(connection: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS grams_unit ON grams(unit_id);\
         CREATE TABLE IF NOT EXISTS tokens(token TEXT NOT NULL, first TEXT NOT NULL, length INTEGER NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(token, unit_id));\
         CREATE INDEX IF NOT EXISTS tokens_lookup ON tokens(first, length);\
+        CREATE INDEX IF NOT EXISTS tokens_unit ON tokens(unit_id);\
         PRAGMA user_version=2;")?;
     // Retire every old extraction record when indexing is next enabled, including
     // files outside today's roots. No old phonetic text remains queryable.
@@ -80,7 +83,11 @@ impl Index {
     /// Composite conditions need every unit in a candidate scope, including NOT evidence.
     /// The initial implementation reads the complete indexed file to avoid false negatives.
     pub fn all_units(&self, path: &Path) -> rusqlite::Result<Vec<Unit>> {
-        self.candidates(path, &fuzzy::Query::new(""), false)
+        let mut statement = self.0.prepare_cached(&format!(
+            "SELECT {UNIT_COLUMNS} FROM units WHERE file_path=?1 ORDER BY id"
+        ))?;
+        let rows = statement.query_map([path.to_string_lossy().as_ref()], unit_from_row)?;
+        rows.collect()
     }
 
     pub fn open() -> rusqlite::Result<Self> {
@@ -121,25 +128,37 @@ impl Index {
     }
 
     pub fn current(&self, path: &Path, scope: i64) -> bool {
-        let Some((size, modified)) = stamp(path) else {
-            return false;
-        };
-        self.0
-            .query_row(
-                "SELECT size, modified, extraction_version, extraction_scope FROM files WHERE path=?1",
-                [path.to_string_lossy().as_ref()],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?, row.get::<_, i64>(3)?)),
-            )
-            .is_ok_and(|stored| stored == (size, modified, EXTRACTION_VERSION, scope))
-            && self.sheet_metadata(path).is_ok()
+        self.current_sheets(path, scope).is_some()
     }
 
+    pub(crate) fn current_sheets(&self, path: &Path, scope: i64) -> Option<Vec<SheetMeta>> {
+        let (size, modified) = stamp(path)?;
+        let mut statement = self.0.prepare_cached(
+            "SELECT size, modified, extraction_version, extraction_scope, sheets FROM files WHERE path=?1"
+        ).ok()?;
+        let (stored, data) = statement
+            .query_row([path.to_string_lossy().as_ref()], |row| {
+                let stored = (
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                );
+                Ok((stored, row.get::<_, String>(4)?))
+            })
+            .ok()?;
+        if stored != (size, modified, EXTRACTION_VERSION, scope) {
+            return None;
+        }
+        serde_json::from_str(&data).ok()
+    }
+
+    #[cfg(test)]
     pub fn sheet_metadata(&self, path: &Path) -> rusqlite::Result<Vec<SheetMeta>> {
-        let data: String = self.0.query_row(
-            "SELECT sheets FROM files WHERE path=?1",
-            [path.to_string_lossy().as_ref()],
-            |row| row.get(0),
-        )?;
+        let data: String = self
+            .0
+            .prepare_cached("SELECT sheets FROM files WHERE path=?1")?
+            .query_row([path.to_string_lossy().as_ref()], |row| row.get(0))?;
         serde_json::from_str(&data).map_err(|_| rusqlite::Error::InvalidQuery)
     }
 
@@ -150,7 +169,7 @@ impl Index {
         rows: (u32, u32),
         columns: (u32, u32),
     ) -> rusqlite::Result<Vec<(u32, u32, String)>> {
-        let mut statement = self.0.prepare(
+        let mut statement = self.0.prepare_cached(
             "SELECT row_number, column_number, text FROM units \
              WHERE file_path=?1 AND part_key=?2 AND source_kind='cell' \
              AND row_number BETWEEN ?3 AND ?4 AND column_number BETWEEN ?5 AND ?6 \
@@ -180,7 +199,7 @@ impl Index {
 
     pub fn prune_missing(&mut self) -> rusqlite::Result<()> {
         let paths = {
-            let mut statement = self.0.prepare("SELECT path FROM files")?;
+            let mut statement = self.0.prepare_cached("SELECT path FROM files")?;
             let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
             rows.collect::<rusqlite::Result<Vec<_>>>()?
         };
@@ -192,17 +211,21 @@ impl Index {
             return Ok(());
         }
         let tx = self.0.transaction()?;
-        for path in missing {
-            tx.execute(
+        {
+            let mut grams = tx.prepare_cached(
                 "DELETE FROM grams WHERE unit_id IN (SELECT id FROM units WHERE file_path=?1)",
-                [&path],
             )?;
-            tx.execute(
+            let mut tokens = tx.prepare_cached(
                 "DELETE FROM tokens WHERE unit_id IN (SELECT id FROM units WHERE file_path=?1)",
-                [&path],
             )?;
-            tx.execute("DELETE FROM units WHERE file_path=?1", [&path])?;
-            tx.execute("DELETE FROM files WHERE path=?1", [&path])?;
+            let mut units = tx.prepare_cached("DELETE FROM units WHERE file_path=?1")?;
+            let mut files = tx.prepare_cached("DELETE FROM files WHERE path=?1")?;
+            for path in missing {
+                grams.execute([&path])?;
+                tokens.execute([&path])?;
+                units.execute([&path])?;
+                files.execute([&path])?;
+            }
         }
         tx.commit()
     }
@@ -225,46 +248,60 @@ impl Index {
             serde_json::to_string(&document.sheets).map_err(|_| rusqlite::Error::InvalidQuery)?;
         let file_path = path.to_string_lossy();
         let tx = self.0.transaction()?;
-        tx.execute(
+        tx.prepare_cached(
             "DELETE FROM grams WHERE unit_id IN (SELECT id FROM units WHERE file_path=?1)",
-            [file_path.as_ref()],
-        )?;
-        tx.execute(
+        )?
+        .execute([file_path.as_ref()])?;
+        tx.prepare_cached(
             "DELETE FROM tokens WHERE unit_id IN (SELECT id FROM units WHERE file_path=?1)",
-            [file_path.as_ref()],
-        )?;
-        tx.execute("DELETE FROM units WHERE file_path=?1", [file_path.as_ref()])?;
-        tx.execute("DELETE FROM files WHERE path=?1", [file_path.as_ref()])?;
-        for unit in &document.units {
-            let loose = fuzzy::loose_key(&unit.text);
-            tx.execute("INSERT INTO units(file_path,source_kind,location,text,loose,unit_key,part_key,group_key,row_number,column_number,content_class,anchor) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
-                params![file_path.as_ref(), unit.source_kind, unit.location.to_string(), unit.text, loose, unit.meta.unit_key, unit.meta.part_key, unit.meta.group_key, unit.meta.row, unit.meta.column, unit.meta.content_class, unit.meta.anchor])?;
-            let id = tx.last_insert_rowid();
-            for gram in fuzzy::grams(&loose, 3)
-                .into_iter()
-                .chain(fuzzy::grams(&loose, 2))
-            {
-                tx.execute(
-                    "INSERT INTO grams(gram,unit_id) VALUES(?1,?2)",
-                    params![gram, id],
-                )?;
-            }
-            for token in fuzzy::tokens(&unit.text)
-                .into_iter()
-                .collect::<HashSet<_>>()
-            {
-                let first = token.chars().next().unwrap_or_default().to_string();
-                tx.execute(
-                    "INSERT INTO tokens(token,first,length,unit_id) VALUES(?1,?2,?3,?4)",
-                    params![token, first, token.chars().count() as i64, id],
-                )?;
+        )?
+        .execute([file_path.as_ref()])?;
+        tx.prepare_cached("DELETE FROM units WHERE file_path=?1")?
+            .execute([file_path.as_ref()])?;
+        tx.prepare_cached("DELETE FROM files WHERE path=?1")?
+            .execute([file_path.as_ref()])?;
+        {
+            let mut units = tx.prepare_cached("INSERT INTO units(file_path,source_kind,location,text,loose,unit_key,part_key,group_key,row_number,column_number,content_class,anchor) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)")?;
+            let mut grams = tx.prepare_cached("INSERT INTO grams(gram,unit_id) VALUES(?1,?2)")?;
+            let mut tokens = tx.prepare_cached(
+                "INSERT INTO tokens(token,first,length,unit_id) VALUES(?1,?2,?3,?4)",
+            )?;
+            for unit in &document.units {
+                let loose = fuzzy::loose_key(&unit.text);
+                units.execute(params![
+                    file_path.as_ref(),
+                    unit.source_kind,
+                    unit.location.to_string(),
+                    unit.text,
+                    loose,
+                    unit.meta.unit_key,
+                    unit.meta.part_key,
+                    unit.meta.group_key,
+                    unit.meta.row,
+                    unit.meta.column,
+                    unit.meta.content_class,
+                    unit.meta.anchor
+                ])?;
+                let id = tx.last_insert_rowid();
+                for gram in fuzzy::grams(&loose, 3)
+                    .into_iter()
+                    .chain(fuzzy::grams(&loose, 2))
+                {
+                    grams.execute(params![gram, id])?;
+                }
+                for token in fuzzy::tokens(&unit.text)
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+                {
+                    let first = token.chars().next().unwrap_or_default().to_string();
+                    tokens.execute(params![token, first, token.chars().count() as i64, id])?;
+                }
             }
         }
         if stamp(path) != Some(expected_stamp) {
             return Ok(false);
         }
-        tx.execute(
-            "INSERT INTO files(path,size,modified,extraction_version,extraction_scope,sheets) VALUES(?1,?2,?3,?4,?5,?6)",
+        tx.prepare_cached("INSERT INTO files(path,size,modified,extraction_version,extraction_scope,sheets) VALUES(?1,?2,?3,?4,?5,?6)")?.execute(
             params![file_path.as_ref(), size, modified, EXTRACTION_VERSION, scope, sheets],
         )?;
         tx.commit()?;
@@ -290,9 +327,14 @@ impl Index {
         } else {
             fuzzy::grams(needle, gram_size)
         };
+        // An unfiltered candidate scope already contains every unit. In
+        // particular, normal/short/condition/batch searches need one row scan.
+        if query_grams.is_empty() {
+            return self.all_units(path);
+        }
         let mut ids = HashSet::new();
-        if !query_grams.is_empty() {
-            let mut statement = self.0.prepare("SELECT u.id FROM units u JOIN grams g ON g.unit_id=u.id WHERE u.file_path=?1 AND g.gram=?2")?;
+        {
+            let mut statement = self.0.prepare_cached("SELECT u.id FROM units u JOIN grams g ON g.unit_id=u.id WHERE u.file_path=?1 AND g.gram=?2")?;
             for (number, gram) in query_grams.iter().take(3).enumerate() {
                 let rows = statement
                     .query_map(params![path.to_string_lossy().as_ref(), gram], |row| {
@@ -308,20 +350,12 @@ impl Index {
                     break;
                 }
             }
-        } else {
-            let mut statement = self.0.prepare("SELECT id FROM units WHERE file_path=?1")?;
-            let rows = statement.query_map([path.to_string_lossy().as_ref()], |row| {
-                row.get::<_, i64>(0)
-            })?;
-            for row in rows {
-                ids.insert(row?);
-            }
         }
         // A single-token match need not contain the full raw query's grams.
         // Union exact/prefix token candidates before the final evaluator runs.
         if fuzzy_search && query.tokens.len() == 1 {
             let token = &query.tokens[0];
-            let mut statement = self.0.prepare("SELECT t.unit_id FROM tokens t JOIN units u ON u.id=t.unit_id WHERE u.file_path=?1 AND (t.token=?2 OR (?3 AND substr(t.token,1,length(?2))=?2))")?;
+            let mut statement = self.0.prepare_cached("SELECT t.unit_id FROM tokens t JOIN units u ON u.id=t.unit_id WHERE u.file_path=?1 AND (t.token=?2 OR (?3 AND substr(t.token,1,length(?2))=?2))")?;
             let rows = statement.query_map(
                 params![
                     path.to_string_lossy().as_ref(),
@@ -338,7 +372,7 @@ impl Index {
             let first = typo.chars().next().unwrap_or_default().to_string();
             let len = typo.chars().count() as i64;
             let limit = if len >= 11 { 2 } else { 1 };
-            let mut statement = self.0.prepare("SELECT t.unit_id FROM tokens t JOIN units u ON u.id=t.unit_id WHERE u.file_path=?1 AND t.first=?2 AND t.length BETWEEN ?3 AND ?4")?;
+            let mut statement = self.0.prepare_cached("SELECT t.unit_id FROM tokens t JOIN units u ON u.id=t.unit_id WHERE u.file_path=?1 AND t.first=?2 AND t.length BETWEEN ?3 AND ?4")?;
             let rows = statement.query_map(
                 params![
                     path.to_string_lossy().as_ref(),
@@ -352,48 +386,51 @@ impl Index {
                 ids.insert(row?);
             }
         }
-        let mut statement = self
-            .0
-            .prepare("SELECT source_kind, location, text, unit_key, part_key, group_key, row_number, column_number, content_class, anchor FROM units WHERE id=?1")?;
         let mut ordered_ids: Vec<i64> = ids.into_iter().collect();
         ordered_ids.sort_unstable();
         let mut result = Vec::with_capacity(ordered_ids.len());
-        for id in ordered_ids {
-            let unit = statement.query_row([id], |row| {
-                let kind: String = row.get(0)?;
-                let location: String = row.get(1)?;
-                let text: String = row.get(2)?;
-                let location =
-                    serde_json::from_str(&location).map_err(|_| rusqlite::Error::InvalidQuery)?;
-                let row_number: Option<i64> = row.get(6)?;
-                let column_number: Option<i64> = row.get(7)?;
-                Ok(Unit {
-                    source_kind: source_kind(&kind)?,
-                    location,
-                    text,
-                    meta: UnitMeta {
-                        unit_key: row.get(3)?,
-                        part_key: row.get(4)?,
-                        group_key: row.get(5)?,
-                        row: row_number
-                            .map(|value| {
-                                u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery)
-                            })
-                            .transpose()?,
-                        column: column_number
-                            .map(|value| {
-                                u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery)
-                            })
-                            .transpose()?,
-                        content_class: row.get(8)?,
-                        anchor: row.get(9)?,
-                    },
-                })
-            })?;
-            result.push(unit);
+        for chunk in ordered_ids.chunks(FETCH_BATCH_SIZE) {
+            let placeholders = vec!["?"; chunk.len()].join(",");
+            let mut statement = self.0.prepare_cached(&format!(
+                "SELECT {UNIT_COLUMNS} FROM units WHERE id IN ({placeholders}) ORDER BY id"
+            ))?;
+            let rows = statement.query_map(params_from_iter(chunk.iter()), unit_from_row)?;
+            let units = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+            if units.len() != chunk.len() {
+                // A concurrently replaced cache must fall back to extraction,
+                // rather than silently returning only the surviving IDs.
+                return Err(rusqlite::Error::QueryReturnedNoRows);
+            }
+            result.extend(units);
         }
         Ok(result)
     }
+}
+
+fn unit_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Unit> {
+    let kind: String = row.get(0)?;
+    let location: String = row.get(1)?;
+    let location = serde_json::from_str(&location).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let row_number: Option<i64> = row.get(6)?;
+    let column_number: Option<i64> = row.get(7)?;
+    Ok(Unit {
+        source_kind: source_kind(&kind)?,
+        location,
+        text: row.get(2)?,
+        meta: UnitMeta {
+            unit_key: row.get(3)?,
+            part_key: row.get(4)?,
+            group_key: row.get(5)?,
+            row: row_number
+                .map(|value| u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery))
+                .transpose()?,
+            column: column_number
+                .map(|value| u32::try_from(value).map_err(|_| rusqlite::Error::InvalidQuery))
+                .transpose()?,
+            content_class: row.get(8)?,
+            anchor: row.get(9)?,
+        },
+    })
 }
 
 fn source_kind(kind: &str) -> rusqlite::Result<&'static str> {

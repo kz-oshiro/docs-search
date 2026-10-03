@@ -277,10 +277,7 @@ fn index_data(
     end: (u32, u32),
 ) -> Option<(SheetMeta, Vec<CellRange>, Vec<(u32, u32, String)>)> {
     let index = Index::open().ok()?;
-    if !index.current(&target.path, DEFAULT_SCOPE) {
-        return None;
-    }
-    let sheets = index.sheet_metadata(&target.path).ok()?;
+    let sheets = index.current_sheets(&target.path, DEFAULT_SCOPE)?;
     let sheet = target.sheet(&sheets)?.clone();
     let merges = visible_merges(&sheet, range, end.0, end.1).ok()?;
     let mut cells = index

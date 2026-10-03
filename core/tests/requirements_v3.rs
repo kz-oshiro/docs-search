@@ -278,6 +278,69 @@ fn r3_04_all_89_text_extensions_use_the_same_line_contract() {
 }
 
 #[test]
+fn r3_10_many_batch_terms_keep_unicode_ranges_and_first_input_order() {
+    let fixture = Fixture::new();
+    let terms: Vec<String> = (0..256).map(|number| format!("TAB_{number:03}")).collect();
+    let contents = format!("👩‍💻 {} / TAB_0000 / 顧客TAB_001\r\n", terms.join(" "));
+    fixture.write("sample.txt", &contents);
+    for match_mode in ["identifier", "text"] {
+        for fuzzy in [false, true] {
+            let mut request = fixture.request("");
+            request.fuzzy_search = fuzzy;
+            request.query_spec =
+                Some(json!({"mode":"batch", "matchMode":match_mode, "terms":terms}));
+            let events = fixture.run(request);
+            let results = hits(&events);
+            assert_eq!(results.len(), 256);
+            for (number, hit) in results.iter().enumerate() {
+                let term_id = format!("batch:{}", number + 1);
+                assert_eq!(hit.term_id.as_deref(), Some(term_id.as_str()));
+                assert_eq!(hit.term.as_deref(), Some(terms[number].as_str()));
+                assert_eq!(
+                    hit.source_match_ranges,
+                    vec![[4 + number * 8, 11 + number * 8]]
+                );
+                assert!(hit.edit_anchor.is_some());
+            }
+            let summary = events
+                .iter()
+                .find_map(|event| match &event.kind {
+                    EventKind::BatchSummary { terms } => Some(terms),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(summary.len(), 256);
+            assert!(summary
+                .iter()
+                .all(|term| term.file_count == 1 && term.hit_count == 1));
+        }
+    }
+}
+
+#[test]
+fn r3_17_search_generated_revision_rejects_external_changes_outside_matched_line() {
+    let fixture = Fixture::new();
+    let original = "\u{feff}before\r\n👩‍💻 needle\r\nafter\r\n";
+    fixture.write("sample.txt", original);
+    let events = fixture.run(fixture.request("needle"));
+    let results = hits(&events);
+    assert_eq!(results.len(), 1);
+    let (_, view) = docs_search_core::edit::prepare(results[0], None).unwrap();
+    assert_eq!(view.selected_text, "needle");
+    assert_eq!(
+        fs::read(fixture.0.join("sample.txt")).unwrap(),
+        original.as_bytes()
+    );
+    let changed = original.replace("after", "other");
+    fixture.write("sample.txt", &changed);
+    assert!(docs_search_core::edit::prepare(results[0], None).is_err());
+    assert_eq!(
+        fs::read(fixture.0.join("sample.txt")).unwrap(),
+        changed.as_bytes()
+    );
+}
+
+#[test]
 fn r3_05_normal_query_is_literal_and_does_not_cross_lines() {
     let fixture = Fixture::new();
     fixture.write(

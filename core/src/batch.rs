@@ -2,7 +2,6 @@ use crate::{fuzzy, InputError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
-use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
 pub struct Batch {
@@ -85,41 +84,24 @@ pub fn valid_identifier(text: &str) -> bool {
 
 impl Batch {
     pub fn matched(&self, term: &Term, text: &str, fuzzy_search: bool) -> Option<fuzzy::Match> {
+        self.matched_prepared(term, &fuzzy::PreparedText::new(text), fuzzy_search)
+    }
+
+    pub(crate) fn matched_prepared(
+        &self,
+        term: &Term,
+        text: &fuzzy::PreparedText<'_>,
+        fuzzy_search: bool,
+    ) -> Option<fuzzy::Match> {
         if !self.identifier {
-            return fuzzy::evaluate_selected(text, &term.query, fuzzy_search);
+            return text.evaluate_selected(&term.query, fuzzy_search);
         }
-        let mut normalized = String::new();
-        let mut positions = Vec::new();
-        let mut original = 0;
-        for grapheme in text.graphemes(true) {
-            let end = original + grapheme.chars().count();
-            let folded = fuzzy::base(grapheme);
-            positions.extend(std::iter::repeat_n([original, end], folded.len()));
-            normalized.push_str(&folded);
-            original = end;
-        }
-        let identifier_char = |c: char| c.is_alphanumeric() || c == '_';
-        for (start, _) in normalized.match_indices(&term.query.base) {
-            let end = start + term.query.base.len();
-            if normalized[..start]
-                .chars()
-                .next_back()
-                .is_some_and(identifier_char)
-                || normalized[end..]
-                    .chars()
-                    .next()
-                    .is_some_and(identifier_char)
-            {
-                continue;
-            }
-            return Some(fuzzy::Match {
-                kind: "identifier",
-                category: "standard",
-                score: 90,
-                range: [positions[start][0], positions[end - 1][1]],
-            });
-        }
-        None
+        text.identifier(&term.query.base).map(|range| fuzzy::Match {
+            kind: "identifier",
+            category: "standard",
+            score: 90,
+            range,
+        })
     }
 }
 

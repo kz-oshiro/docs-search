@@ -1,0 +1,4 @@
+interface:
+  display_name: "docs-search 検証・公開"
+  short_description: "Cargoの検証結果と同じ実行の成果物を照合し公開まで進める"
+  default_prompt: "$docs-search-validation-release を使って、依頼範囲の検証・公開を行い、同じ実行の証跡で結果を確認してください。"

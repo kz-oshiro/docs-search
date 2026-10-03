@@ -61,9 +61,9 @@ cargo xtask ci
 
 ## 記録の自動生成と公開
 
-`cargo xtask release-record` と `record-contracts` 工程はリモートのmainには未導入です。以下の記録生成コマンド・公開照合・契約試験は導入後の手順として扱います。現行のテスト・ビルドによる実行別レポートの保存は実装済みです。
+`cargo xtask release-record` と `record-contracts` 工程は実装済みで、静的確認まで完了しています。記録生成・公開照合・契約試験の実行検証は未実施です。既存のテスト・ビルドによる実行別レポートの保存は実装済みです。
 
-テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。通常は `report.md` の概要を読み、失敗工程だけログを調べます。正常ログ・件数・環境・ハッシュやUI JSONの全文を版別検証文書・実装状況・試験設計へ転記しません。
+テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。読む範囲と会話報告は[文書作成ガイド](documentation.md#検証結果の読み方と会話報告)に従います。正常ログ・件数・環境・ハッシュやUI JSONの全文を版別検証文書・実装状況・試験設計へ転記しません。
 
 公開時は下記の `release-record` でRelease本文と検証記録を生成・添付し、公開後に `--published` で照合します。毎回の索引行追加や公開確認だけの文書コミットは不要です。
 

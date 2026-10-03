@@ -7,6 +7,8 @@ use std::{
     process::{Command, Stdio},
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
+mod records;
+mod release;
 const ASSETS: &[&str] = &[
     "index.html",
     "style.css",
@@ -20,6 +22,9 @@ const ASSETS: &[&str] = &[
 #[derive(Serialize)]
 struct Phase {
     name: String,
+    command: Option<Vec<String>>,
+    working_directory: Option<String>,
+    environment: Option<Value>,
     status: String,
     exit_code: Option<i32>,
     started_at_unix_ms: u128,
@@ -79,9 +84,10 @@ impl Run {
         ));
         fs::create_dir_all(dir.parent().unwrap())?;
         fs::create_dir(&dir)?;
-        let metadata = json!({"schemaVersion":1,"command":command,"startedAtUnixMs":stamp,"commit":capture(&root,"git",&["rev-parse","HEAD"]),
+        let mut metadata = json!({"schemaVersion":2,"command":command,"invocation":std::env::args().skip(1).collect::<Vec<_>>(),"runId":dir.file_name().unwrap().to_string_lossy(),"startedAtUnixMs":stamp,"commit":capture(&root,"git",&["rev-parse","HEAD"]),
             "workingTree":capture(&root,"git",&["status","--porcelain"]),"rustc":capture(&root,"rustc",&["--version"]),"cargo":capture(&root,"cargo",&["--version"]),
-            "node":capture(&root,"node",&["--version"]),"npm":capture(&root,npm(),&["--version"]),"playwright":capture(&root,"node",&["-p","require('./tests/ui/node_modules/@playwright/test/package.json').version"]),"playwrightRequired":"1.63.0","platform":std::env::consts::OS,"architecture":std::env::consts::ARCH,"proptest":{"casesEnv":std::env::var("PROPTEST_CASES").ok(),"rngSeedEnv":std::env::var("PROPTEST_RNG_SEED").ok()}});
+            "node":capture(&root,"node",&["--version"]),"npm":capture(&root,npm(),&["--version"]),"playwright":capture(&root,"node",&["-p","require('./tests/ui/node_modules/@playwright/test/package.json').version"]),"playwrightRequired":"1.63.0","platform":std::env::consts::OS,"architecture":std::env::consts::ARCH,
+            "proptest":{"casesEnv":std::env::var("PROPTEST_CASES").ok(),"rngSeedEnv":std::env::var("PROPTEST_RNG_SEED").ok()}});
         let output = Command::new("cargo")
             .args(["metadata", "--no-deps", "--locked", "--format-version", "1"])
             .current_dir(&root)
@@ -90,6 +96,21 @@ impl Run {
             return Err(String::from_utf8_lossy(&output.stderr).into_owned().into());
         }
         let value: Value = serde_json::from_slice(&output.stdout)?;
+        let packages = value["packages"]
+            .as_array()
+            .ok_or("missing workspace packages")?;
+        metadata["productVersion"] = packages
+            .iter()
+            .find(|package| package["name"] == "docs-search-desktop")
+            .ok_or("missing desktop package")?["version"]
+            .clone();
+        metadata["packageVersions"] = json!(packages
+            .iter()
+            .map(|package| json!({"name":package["name"],"version":package["version"]}))
+            .collect::<Vec<_>>());
+        let tauri: Value =
+            serde_json::from_slice(&fs::read(root.join("src-tauri/tauri.conf.json"))?)?;
+        metadata["tauriVersion"] = tauri["version"].clone();
         let target = PathBuf::from(
             value["target_directory"]
                 .as_str()
@@ -130,6 +151,9 @@ impl Run {
         println!("SKIP {name}: {reason}");
         self.phases.push(Phase {
             name: name.into(),
+            command: None,
+            working_directory: None,
+            environment: None,
             status: "skipped".into(),
             exit_code: None,
             started_at_unix_ms: unix_ms(),
@@ -183,6 +207,18 @@ impl Run {
         );
         self.phases.push(Phase {
             name: name.into(),
+            command: Some(
+                std::iter::once(program)
+                    .chain(args.iter().copied())
+                    .map(str::to_owned)
+                    .collect(),
+            ),
+            working_directory: Some(self.relative(cwd)),
+            environment: Some(Value::Object(
+                env.iter()
+                    .map(|(key, value)| ((*key).to_owned(), json!(self.relative(value))))
+                    .collect(),
+            )),
             status: if passed { "passed" } else { "failed" }.into(),
             exit_code: code,
             started_at_unix_ms,
@@ -214,6 +250,9 @@ impl Run {
         );
         self.phases.push(Phase {
             name: name.into(),
+            command: None,
+            working_directory: None,
+            environment: None,
             status: if success { "passed" } else { "failed" }.into(),
             exit_code: Some(if success { 0 } else { 1 }),
             started_at_unix_ms,
@@ -261,6 +300,19 @@ impl Run {
                 fs::write(destination, bytes)?;
             }
         }
+        let files = ASSETS
+            .iter()
+            .map(|asset| -> Result<Value> {
+                let source = digest(&self.root.join("frontend").join(asset))?;
+                let staged = digest(&folder.join(asset))?;
+                if source != staged {
+                    return Err(format!("frontend staging hash differs: {asset}").into());
+                }
+                Ok(json!({"name":asset,"sourceSha256":source,"sha256":staged}))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.artifacts
+            .push(json!({"kind":"frontend-staging","path":self.relative(folder),"files":files}));
         Ok(())
     }
     fn ui(&mut self, case: Option<&str>) -> bool {
@@ -354,7 +406,18 @@ impl Run {
         };
         self.absorb(frontend);
         self.phases.sort_by_key(|phase| phase.started_at_unix_ms);
-        backend_passed && frontend_passed
+        // Validate result files before CI starts the build. This snapshot covers
+        // tests only; the final CI report also covers the distribution EXE.
+        let mut metadata = self.metadata.clone();
+        metadata["command"] = json!("test");
+        let mut evidence = json!({"metadata":metadata,"finishedAtUnixMs":unix_ms(),"success":backend_passed && frontend_passed,"phases":self.phases,"artifacts":self.artifacts});
+        records::complete(&self.root, &self.dir, &mut evidence);
+        if evidence["success"] != true {
+            println!(
+                "FAIL automatic-test-evidence; inspect the report summaries and failed phase logs"
+            );
+        }
+        evidence["success"] == true
     }
     fn backend_tests(&mut self) -> bool {
         let root = self.root.clone();
@@ -397,6 +460,13 @@ impl Run {
             &root,
             &env,
         );
+        success &= self.phase(
+            "record-contracts",
+            "cargo",
+            &["test", "--locked", "-p", "xtask", "--", "--nocapture"],
+            &root,
+            &[],
+        );
         for (name, test) in [
             ("common-cli", "cli_backend"),
             ("context-cli", "cli_context"),
@@ -431,7 +501,7 @@ impl Run {
         success &= self.phase(
             "worker-policy",
             "node",
-            &["--test", "workers.test.mjs"],
+            &["--test", "--test-reporter=tap", "workers.test.mjs"],
             &folder,
             &[],
         );
@@ -500,13 +570,15 @@ impl Run {
         let checked = self.phase("setup-preflight", "node", &["preflight.mjs"], &folder, &[]);
         installed && checked
     }
-    fn report(&self, success: bool) -> Result<()> {
-        let document = json!({"metadata":self.metadata,"finishedAtUnixMs":unix_ms(),"success":success,"phases":self.phases,"artifacts":self.artifacts});
+    fn report(&self, success: bool) -> Result<bool> {
+        let mut document = json!({"metadata":self.metadata,"finishedAtUnixMs":unix_ms(),"sourceAtFinish":{"commit":capture(&self.root,"git",&["rev-parse","HEAD"]),"workingTree":capture(&self.root,"git",&["status","--porcelain"])},"success":success,"phases":self.phases,"artifacts":self.artifacts});
+        records::complete(&self.root, &self.dir, &mut document);
         fs::write(
             self.dir.join("report.json"),
             serde_json::to_string_pretty(&document)? + "\n",
         )?;
-        let mut md=format!("# Cargo {} report\n\nResult: **{}**\n\n| Phase | Status | Exit | Start offset (ms) | Duration (ms) | Logs / reason |\n|---|---|---:|---:|---:|---|\n",self.metadata["command"].as_str().unwrap(),if success {"passed"} else {"failed"});
+        let mut md = records::overview(&document);
+        md += "\n| Phase | Status | Exit | Start offset (ms) | Duration (ms) | Logs / reason |\n|---|---|---:|---:|---:|---|\n";
         for phase in &self.phases {
             let detail =
                 phase
@@ -553,15 +625,18 @@ impl Run {
         md += "\nMetadata and artifact SHA256: [report.json](report.json).\n";
         fs::write(self.dir.join("report.md"), md)?;
         println!("Report: {}", self.dir.join("report.md").display());
-        Ok(())
+        Ok(document["success"] == true)
     }
 }
 fn execute() -> Result<bool> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
-        println!("cargo xtask <test|build|ci|ui|setup|fixtures|icons|compare-fixtures>\n  ui [--case REGEX]\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  compare-fixtures --old OLD_DIRECTORY --new NEW_DIRECTORY");
+        println!("cargo xtask <test|build|ci|ui|setup|fixtures|icons|compare-fixtures|release-record>\n  ui [--case REGEX]\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  compare-fixtures --old OLD_DIRECTORY --new NEW_DIRECTORY\n  release-record --run RUN_DIRECTORY --tag vX.Y.Z --notes CHANGES.md [--repo OWNER/REPO] [--published]");
         return Ok(true);
     };
+    if command == "release-record" {
+        return release::execute(&args[1..]);
+    }
     let mut profile = "acceptance";
     let mut kind = "common";
     let mut output = None;
@@ -630,8 +705,7 @@ fn execute() -> Result<bool> {
         }),
         _=>unreachable!()
     };
-    run.report(success)?;
-    Ok(success)
+    run.report(success)
 }
 fn main() {
     match execute() {

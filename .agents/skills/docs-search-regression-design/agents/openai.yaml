@@ -1,0 +1,4 @@
+interface:
+  display_name: "docs-search 回帰試験設計"
+  short_description: "既存の生成器とケース原本を使い回帰試験と確認方針を設計する"
+  default_prompt: "$docs-search-regression-design を使って、この変更の回帰試験と確認方針を既存資産から設計してください。"
