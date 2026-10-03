@@ -1,6 +1,6 @@
 # v3.0.0 自動検証記録
 
-実施日: 2026-10-03。対象: [Rust要求仕様 v3.0.0](../specifications/rust-requirements-v3.0.0.md)。実アプリ起動/GUIは今回の依頼対象外。ヘッドレスPlaywrightは自動試験に含めた。
+実施日: 2026-10-03。対象: [Rust要求仕様 v3.0.0](https://github.com/kz-oshiro/docs-search/blob/v3.0.0/docs/rust-requirements-v3.0.0.md)。実アプリ起動/GUIは今回の依頼対象外。ヘッドレスPlaywrightは自動試験に含めた。
 
 公開済み: **[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)**。ソースコミット`f96af8605840306a50c76c34356b13ca3e62bf1a`。正式Releaseとアップロード済みEXEのサイズ・SHA-256を確認した。公開後の文書更新には実行ソースの変更を含めていない。
 

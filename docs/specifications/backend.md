@@ -1,6 +1,6 @@
 # docs-search 再構築版: バックエンド仕様
 
-v3.0.0の詳細仕様。要求ID・上限・自動テストとの対応は [Rust要求仕様](rust-requirements-v3.0.0.md)、実施結果は [検証記録](../releases/validation-v3.0.0.md) を参照。
+現行の詳細仕様。要求ID・上限・自動テストとの対応は[Rust要求仕様](rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照。
 
 検索バックエンドはフォルダーの列挙、文書からの文字列抽出、照合、結果と進捗の通知を担当する。GUI や OS の画面部品には依存しない。入出力の意味は [境界契約](boundary.md) に定義する。
 

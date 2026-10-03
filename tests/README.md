@@ -32,8 +32,12 @@
 
 個別診断は `cargo test --locked -p docs-search-core --test cli_index -- --nocapture` のように実行できます。全件の結果には mandatory UI を含む `cargo xtask test` を使います。各子 CLI はそのテストの LOCALAPPDATA だけを使用し、プロセス全体の環境を変更しません。core の既存単体/API/proptest は継続します。
 
-## UI と移行の検証
+## フロントエンド試験とアプリケーション結合試験
 
-[UI 方針](../docs/test-plans/playwright-ui-test-plan.md)の既存51件の期待値を保ち、WASM 資材なし・起動資材失敗・CRLF 条件要求を3件追加しました。現在54件は未実行です。実フロントエンドをヘッドレス Chromium で操作し、Tauri/OS 境界だけをモックにします。画像・動画・トレースは使いません。
+[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)に対応する現行ケースは54件です。実フロントエンドをヘッドレス Chromium で操作し、Tauri/OS 境界だけをモックにします。画像・動画・トレースは使いません。実施結果は実行ごとのレポートと[公開・検証記録](../docs/releases/README.md)を参照してください。
 
-[移行検証方針](../docs/test-plans/cargo-native-ui-test-plan.md)に、旧生成器との一度の比較、ZIP 内容/順序/日時/圧縮方式、再生成の SHA256、cold/warm の性能計測手順があります。実装だけの今回ではテスト・ビルド・生成・GUI・リモート反映を実行していません。
+[移行検証方針](../docs/test-plans/cargo-native-ui-test-plan.md)には、旧生成器との一度の比較、ZIP 内容/順序/日時/圧縮方式、再生成の SHA256、cold/warm の性能計測手順を履歴として保存しています。通常の実行手順は[開発手順](../docs/development.md)、移行時の結果は[公開・検証記録](../docs/releases/README.md)を参照します。
+
+基本方針は、バックエンド試験・フロントエンド試験でカバーできないもののみアプリケーション結合試験に回すことです。処理・計算の網羅はバックエンド試験、DOM・操作・要求引数・応答表示・構造/配色はフロントエンド試験で担当します。個別試験の不足はその区分で補います。生成器・資材・ハッシュは共通の検証基盤として併記します。
+
+[アプリケーション結合試験設計](../docs/test-plans/playwright-exe-test-plan.md)には有効なE01/E02/E04/E06〜E11の9ケース群ごとに、個別試験では確認できない理由・手順・期待結果を記載しました。旧E03/E05のルート/条件/順位と旧E12のTSV整形は個別試験へ振り分け、独立した結合ケースを廃止しました。G01/G02は[フロントエンド試験の拡張](../docs/test-plans/playwright-ui-test-plan.md#設計中のフロントエンド試験の拡張g01g02)として管理し、実EXEへ重複させません。test/ciへのReleaseビルド・結合試験追加とフロントエンド試験の拡張は未実装・未実行です。Rust製OS操作補助は追加せず、ネイティブダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は保証対象外とし、手動票を必須にしません。現行のcargo xtask test/ciが実EXEを試験しているとは扱いません。結果は3区分で報告します。

@@ -1,10 +1,10 @@
-# Rust 要求仕様 v3.0.0
+# Rust 要求仕様
 
-Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+本書は現行の機能基準を定める。文書の改訂履歴はGitで管理し、製品のリリース番号とは連動させない。実行手順は[開発手順](../development.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。
 
-制定日: 2026-10-03。対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、HTML/CSS/JavaScript 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、この版の機能基準には含めない。Cargo workspaceの4パッケージと Tauri の製品版番号を `3.0.0` に揃える。仕様の版を確定したことと Windows 配布物のビルド・公開は別である。
+対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、HTML/CSS/JavaScript 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、本書の機能基準には含めない。製品の版番号は配布設定、対象ソース・ビルド・公開結果は各リリースの記録で管理する。
 
-本書はここまでの要求を Rust 実装向けに整理した基準である。[全体仕様](requirements.md)の A-01〜A-27、[バックエンド](backend.md)、[境界契約](boundary.md)、[GUI](gui.md)が詳細を定める。P0〜P6とイシュー #1〜#9、テーマ設定を含み、追加の製品機能は要求しない。過去の実装報告の「未実施」は報告時点の記録とし、今回の検証結果は [v3.0.0 検証記録](../releases/validation-v3.0.0.md)へ集約する。
+本書はここまでの要求を Rust 実装向けに整理した基準である。[全体仕様](requirements.md)の A-01〜A-27、[バックエンド](backend.md)、[境界契約](boundary.md)、[GUI](gui.md)が詳細を定める。P0〜P6とイシュー #1〜#9、テーマ設定を含み、追加の製品機能は要求しない。要求IDのR3接頭辞は既存テストとの対応を保つ識別子であり、文書や製品の改訂に合わせて変更しない。
 
 ## 適用範囲と責務
 
@@ -78,7 +78,7 @@ Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](.
 | R3-16 | `context.rs` の窓/結合/非表示/書式試験、[周辺CLI](../../core/tests/cli_context.rs)の直接/初回/再利用・変更/削除試験 |
 | R3-17 | `edit.rs` のBOM/CRLF/Unicode/省略抜粋/外部変更/Shift_JIS/根拠選択試験（Windowsでは実際の置換処理を通る） |
 | R3-18 | `report.rs` のCSV/TSV/JSON/根拠/行列試験 |
-| R3-19〜R3-20 | [Playwright方針](../test-plans/playwright-ui-test-plan.md)のU01〜U39をヘッドレスChromiumで51件実行し成功。実アプリ/OS連携と見た目はM1〜M5 |
+| R3-19〜R3-20 | [フロントエンド試験設計](../test-plans/playwright-ui-test-plan.md)のUケースとG01/G02拡張。個別試験では確認できない接続は[アプリケーション結合試験設計](../test-plans/playwright-exe-test-plan.md)で担当。実施済み範囲は各実行記録で確認する |
 
 ## 実行手順と対象外
 
@@ -90,6 +90,6 @@ cargo xtask test
 
 共通load生成→Rust単体/公開API/proptest→生成器検証→共通→周辺→条件→Office/順位/一括→イシュー→索引→ヘッドレスPlaywrightの順。UI試験の初回準備は [こちら](../test-plans/playwright-ui-test-plan.md#実装と準備)。失敗時は原因と修正を記録し、失敗した確認を再実施して残りを続行する。テスト/CLIのコンパイルとUI資材stagingは必要だが、Windows配布ビルド・実アプリ起動は含まない。`cargo xtask ci` はこの入口の後にWindows配布ビルドを追加する従来の用途を保つ。
 
-自動テスト・Windows配布ビルドとv3.0.0のcommit/push/タグ/Releaseは完了した。結果は[検証記録](../releases/validation-v3.0.0.md)を参照する。ヘッドレスUIではDOM・状態・要求引数を確認した。実アプリ起動/GUI、性能測定、実Office文書の網羅的互換性、イシュー完了操作は未実施。実EXEでの編集セッションtoken、Windowsクリップボード/保存先選択と、テーマ・アイコン・周辺書式などの見た目の成功を自動試験から推定しない。
+試験と結果報告はバックエンド試験・フロントエンド試験・アプリケーション結合試験の3区分とする。個別のバックエンド試験・フロントエンド試験でカバーできないもののみ結合試験に回し、設計の存在を実行成功とは扱わない。結合ランナーとG01/G02拡張は未実装である。OS固有のダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は[結合試験設計の保証対象外](../test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照し、必須の手動確認へ移さない。
 
-PDF、旧Officeバイナリ形式、OCR、クラウド専用API、正規表現/括弧式、Office編集、履歴、設計書の意味的差分表示はこの版の対象外。テキスト編集後のコード/JSON等の構文検証もしない。検索全体の一貫したスナップショットや、サイズ/mtimeが変わらない外部更新の検知は保証しない。
+PDF、旧Officeバイナリ形式、OCR、クラウド専用API、正規表現/括弧式、Office編集、検索履歴、設計書の意味的差分表示は現行の対象外。テキスト編集後のコード/JSON等の構文検証もしない。検索全体の一貫したスナップショットや、サイズ/mtimeが変わらない外部更新の検知は保証しない。

@@ -1,6 +1,6 @@
 # v3.0.1 検証・公開記録
 
-2026-10-03。Cargo 集約・WASM 撤去後の自動テスト・Windows Release ビルドを実施し、ユーザーの公開依頼に基づいて結果をレビューした。実装前基準は `750c4674df79c3a0d7f9bd014462ace525e8dcbc`。検索の要求契約は [v3.0.0](../specifications/rust-requirements-v3.0.0.md)を継続する。
+2026-10-03。Cargo 集約・WASM 撤去後の自動テスト・Windows Release ビルドを実施し、ユーザーの公開依頼に基づいて結果をレビューした。実装前基準は `750c4674df79c3a0d7f9bd014462ace525e8dcbc`。検索の要求契約は [v3.0.0](https://github.com/kz-oshiro/docs-search/blob/v3.0.1/docs/specifications/rust-requirements-v3.0.0.md)を継続する。
 
 ## 最終実行
 

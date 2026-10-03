@@ -1,6 +1,6 @@
-# docs-search v3.0.0: 全体要求仕様
+# docs-search 全体要求仕様
 
-状態: v3.0.0の全体要求。Rust向けの要求ID・上限・テスト対応は [Rust要求仕様 v3.0.0](rust-requirements-v3.0.0.md)、最新の自動確認は [検証記録](../releases/validation-v3.0.0.md) を参照。Tauri 実装の方式と実行方法は [Tauri 実装の README](../development.md) を参照。
+現行の全体要求を定める。Rust向けの要求ID・上限・テスト対応は[Rust要求仕様](rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)、実装の方式と実行方法は[開発手順](../development.md)を参照する。文書の変更履歴はGitで管理する。
 
 ## 目的と対象
 
@@ -26,7 +26,7 @@ PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.co
 
 境界は関数呼び出し、プロセス間通信、その他の実装手段に置き換えられる。ファイルを開くこととクリップボードへのコピーは GUI 側の操作とし、検索バックエンドはそのためのファイルパスと場所情報を返す。
 
-## v3.0.0で扱わないもの
+## 現行で扱わないもの
 
 - `.xls`、`.ppt`、`.doc`、PDF、画像、OCR、クラウド上の文書専用 API。
 - 正規表現、括弧を使う論理式、Office文書の編集・置換。対応テキスト形式の選択範囲の編集・保存はA-20の対象とする。
