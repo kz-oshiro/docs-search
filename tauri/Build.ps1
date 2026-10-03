@@ -3,7 +3,6 @@
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $frontendBuild = Join-Path $here '.frontend-build'
-$pkg = Join-Path $frontendBuild 'pkg'
 $app = Join-Path $here 'docs-search-desktop.exe'
 $releaseDirectories = @(
     (Join-Path $here 'frontend\target\release'),
@@ -40,16 +39,7 @@ if ($runningApp) { throw '起動中の docs-search-desktop.exe を閉じてか�
 try {
     Remove-BuildDirectory $frontendBuild
 
-    cargo build --release --manifest-path (Join-Path $here 'frontend\Cargo.toml') --target wasm32-unknown-unknown
-    if ($LASTEXITCODE -ne 0) { throw 'WASM のビルドに失敗しました。' }
-
-    New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-    $wasm = Join-Path $here 'frontend\target\wasm32-unknown-unknown\release\docs_search_ui.wasm'
-    wasm-bindgen --target web --out-dir $pkg $wasm
-    if ($LASTEXITCODE -ne 0) { throw 'WASM の JavaScript 接続コードを作れませんでした。' }
-    Copy-Item -LiteralPath (Join-Path $here 'frontend\index.html') -Destination $frontendBuild
-    Copy-Item -LiteralPath (Join-Path $here 'frontend\style.css') -Destination $frontendBuild
-    Copy-Item -LiteralPath (Join-Path $here 'frontend\boot.js') -Destination $frontendBuild
+    & (Join-Path $here 'Build-Frontend.ps1') -OutputDirectory $frontendBuild -Profile release
 
     cargo build --release --manifest-path (Join-Path $here 'src-tauri\Cargo.toml')
     if ($LASTEXITCODE -ne 0) { throw 'デスクトップアプリのビルドに失敗しました。' }

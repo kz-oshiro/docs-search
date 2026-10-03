@@ -135,9 +135,6 @@ impl Query {
 }
 
 pub fn could_match(text: &str, query: &Query) -> bool {
-    if query.numeric {
-        return kana(text).contains(&query.loose);
-    }
     if (if query.allow_loose {
         loose(text)
     } else {
@@ -149,6 +146,19 @@ pub fn could_match(text: &str, query: &Query) -> bool {
         &query.kana
     }) {
         return true;
+    }
+    // The evaluator also accepts a single identifier token or token prefix,
+    // even when punctuation in the original query is absent from the source.
+    if query.tokens.len() == 1 {
+        let token = &query.tokens[0];
+        if tokens_with_ranges(text).into_iter().any(|(candidate, _)| {
+            candidate == *token || (token.chars().count() >= 3 && candidate.starts_with(token))
+        }) {
+            return true;
+        }
+    }
+    if query.numeric {
+        return false;
     }
     let Some(typo) = &query.typo else {
         return false;
@@ -383,7 +393,16 @@ fn tokens_with_ranges(text: &str) -> Vec<(String, [usize; 2])> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluate, tokens, Query};
+    use super::{could_match, evaluate, tokens, Query};
+
+    #[test]
+    fn token_matches_are_not_lost_when_query_punctuation_is_absent() {
+        for (text, raw) in [("a_", "a!"), ("alphabet_", "alpha!")] {
+            let query = Query::new(raw);
+            assert!(evaluate(text, &query).is_some());
+            assert!(could_match(text, &query));
+        }
+    }
 
     #[test]
     fn identifier_variants_and_width_keep_original_ranges() {

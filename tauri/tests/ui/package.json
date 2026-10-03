@@ -1,0 +1,9 @@
+{
+  "name": "docs-search-ui-tests",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.63.0" }
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>docs-search</title>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#F28C28"/>
+  <rect x="29" y="21" width="62" height="86" rx="8" fill="#FFFFFF"/>
+  <rect x="68" y="21" width="23" height="26" fill="#F28C28"/>
+  <polygon points="73,22 92,42 73,42" fill="#FFFFFF"/>
+  <rect x="40" y="51" width="32" height="7" rx="3.5" fill="#743A17"/>
+  <circle cx="78" cy="82" r="16" fill="#FFFFFF" stroke="#743A17" stroke-width="8"/>
+  <line x1="92" y1="96" x2="107" y2="111" stroke="#743A17" stroke-width="10" stroke-linecap="round"/>
+</svg>

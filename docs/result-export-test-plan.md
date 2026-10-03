@@ -1,19 +1,22 @@
 # 検索結果の一括出力: 確認方針
 
+> 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
+
 対象: [実装計画 P1](./implementation-plan.md)。実装時点では未実施だったが、後に[v2.0.6 の公開記録](./release-notes-v2.0.6.md)に自動確認の成功を記録した。GUI 操作は未確認。新しい変更の検証では、以下の項目・手順・期待結果を確認する。現在の状態は[進捗レポート](./implementation-status.md)を参照する。
 
 ## 自動確認
 
-`docs-search` を作業ディレクトリとして、次を順に実行する。
+`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行する。試験用WASM生成とヘッドレスPlaywrightを含む。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Automated-Tests.ps1
 ```
+
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1` を使う。
 
 | 項目 | 手順 | 期待結果 |
 | --- | --- | --- |
-| 既存検索の回帰 | 上記の共通ケース、Rustテスト、WASMチェック、Windowsビルドを実行 | 既存ケースが通り、検索・件数・中断の契約が変わらない |
+| 既存検索の回帰 | 上記の共通ケース、Rustテスト、WASM型検査、ヘッドレスUIを実行 | 既存ケースが通り、検索・件数・中断・出力対象の契約が変わらない |
 | 表形式の変換 | `tauri/core/src/report.rs` のCSV/TSV変換ケースを実行 | 日本語、空文字、カンマ、引用符、タブ、改行、バックスラッシュで行・列が崩れない。CSVのみBOMが付く |
 | 数式の無害化 | `=`, `+`, `-`, `@` と、前に空白を含む値を出力 | 表計算ソフトが数式として扱わない。JSONの原文は変わらない |
 | 出力記録の整合 | 全結果・絞り込み結果とIssueのある記録を変換 | 全結果の行数は終端の `resultCount`、Issue数は `issueCount` と一致する。絞り込み結果でも全Issueが残る |

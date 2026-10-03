@@ -8,13 +8,15 @@ pub enum Format {
     Csv,
     Tsv,
     Json,
+    Matrixcsv,
+    Matrixtsv,
 }
 
 impl Format {
     pub fn extension(self) -> &'static str {
         match self {
-            Self::Csv => "csv",
-            Self::Tsv => "tsv",
+            Self::Csv | Self::Matrixcsv => "csv",
+            Self::Tsv | Self::Matrixtsv => "tsv",
             Self::Json => "json",
         }
     }
@@ -32,9 +34,19 @@ pub struct Report {
     pub scope: String,
     pub filter_text: String,
     pub filter_extension: String,
+    #[serde(default)]
+    pub filter_include: String,
+    #[serde(default)]
+    pub filter_exclude: String,
     pub selected_file_count: usize,
     pub rows: Vec<ReportRow>,
     pub issues: Vec<ReportIssue>,
+    #[serde(default)]
+    pub rankings: Vec<crate::ranking::FileRanking>,
+    #[serde(default)]
+    pub batch_summary: Vec<crate::batch::TermSummary>,
+    #[serde(default)]
+    pub execution_summary: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -49,6 +61,14 @@ pub struct ReportCounts {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportRow {
+    #[serde(default)]
+    pub modified_at: Option<f64>,
+    #[serde(default)]
+    pub document_order: Vec<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub term_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub term: Option<String>,
     pub result_id: usize,
     pub file_name: String,
     pub file_path: String,
@@ -150,6 +170,12 @@ fn source_label(kind: &str) -> &str {
     match kind {
         "fileName" => "ファイル名",
         "cell" => "セル",
+        "formula" => "Excel数式文字列",
+        "note" => "PowerPointノート",
+        "excelComment" => "Excelコメント",
+        "wordHeader" => "Wordヘッダー",
+        "wordFooter" => "Wordフッター",
+        "wordComment" => "Wordコメント",
         "excelRow" => "Excelの行",
         "fileMatch" => "ファイル全体",
         "shape" => "図形",
@@ -194,16 +220,93 @@ fn category_label(kind: &str) -> &str {
 pub fn table_text(report: &Report, format: Format) -> Result<String, String> {
     report.validate()?;
     let (separator, cell): (&str, fn(&str) -> String) = match format {
-        Format::Csv => (",", csv_cell),
-        Format::Tsv => ("\t", tsv_cell),
+        Format::Csv | Format::Matrixcsv => (",", csv_cell),
+        Format::Tsv | Format::Matrixtsv => ("\t", tsv_cell),
         Format::Json => return Err("表形式を指定してください。".into()),
     };
     let mut output = String::new();
-    let advanced = report.request.query_spec.is_some();
+    if matches!(format, Format::Matrixcsv | Format::Matrixtsv) {
+        if report
+            .request
+            .query_spec
+            .as_ref()
+            .is_none_or(|spec| spec["mode"] != "batch")
+        {
+            return Err("語×ファイル出力は一括検索で利用できます。".into());
+        }
+        let mut remaining: std::collections::BTreeSet<&str> = report
+            .rows
+            .iter()
+            .map(|row| row.file_path.as_str())
+            .collect();
+        let mut files = Vec::new();
+        for ranking in &report.rankings {
+            let path = ranking.file_path.as_str();
+            if remaining.remove(path) {
+                files.push(path);
+            }
+        }
+        files.extend(remaining);
+        let mut headers = vec![
+            "検索語ID".to_owned(),
+            "検索語".into(),
+            "確認状態".into(),
+            "出力範囲".into(),
+        ];
+        headers.extend(files.iter().map(|path| (*path).into()));
+        output.push_str(
+            &headers
+                .iter()
+                .map(|value| cell(value))
+                .collect::<Vec<_>>()
+                .join(separator),
+        );
+        output.push_str("\r\n");
+        let mut counts = std::collections::HashMap::new();
+        for row in &report.rows {
+            if let Some(id) = &row.term_id {
+                *counts
+                    .entry((id.as_str(), row.file_path.as_str()))
+                    .or_insert(0usize) += 1;
+            }
+        }
+        for term in &report.batch_summary {
+            let mut values = vec![
+                cell(&term.term_id),
+                cell(&term.term),
+                cell(&term.status),
+                cell(&report.scope),
+            ];
+            values.extend(files.iter().map(|path| {
+                counts
+                    .get(&(term.term_id.as_str(), *path))
+                    .copied()
+                    .unwrap_or(0)
+                    .to_string()
+            }));
+            output.push_str(&values.join(separator));
+            output.push_str("\r\n");
+        }
+        return Ok(output);
+    }
+    let advanced = report
+        .request
+        .query_spec
+        .as_ref()
+        .is_some_and(|spec| spec["mode"] == "conditions");
+    let batch = report
+        .request
+        .query_spec
+        .as_ref()
+        .is_some_and(|spec| spec["mode"] == "batch");
     let mut headers = HEADERS.to_vec();
     if advanced {
         headers.push("検索語と根拠");
     }
+    if batch {
+        headers.extend(["検索語ID", "検索語"]);
+    }
+    headers.push("順位理由");
     output.push_str(&headers.join(separator));
     output.push_str("\r\n");
     for row in &report.rows {
@@ -240,6 +343,17 @@ pub fn table_text(report: &Report, format: Format) -> Result<String, String> {
                 .join(" | ");
             values.push(cell(&evidence));
         }
+        if batch {
+            values.push(cell(row.term_id.as_deref().unwrap_or("")));
+            values.push(cell(row.term.as_deref().unwrap_or("")));
+        }
+        let reasons = report
+            .rankings
+            .iter()
+            .find(|ranking| ranking.file_path == row.file_path)
+            .map(|ranking| ranking.reasons.join(" / "))
+            .unwrap_or_default();
+        values.push(cell(&reasons));
         output.push_str(&values.join(separator));
         output.push_str("\r\n");
     }
@@ -249,12 +363,12 @@ pub fn table_text(report: &Report, format: Format) -> Result<String, String> {
 pub fn file_bytes(report: &Report, format: Format) -> Result<Vec<u8>, String> {
     report.validate()?;
     match format {
-        Format::Csv => {
+        Format::Csv | Format::Matrixcsv => {
             let mut bytes = vec![0xef, 0xbb, 0xbf];
             bytes.extend_from_slice(table_text(report, format)?.as_bytes());
             Ok(bytes)
         }
-        Format::Tsv => Ok(table_text(report, format)?.into_bytes()),
+        Format::Tsv | Format::Matrixtsv => Ok(table_text(report, format)?.into_bytes()),
         Format::Json => {
             serde_json::to_vec_pretty(report).map_err(|_| "調査記録を作成できませんでした。".into())
         }
@@ -264,6 +378,7 @@ pub fn file_bytes(report: &Report, format: Format) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use serde_json::json;
 
     fn sample(preview: &str) -> Report {
@@ -281,6 +396,8 @@ mod tests {
                 extensions: vec!["xlsx".into()],
                 use_index: false,
                 fuzzy_search: false,
+                include_notes: false,
+                include_formulas: false,
             },
             finished_reason: "completed".into(),
             counts: ReportCounts {
@@ -292,8 +409,14 @@ mod tests {
             scope: "all".into(),
             filter_text: String::new(),
             filter_extension: String::new(),
+            filter_include: String::new(),
+            filter_exclude: String::new(),
             selected_file_count: 1,
             rows: vec![ReportRow {
+                modified_at: None,
+                document_order: vec![],
+                term_id: None,
+                term: None,
                 result_id: 1,
                 file_name: "設計.xlsx".into(),
                 file_path: "C:\\docs\\設計.xlsx".into(),
@@ -317,6 +440,9 @@ mod tests {
                 evidence: vec![],
             }],
             issues: vec![],
+            rankings: vec![],
+            batch_summary: vec![],
+            execution_summary: None,
         }
     }
 
@@ -367,11 +493,120 @@ mod tests {
             json!({"termId": "all:2", "term": "必須", "locationText": "Sheet1!D1", "previewText": "必須"}),
         ];
         let csv = table_text(&report, Format::Csv).unwrap();
-        assert!(csv.lines().next().unwrap().ends_with("検索語と根拠"));
+        assert!(csv
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("検索語と根拠,順位理由"));
         assert!(csv.contains("顧客: Sheet1!A1 — 顧客番号 | 必須: Sheet1!D1 — 必須"));
         let saved: Value =
             serde_json::from_slice(&file_bytes(&report, Format::Json).unwrap()).unwrap();
         assert_eq!(saved["request"]["querySpec"]["scope"], "excelRow");
         assert_eq!(saved["rows"][0]["evidence"][1]["termId"], "all:2");
+    }
+
+    #[test]
+    fn batch_matrix_preserves_zero_terms_uncertainty_and_safe_cells() {
+        let mut report = sample("顧客");
+        report.request.query.clear();
+        report.request.query_spec = Some(json!({
+            "mode": "batch", "terms": ["=TAB,01", "MISSING"], "matchMode": "text"
+        }));
+        report.rows[0].term_id = Some("batch:1".into());
+        report.rows[0].term = Some("=TAB,01".into());
+        let mut second = sample("顧客").rows.remove(0);
+        second.result_id = 2;
+        second.file_path = "C:\\docs\\a.txt".into();
+        second.file_name = "a.txt".into();
+        second.file_type = "txt".into();
+        second.term_id = Some("batch:1".into());
+        second.term = Some("=TAB,01".into());
+        report.rows.push(second);
+        report.counts.discovered_files = 3;
+        report.counts.processed_files = 3;
+        report.counts.result_count = 2;
+        report.counts.issue_count = 1;
+        report.issues = vec![ReportIssue {
+            stage: "read".into(),
+            path: Some("C:\\docs\\broken.pptx".into()),
+            code: "unreadable".into(),
+            reason: "注記部品を読めません。".into(),
+        }];
+        report.selected_file_count = 2;
+        report.rankings = report
+            .rows
+            .iter()
+            .map(|row| crate::ranking::FileRanking {
+                file_path: row.file_path.clone(),
+                evidence: Default::default(),
+                reasons: vec![],
+                result_ids: vec![row.result_id],
+            })
+            .collect();
+        report.scope = "filtered".into();
+        report.batch_summary = vec![
+            crate::batch::TermSummary {
+                term_id: "batch:1".into(),
+                term: "=TAB,01".into(),
+                file_count: 2,
+                hit_count: 2,
+                status: "未確定（一部エラーあり）".into(),
+            },
+            crate::batch::TermSummary {
+                term_id: "batch:2".into(),
+                term: "MISSING".into(),
+                file_count: 0,
+                hit_count: 0,
+                status: "未確定（一部エラーあり）".into(),
+            },
+        ];
+        let csv = table_text(&report, Format::Matrixcsv).unwrap();
+        assert!(csv
+            .lines()
+            .next()
+            .unwrap()
+            .ends_with("C:\\docs\\設計.xlsx,C:\\docs\\a.txt"));
+        assert!(csv.contains("batch:1,\"'=TAB,01\",未確定（一部エラーあり）,filtered,1,1\r\n"));
+        assert!(csv.contains("batch:2,MISSING,未確定（一部エラーあり）,filtered,0,0\r\n"));
+        assert!(file_bytes(&report, Format::Matrixcsv)
+            .unwrap()
+            .starts_with(&[0xef, 0xbb, 0xbf]));
+        report.rows.clear();
+        report.selected_file_count = 0;
+        let tsv = table_text(&report, Format::Matrixtsv).unwrap();
+        assert_eq!(tsv.lines().count(), 3);
+        assert!(tsv.contains("batch:2\tMISSING\t未確定（一部エラーあり）\tfiltered\r\n"));
+        let saved: Value =
+            serde_json::from_slice(&file_bytes(&report, Format::Json).unwrap()).unwrap();
+        assert_eq!(saved["batchSummary"][0]["term"], "=TAB,01");
+        assert!(table_text(&sample("顧客"), Format::Matrixcsv).is_err());
+    }
+
+    proptest! {
+        #[test]
+        fn r3_18_json_preserves_arbitrary_unicode_and_controls(chars in prop::collection::vec(any::<char>(), 0..400)) {
+            let payload: String = chars.into_iter().collect();
+            let mut report = sample(&payload);
+            report.rows[0].match_ranges.clear();
+            let encoded = file_bytes(&report, Format::Json).unwrap();
+            let decoded: Report = serde_json::from_slice(&encoded).unwrap();
+            prop_assert_eq!(decoded.rows[0].preview_text.as_str(), payload.as_str());
+            prop_assert_eq!(serde_json::to_value(&decoded).unwrap(), serde_json::to_value(&report).unwrap());
+        }
+
+        #[test]
+        fn r3_18_tsv_controls_cannot_create_extra_rows_or_columns(payload in "[A-Za-z0-9=+@ \\t,\"\\r\\n\\\\]{0,200}") {
+            let mut report = sample(&payload);
+            report.rows[0].match_ranges.clear();
+            let text = table_text(&report, Format::Tsv).unwrap();
+            let lines: Vec<_> = text.split("\r\n").collect();
+            prop_assert_eq!(lines.len(), 3);
+            prop_assert_eq!(lines[0].split('\t').count(), lines[1].split('\t').count());
+            let preview = lines[1].split('\t').nth(6).unwrap();
+            prop_assert!(!preview.contains(['\r', '\n', '\t']));
+            if payload.trim_start().starts_with(['=', '+', '-', '@']) {
+                prop_assert!(preview.starts_with('\''));
+            }
+        }
     }
 }

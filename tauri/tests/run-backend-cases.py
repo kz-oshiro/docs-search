@@ -121,7 +121,10 @@ def main():
             def relative(path):
                 return Path(path).relative_to(root / "search").as_posix()
             def hit_key(hit):
-                return (relative(hit["filePath"]), hit["sourceKind"], json.dumps(hit["location"], sort_keys=True))
+                # The shared conceptual fixture does not encode workbook position.
+                # Check the additive ordering metadata in run-issue-cases.py instead.
+                location = {key: value for key, value in hit["location"].items() if key != "sheetIndex"}
+                return (relative(hit["filePath"]), hit["sourceKind"], json.dumps(location, sort_keys=True))
             actual_hits = {hit_key(hit): hit for hit in results}
             check(len(actual_hits) == len(results), f"{prefix}: duplicate results")
             for wanted in expected["results"]:

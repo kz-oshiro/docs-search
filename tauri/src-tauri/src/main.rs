@@ -1,10 +1,11 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 use docs_search_core::context::{self, ContextError, ContextRange, ContextTarget, ResultContext};
+use docs_search_core::edit::{self, EditDraft, EditView};
 use docs_search_core::report::{self, Format, Report};
-use docs_search_core::{run_search, validate, EventKind, InputError, SearchRequest};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use docs_search_core::{run_search, validate, EventKind, InputError, SearchHit, SearchRequest};
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
@@ -15,6 +16,9 @@ struct ActiveSearch {
 struct SearchSession {
     id: String,
     targets: HashMap<usize, ContextTarget>,
+    hits: HashMap<usize, SearchHit>,
+    drafts: HashMap<String, EditDraft>,
+    edited_paths: HashSet<String>,
 }
 #[derive(Default)]
 struct SearchSessions {
@@ -22,6 +26,7 @@ struct SearchSessions {
     latest: Option<SearchSession>,
 }
 struct SearchState(Mutex<SearchSessions>);
+static NEXT_EDIT: AtomicU64 = AtomicU64::new(1);
 
 fn context_error(code: &'static str, message: &str) -> ContextError {
     ContextError {
@@ -76,6 +81,9 @@ fn start_search(
     current.latest = Some(SearchSession {
         id: search_id.clone(),
         targets: HashMap::new(),
+        hits: HashMap::new(),
+        drafts: HashMap::new(),
+        edited_paths: HashSet::new(),
     });
     current.active = Some(ActiveSearch {
         id: search_id.clone(),
@@ -88,6 +96,13 @@ fn start_search(
         let mut batch = Vec::with_capacity(128);
         let _ = run_search(request, id.clone(), &cancel, |event| {
             if let EventKind::Result { hit } = &event.kind {
+                if let Some(state) = app_for_events.try_state::<SearchState>() {
+                    if let Ok(mut current) = state.0.lock() {
+                        if let Some(session) = current.latest.as_mut().filter(|s| s.id == id) {
+                            session.hits.insert(hit.result_id, hit.clone());
+                        }
+                    }
+                }
                 if let Some(target) = ContextTarget::from_hit(hit, use_index) {
                     if let Some(state) = app_for_events.try_state::<SearchState>() {
                         if let Ok(mut current) = state.0.lock() {
@@ -202,8 +217,143 @@ fn open_result(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn validate_folder_paths(paths: Vec<String>) -> Vec<String> {
+    paths
+        .into_iter()
+        .map(|path| {
+            let candidate = std::path::Path::new(path.trim());
+            if candidate.is_absolute() && candidate.is_dir() {
+                path
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreparedEdit {
+    token: String,
+    view: EditView,
+}
+
+#[tauri::command]
+async fn prepare_result_edit(
+    search_id: String,
+    result_id: usize,
+    evidence_index: Option<usize>,
+    state: tauri::State<'_, SearchState>,
+) -> Result<PreparedEdit, String> {
+    let hit = {
+        let current = state.0.lock().map_err(|_| "検索状態を取得できません。")?;
+        if current.active.is_some() {
+            return Err("検索終了後に編集できます。".into());
+        }
+        let session = current
+            .latest
+            .as_ref()
+            .filter(|s| s.id == search_id)
+            .ok_or("新しい検索が始まりました。")?;
+        let hit = session
+            .hits
+            .get(&result_id)
+            .ok_or("編集する結果が見つかりません。")?;
+        if session.edited_paths.contains(&hit.file_path) {
+            return Err("このファイルは保存後の再検索が必要です。".into());
+        }
+        hit.clone()
+    };
+    let (draft, view) =
+        tauri::async_runtime::spawn_blocking(move || edit::prepare(&hit, evidence_index))
+            .await
+            .map_err(|_| "編集内容を取得できません。")??;
+    let mut current = state.0.lock().map_err(|_| "検索状態を取得できません。")?;
+    if current.active.is_some() {
+        return Err("新しい検索が始まりました。".into());
+    }
+    let session = current
+        .latest
+        .as_mut()
+        .filter(|s| s.id == search_id)
+        .ok_or("新しい検索が始まりました。")?;
+    if session.edited_paths.contains(&view.file_path) {
+        return Err("保存後の再検索が必要です。".into());
+    }
+    let token = format!(
+        "{}:{}:{}",
+        result_id,
+        evidence_index.unwrap_or(usize::MAX),
+        NEXT_EDIT.fetch_add(1, Ordering::Relaxed)
+    );
+    session.drafts.insert(token.clone(), draft);
+    Ok(PreparedEdit { token, view })
+}
+
+#[tauri::command]
+fn save_result_edit(
+    search_id: String,
+    token: String,
+    replacement: String,
+    state: tauri::State<'_, SearchState>,
+) -> Result<(), String> {
+    let mut current = state.0.lock().map_err(|_| "検索状態を取得できません。")?;
+    if current.active.is_some() {
+        return Err("検索中は保存できません。入力を控え、検索終了後に再検索してください。".into());
+    }
+    let session = current
+        .latest
+        .as_mut()
+        .filter(|s| s.id == search_id)
+        .ok_or("新しい検索が始まりました。編集入力を控えてください。")?;
+    let draft = session
+        .drafts
+        .get(&token)
+        .ok_or("編集状態が無効です。入力を控えて再検索してください。")?;
+    let path = draft.path().to_string_lossy().into_owned();
+    if session.edited_paths.contains(&path) {
+        return Err("このファイルは保存後の再検索が必要です。".into());
+    }
+    draft.save(&replacement)?;
+    session.edited_paths.insert(path.clone());
+    session
+        .drafts
+        .retain(|_, draft| draft.path().to_string_lossy() != path);
+    let hits = &session.hits;
+    session
+        .targets
+        .retain(|id, _| hits.get(id).is_some_and(|hit| hit.file_path != path));
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_result_edit(search_id: String, token: String, state: tauri::State<'_, SearchState>) {
+    if let Ok(mut current) = state.0.lock() {
+        if let Some(session) = current.latest.as_mut().filter(|s| s.id == search_id) {
+            session.drafts.remove(&token);
+        }
+    }
+}
+
+#[tauri::command]
 fn format_report(report: Report) -> Result<String, String> {
     report::table_text(&report, Format::Tsv)
+}
+
+#[tauri::command]
+fn preview_batch(
+    query_spec: serde_json::Value,
+) -> Result<Vec<docs_search_core::batch::TermSummary>, InputError> {
+    let batch = docs_search_core::batch::parse(&query_spec)?;
+    Ok(batch
+        .terms
+        .into_iter()
+        .map(|term| docs_search_core::batch::TermSummary {
+            term_id: term.id,
+            term: term.text,
+            ..Default::default()
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -234,8 +384,13 @@ fn main() {
             cancel_search,
             clear_search_index,
             get_result_context,
+            validate_folder_paths,
+            prepare_result_edit,
+            save_result_edit,
+            cancel_result_edit,
             open_result,
             format_report,
+            preview_batch,
             save_report
         ])
         .on_window_event(|window, event| {

@@ -153,10 +153,10 @@ fn best_match<'a>(
             return None;
         }
         if let Some(matched) = fuzzy::evaluate_selected(&unit.text, &term.query, fuzzy_search) {
-            if best
-                .as_ref()
-                .is_none_or(|(_, previous)| matched.score > previous.score)
-            {
+            if best.as_ref().is_none_or(|(previous_unit, previous)| {
+                (matched.score, unit.meta.content_class == "body")
+                    > (previous.score, previous_unit.meta.content_class == "body")
+            }) {
                 best = Some((*unit, matched));
             }
         }
@@ -209,6 +209,38 @@ fn evaluate_group<'a>(
     any_matched.then_some(evidence)
 }
 
+pub(crate) fn same_row_terms(
+    units: &[&Unit],
+    spec: &Conditions,
+    fuzzy_search: bool,
+    cancel: &AtomicBool,
+) -> usize {
+    let mut rows: HashMap<(String, u32), HashSet<String>> = HashMap::new();
+    for unit in units {
+        if !matches!(unit.source_kind, "cell" | "formula") {
+            continue;
+        }
+        let Some(row) = unit.meta.row else {
+            continue;
+        };
+        for term in spec.all.iter().chain(&spec.any) {
+            if cancel.load(Ordering::Relaxed) {
+                return 0;
+            }
+            if fuzzy::evaluate_selected(&unit.text, &term.query, fuzzy_search).is_some() {
+                rows.entry((unit.meta.part_key.clone(), row))
+                    .or_default()
+                    .insert(term.key.clone());
+            }
+        }
+    }
+    rows.values()
+        .map(HashSet::len)
+        .filter(|count| *count > 1)
+        .max()
+        .unwrap_or(0)
+}
+
 fn matches_without_fuzzy(units: &[&Unit], spec: &Conditions, cancel: &AtomicBool) -> bool {
     spec.all
         .iter()
@@ -238,7 +270,7 @@ pub fn evaluate<'a>(
             }
             let key = if spec.scope == Scope::ExcelRow
                 && matches!(file_type, "xlsx" | "xlsm")
-                && unit.source_kind == "cell"
+                && matches!(unit.source_kind, "cell" | "formula")
                 && unit.meta.row.is_some()
             {
                 format!(
@@ -272,7 +304,7 @@ pub fn evaluate<'a>(
         let leader = &evidence[0].unit;
         let is_row = spec.scope == Scope::ExcelRow
             && matches!(file_type, "xlsx" | "xlsm")
-            && leader.source_kind == "cell";
+            && matches!(leader.source_kind, "cell" | "formula");
         let source_kind = if spec.scope == Scope::File {
             "fileMatch"
         } else if is_row {
@@ -283,7 +315,7 @@ pub fn evaluate<'a>(
         let location = if spec.scope == Scope::File {
             json!({})
         } else if is_row {
-            json!({"sheetName": leader.location["sheetName"], "row": leader.meta.row})
+            json!({"sheetName": leader.location["sheetName"], "sheetIndex": leader.location["sheetIndex"], "row": leader.meta.row})
         } else {
             leader.location.clone()
         };

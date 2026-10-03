@@ -16,6 +16,8 @@
 | エラー・中断 | 読めないファイルを混ぜ、検索中に中断する | 個別エラーを表示し、通知済み結果を維持する。終了集計と通知件数が一致する。 |
 | 負荷 | `tests/README.md` の load データと多数セルの Excel で初回・再検索・短語検索を測る | 編集距離を全セルに適用せず、再検索が抽出処理を再実行しない。検索中も中断と画面操作が可能。索引容量と所要時間を記録する。 |
 
-静的確認では `git diff --check` と仕様・コード・結果ラベルの対応を確認する。実行確認の通常手順は `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1` と `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1`。後者は共通ケース、Rust テスト、WASM チェック、ビルドを含む。GUI ではチェックボックスの初期値・4通りの組み合わせ・理由ラベル・強調・完了後の並べ替え・索引削除を確認する。
+静的確認では `git diff --check` と仕様・コード・結果ラベルの対応を確認する。自動テストのみの依頼では、リポジトリルートから `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Automated-Tests.ps1` を使う。共通ケース、Rustテスト、WASM型検査、試験用WASM生成とヘッドレスPlaywrightを含む。Windows配布ビルドまで依頼された場合は、この入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1` を使う。
+
+チェックボックスの初期値・要求オプション・理由ラベル・強調・完了後の並べ替え・索引削除のブラウザー内状態は [Playwright方針](playwright-ui-test-plan.md)の自動項目で確認する。実アプリのOS連携・見た目はM1〜M5に従い、明示依頼または事前確認がある場合に実施する。
 
 一致区分とエラー欄の表示確認は [結果ラベル・エラー表示の確認方針](./result-match-error-test-plan.md) を参照する。

@@ -14,6 +14,11 @@ let issuePaths = new Set();
 let availableTypes = new Set();
 let filterQuery = '';
 let filterExtension = '';
+let filterInclude = '';
+let filterExclude = '';
+let directoryStates = new Map();
+let directoryRows = new Map();
+let nextResultElement = 0;
 let totalHitCount = 0;
 let filteredHitCount = 0;
 let shownGroups = 0;
@@ -26,6 +31,10 @@ let reportFinished = null;
 let reportSearchId = '';
 let reportIssues = [];
 let reportBusy = false;
+let fileRankings = new Map();
+let rankedPaths = [];
+let batchSummary = [];
+let executionSummary = null;
 function clearCopyStatus() {
   if (copyStatusTimer !== null) clearTimeout(copyStatusTimer);
   copyStatusTimer = null;
@@ -67,12 +76,37 @@ export function init_search_mode() {
   const mode = document.getElementById('search-mode');
   function update() {
     const advanced = mode.value === 'conditions';
-    document.getElementById('normal-query-field').hidden = advanced;
+    const batch = mode.value === 'batch';
+    document.getElementById('normal-query-field').hidden = advanced || batch;
     document.getElementById('advanced-conditions').hidden = !advanced;
-    document.getElementById('query').disabled = advanced;
+    document.getElementById('batch-input').hidden = !batch;
+    document.getElementById('query').disabled = advanced || batch;
     set_text('query-error', ''); set_text('advanced-error', '');
   }
   mode.addEventListener('change', update);
+  let revision = 0;
+  let previewTimer;
+  async function previewBatch(number) {
+    const terms = document.getElementById('batch-terms').value.split(/\r?\n/);
+    const matchMode = document.getElementById('batch-match-mode').value;
+    const invalid = terms.map((text,index) => ({text:text.trim(),line:index+1})).filter(item => item.text && matchMode === 'identifier' && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.text));
+    if (invalid.length) {
+      set_text('batch-count', `入力 ${terms.filter(text=>text.trim()).length} 行`);
+      set_text('batch-error', `${invalid.slice(0,5).map(item=>`行${item.line}「${item.text}」`).join('、')}は識別子として扱えません。「通常の文字列検索」に切り替えてください。`);
+      return;
+    }
+    try {
+      const entries = await window.__TAURI__.core.invoke('preview_batch', { querySpec: {mode:'batch', terms, matchMode} });
+      if (number === revision) { set_text('batch-count', `${entries.length} 語（空行・重複を除去）`); set_text('batch-error',''); }
+    } catch (error) { if (number === revision) set_text('batch-error', error?.message ?? String(error)); }
+  }
+  function scheduleBatchPreview() {
+    const number = ++revision;
+    window.clearTimeout(previewTimer);
+    previewTimer = window.setTimeout(() => { void previewBatch(number); }, 120);
+  }
+  document.getElementById('batch-terms').addEventListener('input', scheduleBatchPreview);
+  document.getElementById('batch-match-mode').addEventListener('change', scheduleBatchPreview);
   update();
 }
 function refreshFolderLabels(container, label) {
@@ -83,7 +117,7 @@ function refreshFolderLabels(container, label) {
     if (remove) remove.setAttribute('aria-label', `${label} ${index + 1} を削除`);
   });
 }
-function addFolderRow(container, label, errorId) {
+function addFolderRow(container, label, errorId, focus = true) {
   const row = document.createElement('div'); row.className = 'folder-row';
   const entry = document.createElement('input'); entry.className = 'folder-input'; entry.type = 'text'; entry.autocomplete = 'off';
   entry.placeholder = 'フォルダーのパス'; entry.setAttribute('aria-describedby', errorId);
@@ -92,17 +126,25 @@ function addFolderRow(container, label, errorId) {
   row.append(entry, browse, remove);
   container.append(row);
   refreshFolderLabels(container, label);
-  entry.focus();
+  if (focus) entry.focus();
+  return entry;
 }
 export function init_folder_lists() {
+  const storageKey = 'docs-search.folders.v1';
+  let folderRevision = 0;
+  function persist() {
+    folderRevision++;
+    try { localStorage.setItem(storageKey, JSON.stringify({roots:selected_folders('root-folders'),excluded:selected_folders('excluded-folders')})); set_text('folder-save-status','フォルダー入力は次回起動時にも使います。'); }
+    catch { set_text('folder-save-status','フォルダー入力を保存できません。この起動中だけ使用します。'); }
+  }
   for (const [containerId, addId, label, errorId] of [
     ['root-folders', 'add-root', '検索フォルダー', 'root-error'],
     ['excluded-folders', 'add-excluded', '対象外フォルダー', 'excluded-error']
   ]) {
     const container = document.getElementById(containerId);
     refreshFolderLabels(container, label);
-    document.getElementById(addId).addEventListener('click', () => addFolderRow(container, label, errorId));
-    container.addEventListener('input', () => set_text(errorId, ''));
+    document.getElementById(addId).addEventListener('click', () => { addFolderRow(container, label, errorId); persist(); });
+    container.addEventListener('input', () => { set_text(errorId, ''); persist(); });
     container.addEventListener('click', async event => {
       const button = event.target.closest('button');
       if (!button) return;
@@ -110,6 +152,7 @@ export function init_folder_lists() {
         button.closest('.folder-row').remove();
         refreshFolderLabels(container, label);
         set_text(errorId, '');
+        persist();
       } else if (button.classList.contains('folder-browse')) {
         try {
           const path = await window.__TAURI__.core.invoke('pick_folder');
@@ -117,6 +160,7 @@ export function init_folder_lists() {
             button.closest('.folder-row').querySelector('.folder-input').value = path;
             set_text(errorId, '');
             set_text('general-error', '');
+            persist();
           }
         } catch {
           set_text('general-error', 'フォルダーを選択できませんでした。パスを入力してください。');
@@ -124,6 +168,28 @@ export function init_folder_lists() {
       }
     });
   }
+  async function restore() {
+    let saved;
+    try { saved=JSON.parse(localStorage.getItem(storageKey) ?? 'null'); }
+    catch { set_text('folder-save-status','保存したフォルダー入力を読み取れません。パスを入力してください。'); return; }
+    if (!saved || !Array.isArray(saved.roots) || !Array.isArray(saved.excluded) || saved.roots.length < 1 || [...saved.roots,...saved.excluded].some(value=>typeof value!=='string')) return;
+    const version=folderRevision;
+    document.getElementById('search').disabled=true;
+    try {
+      const validated=await window.__TAURI__.core.invoke('validate_folder_paths',{paths:[...saved.roots,...saved.excluded]});
+      if (version!==folderRevision) return;
+      for (const [id,label,errorId,values] of [['root-folders','検索フォルダー','root-error',validated.slice(0,saved.roots.length)],['excluded-folders','対象外フォルダー','excluded-error',validated.slice(saved.roots.length)]]) {
+        const container=document.getElementById(id);
+        if (id==='root-folders') { const first=container.firstElementChild; container.replaceChildren(first); first.querySelector('.folder-input').value=values[0]; for (const value of values.slice(1)) addFolderRow(container,label,errorId,false).value=value; }
+        else { container.replaceChildren(); for (const value of values) addFolderRow(container,label,errorId,false).value=value; }
+        refreshFolderLabels(container,label);
+      }
+      persist();
+      if (validated.some((value,index)=>!value && [...saved.roots,...saved.excluded][index].trim())) set_text('folder-save-status','無効になったフォルダー欄を空欄にしました。有効な入力と欄の順序は復元しています。');
+    } catch { set_text('folder-save-status','保存したフォルダーを確認できません。パスを入力してください。'); }
+    finally { document.getElementById('search').disabled=false; }
+  }
+  void restore();
 }
 export function selected_folders(id) {
   return Array.from(document.querySelectorAll(`#${id} .folder-input`), entry => entry.value.trim());
@@ -164,9 +230,43 @@ function matchesFilter(group) {
   return (!filterExtension || group.fileType.toLowerCase() === filterExtension)
     && (!filterQuery || normalizeFilterText(group.path).includes(filterQuery));
 }
+function matchesBody(hit) {
+  const texts = hit.evidence?.length ? hit.evidence.map(evidence => evidence.previewText) : [hit.previewText];
+  const body = texts.map(text => normalizeFilterText(text ?? '')).join('\n');
+  return (!filterInclude || body.includes(filterInclude)) && (!filterExclude || !body.includes(filterExclude));
+}
+function compareHits(a, b) {
+  const left = a.hit.documentOrder ?? [], right = b.hit.documentOrder ?? [];
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const difference = (left[i] ?? 0) - (right[i] ?? 0);
+    if (difference) return difference;
+  }
+  const lexical=(left,right)=>left<right ? -1 : left>right ? 1 : 0;
+  return lexical(String(a.hit.termId ?? ''),String(b.hit.termId ?? '')) || lexical(String(a.hit.unitKey),String(b.hit.unitKey)) || a.hit.resultId - b.hit.resultId;
+}
+function insertHit(items, item) {
+  let first = 0, last = items.length;
+  while (first < last) { const middle = Math.floor((first + last) / 2); if (compareHits(items[middle], item) <= 0) first = middle + 1; else last = middle; }
+  items.splice(first, 0, item);
+  return first;
+}
+function parentDirectory(path) { const boundary = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')); return boundary < 0 ? path : path.slice(0, boundary + (boundary === 2 && path[1] === ':' ? 1 : 0)); }
+function directoryKey(path) { return path.replaceAll('/', '\\').toLocaleLowerCase(); }
+function updateDirectoryCounts() {
+  const counts = new Map();
+  for (const group of filteredGroups) {
+    const key = directoryKey(parentDirectory(group.path));
+    const count = counts.get(key) ?? {files:0, hits:0, errors:0};
+    count.files++; count.hits += group.visibleHits.length; count.errors += group.hasIssue ? 1 : 0; counts.set(key, count);
+  }
+  for (const [key, row] of directoryRows) {
+    const count = counts.get(key) ?? {files:0,hits:0,errors:0};
+    row.count.textContent = `${count.files} ファイル · ${count.hits} 件${count.errors ? ` · エラー ${count.errors} ファイル` : ''}`;
+  }
+}
 function updateFilterSummary() {
   set_text('result-filter-summary', `絞り込み後 ${filteredGroups.length} / ${fileGroups.length} ファイル · ${filteredHitCount} / ${totalHitCount} 件`);
-  document.getElementById('result-filter-clear').disabled = !filterQuery && !filterExtension;
+  document.getElementById('result-filter-clear').disabled = !filterQuery && !filterExtension && !filterInclude && !filterExclude;
   updateReportSummary();
 }
 function updateReportSummary() {
@@ -176,7 +276,7 @@ function updateReportSummary() {
   set_text('export-summary', `${files} ファイル · ${hits} 件を対象`);
 }
 function setReportEnabled(enabled) {
-  for (const id of ['copy-results', 'save-csv', 'save-tsv', 'save-report']) {
+  for (const id of ['copy-results', 'save-csv', 'save-tsv', 'save-report', 'save-matrix-csv', 'save-matrix-tsv']) {
     document.getElementById(id).disabled = !enabled;
   }
 }
@@ -188,11 +288,14 @@ function makeReport() {
     finishedReason: reportFinished.reason, counts: reportFinished.counts, scope,
     filterText: scope === 'filtered' ? document.getElementById('result-filter-text').value.trim() : '',
     filterExtension: scope === 'filtered' ? filterExtension : '',
+    filterInclude: scope === 'filtered' ? document.getElementById('result-filter-include').value.trim() : '',
+    filterExclude: scope === 'filtered' ? document.getElementById('result-filter-exclude').value.trim() : '',
     selectedFileCount: groups.length,
-    rows: groups.flatMap(group => group.hits.map(({ hit, location }) => ({
+    rows: groups.flatMap(group => (scope === 'filtered' ? group.visibleHits : group.hits).map(({ hit, location }) => ({
       resultId: hit.resultId,
       fileName: group.path.split(/[\\/]/).pop() || group.path,
       filePath: group.path, fileType: group.fileType,
+      modifiedAt: group.modifiedAt, documentOrder: hit.documentOrder,
       sourceKind: hit.sourceKind, unitKey: hit.unitKey, partKey: hit.partKey,
       groupKey: hit.groupKey, row: hit.row ?? null, column: hit.column ?? null,
       contentClass: hit.contentClass, anchor: hit.anchor ?? null,
@@ -200,14 +303,18 @@ function makeReport() {
       previewText: hit.previewText, previewTruncated: hit.previewTruncated,
       matchRanges: hit.matchRanges, matchType: hit.matchType,
       matchCategory: hit.matchCategory, score: hit.score,
-      evidence: hit.evidence ?? []
+      evidence: hit.evidence ?? [], termId: hit.termId ?? null, term: hit.term ?? null
     }))),
-    issues: reportIssues
+    issues: reportIssues, rankings: rankedPaths.map(path=>fileRankings.get(path)).filter(Boolean), batchSummary, executionSummary
   };
 }
 export function report_started(searchId, request) {
   reportSearchId = searchId;
   reportRequest = request;
+  const batch = request.querySpec?.mode === 'batch';
+  for (const id of ['save-matrix-csv','save-matrix-tsv']) document.getElementById(id).hidden = !batch;
+  document.getElementById('batch-results').hidden = !batch;
+  if (batch) set_text('batch-summary-list', '検索中…');
 }
 export function report_finished(reason, counts) {
   reportFinished = { reason, counts };
@@ -215,7 +322,7 @@ export function report_finished(reason, counts) {
 }
 export function init_report_actions() {
   document.getElementById('export-scope').addEventListener('change', updateReportSummary);
-  for (const [id, format] of [['copy-results', 'copy'], ['save-csv', 'csv'], ['save-tsv', 'tsv'], ['save-report', 'json']]) {
+  for (const [id, format] of [['copy-results', 'copy'], ['save-csv', 'csv'], ['save-tsv', 'tsv'], ['save-report', 'json'], ['save-matrix-csv','matrixcsv'], ['save-matrix-tsv','matrixtsv']]) {
     document.getElementById(id).addEventListener('click', async () => {
       if (!reportFinished || !reportRequest || reportBusy) return;
       const report = makeReport();
@@ -255,16 +362,21 @@ function addFilterType(fileType) {
 function applyResultFilter() {
   filterQuery = normalizeFilterText(document.getElementById('result-filter-text').value.trim());
   filterExtension = document.getElementById('result-filter-extension').value;
+  filterInclude = normalizeFilterText(document.getElementById('result-filter-include').value.trim());
+  filterExclude = normalizeFilterText(document.getElementById('result-filter-exclude').value.trim());
   if (renderFrame !== null) cancelAnimationFrame(renderFrame);
   renderFrame = null;
   document.getElementById('results').replaceChildren();
+  directoryRows = new Map();
   filteredGroups = [];
   filteredHitCount = 0;
   for (const group of fileGroups) {
     group.row = null; group.heading = null; group.count = null; group.matches = null; group.errorBadge = null; group.rendered = 0;
-    group.inFilter = matchesFilter(group);
+    group.visibleHits = group.hits.filter(item => matchesBody(item.hit));
+    group.inFilter = matchesFilter(group) && group.visibleHits.length > 0;
     group.filteredIndex = group.inFilter ? filteredGroups.length : -1;
-    if (group.inFilter) { filteredGroups.push(group); filteredHitCount += group.hits.length; }
+    if (group.inFilter) { filteredGroups.push(group); filteredHitCount += group.visibleHits.length; }
+    group.dirty = false;
   }
   shownGroups = 0; visibleLimit = pageSize; pendingGroups = new Set();
   if (totalHitCount > 0) set_text('empty-state', filteredGroups.length === 0
@@ -274,11 +386,15 @@ function applyResultFilter() {
   if (filteredGroups.length > 0) scheduleRender();
 }
 export function init_result_filter() {
+  document.getElementById('result-filter-include').addEventListener('input', applyResultFilter);
+  document.getElementById('result-filter-exclude').addEventListener('input', applyResultFilter);
   document.getElementById('result-filter-text').addEventListener('input', applyResultFilter);
   document.getElementById('result-filter-extension').addEventListener('change', applyResultFilter);
   document.getElementById('result-filter-clear').addEventListener('click', () => {
     document.getElementById('result-filter-text').value = '';
     document.getElementById('result-filter-extension').value = '';
+    document.getElementById('result-filter-include').value = '';
+    document.getElementById('result-filter-exclude').value = '';
     applyResultFilter();
   });
 }
@@ -287,11 +403,21 @@ function createGroup(group) {
   const heading = document.createElement('div'); heading.className = 'result-heading';
   const type = document.createElement('span'); type.className = 'file-type'; type.dataset.type = group.fileType.toLowerCase(); type.textContent = `.${group.fileType.toLowerCase()}`;
   const name = document.createElement('a'); name.className = 'file-name'; name.href = '#'; name.textContent = group.path.split(/[\\/]/).pop() || group.path;
-  const count = document.createElement('span'); count.className = 'match-count'; count.textContent = `${group.hits.length} 件`;
-  heading.append(type, name, count);
+  const count = document.createElement('span'); count.className = 'match-count'; count.textContent = `${group.visibleHits.length} / ${group.hits.length} 件`;
+  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'result-toggle';
+  heading.append(toggle, type, name, count);
   const path = document.createElement('span'); path.className = 'path'; path.textContent = group.path;
   const matches = document.createElement('div'); matches.className = 'matches'; matches.setAttribute('role', 'list');
-  row.append(heading, path, matches);
+  const modified = document.createElement('span'); modified.className = 'modified-at';
+  const dateFormat=new Intl.DateTimeFormat('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  modified.textContent = Number.isFinite(group.modifiedAt) ? `更新 ${dateFormat.format(new Date(group.modifiedAt))}（${dateFormat.resolvedOptions().timeZone}）` : '更新日時を取得できません';
+  row.append(heading, path, modified, matches);
+  if (group.needsResearch) { const stale = document.createElement('strong'); stale.className='edited-notice'; stale.textContent='保存済み · このファイルの結果は再検索が必要です'; row.insertBefore(stale,matches); }
+  matches.id = `file-matches-${++nextResultElement}`; toggle.setAttribute('aria-controls', matches.id);
+  function updateCollapse() { matches.hidden = group.collapsed; toggle.textContent = group.collapsed ? '展開' : '折りたたむ'; toggle.setAttribute('aria-expanded', String(!group.collapsed)); toggle.setAttribute('aria-label', `${name.textContent}の一致箇所を${group.collapsed ? '展開' : '折りたたむ'}`); }
+  toggle.addEventListener('click', () => { group.collapsed = !group.collapsed; updateCollapse(); }); updateCollapse();
+  const ranking = fileRankings.get(group.path);
+  if (ranking) { const reason = document.createElement('p'); reason.className = 'ranking-reasons'; reason.textContent = ranking.reasons.join(' · '); row.insertBefore(reason, matches); }
   name.addEventListener('click', event => {
     event.preventDefault();
     void open_file(group.path);
@@ -302,6 +428,22 @@ function createGroup(group) {
   group.matches = matches;
   if (group.hasIssue) markGroupError(group);
   return row;
+}
+function directoryHost(group) {
+  const path = parentDirectory(group.path), key = directoryKey(path);
+  let directory = directoryRows.get(key);
+  if (directory) return directory.body;
+  const row = document.createElement('div'); row.className = 'directory-result'; row.setAttribute('role','listitem');
+  const heading = document.createElement('div'); heading.className = 'directory-heading';
+  const toggle = document.createElement('button'); toggle.type = 'button';
+  const name = document.createElement('strong'); name.textContent = path;
+  const count = document.createElement('span'); count.className='directory-count';
+  const body = document.createElement('div'); body.className='directory-files'; body.setAttribute('role','list'); body.id=`directory-files-${++nextResultElement}`;
+  toggle.setAttribute('aria-controls',body.id);
+  function update() { const collapsed=directoryStates.get(key) ?? false; body.hidden=collapsed; toggle.textContent=collapsed ? '展開' : '折りたたむ'; toggle.setAttribute('aria-expanded',String(!collapsed)); toggle.setAttribute('aria-label',`${path}を${collapsed ? '展開' : '折りたたむ'}`); }
+  toggle.addEventListener('click',()=>{directoryStates.set(key,!(directoryStates.get(key) ?? false));update();}); update();
+  heading.append(toggle,name,count); row.append(heading,body); document.getElementById('results').append(row);
+  directory={row,body,count}; directoryRows.set(key,directory); return body;
 }
 function excelColumn(number) {
   let name = '';
@@ -335,6 +477,15 @@ function renderExcelContext(host, context, load) {
   const caption = document.createElement('caption');
   caption.textContent = '保存済みセル値。空欄は保存済みの値がありません。';
   table.append(caption);
+  const layout=context.layout ?? {rows:[],columns:[],cells:[],notes:[]};
+  const colgroup=document.createElement('colgroup'); colgroup.append(document.createElement('col'));
+  for (let column=firstColumn;column<=lastColumn;column++) {
+    const col=document.createElement('col'); const saved=layout.columns.find(item=>item.first<=column && column<=item.last);
+    const width=saved?.width ?? layout.defaultColumnWidth;
+    if (Number.isFinite(width)) col.style.width=`${Math.max(35,Math.min(450,width*7+5))}px`;
+    colgroup.append(col);
+  }
+  table.append(colgroup); table.classList.add('excel-layout-table');
   const header = document.createElement('tr');
   const corner = document.createElement('th'); corner.scope = 'col'; corner.textContent = '行 / 列'; header.append(corner);
   const hiddenRows = new Set(context.hiddenRows);
@@ -346,30 +497,59 @@ function renderExcelContext(host, context, load) {
   }
   const thead = document.createElement('thead'); thead.append(header); table.append(thead);
   const values = new Map(context.cells.map(cell => [`${cell.row}:${cell.column}`, cell]));
+  const styles=new Map(layout.cells.map(cell=>[`${cell.row}:${cell.column}`,cell.style]));
   const evidenceAddresses = new Set(context.evidenceAddresses ?? []);
   const body = document.createElement('tbody');
   for (let row = context.firstRow; row < context.firstRow + context.rowCount; row++) {
     const tr = document.createElement('tr');
+    const height=layout.rows.find(item=>item.row===row)?.height ?? layout.defaultRowHeight;
+    if (Number.isFinite(height)) tr.style.height=`${Math.max(20,Math.min(200,height*4/3))}px`;
     const th = document.createElement('th'); th.scope = 'row';
     th.textContent = String(row) + (hiddenRows.has(row) ? ' (非表示)' : ''); tr.append(th);
     for (let column = firstColumn; column <= lastColumn; column++) {
+      const merge=contextMergeAt(context,row,column);
+      const mergeRow=merge ? Math.max(merge.firstRow,context.firstRow) : row;
+      const mergeColumn=merge ? Math.max(merge.firstColumn,firstColumn) : column;
+      if (merge && (row!==mergeRow || column!==mergeColumn)) continue;
       const td = document.createElement('td');
       const address = `${excelColumn(column)}${row}`;
       const cell = values.get(`${row}:${column}`);
-      td.textContent = cell ? cell.text + (cell.truncated ? '…' : '') : '';
-      td.title = address;
-      if (address === context.focusAddress || evidenceAddresses.has(address)) td.classList.add('excel-context-focus');
-      const merge = contextMergeAt(context, row, column);
+      if (cell) { renderPreview(td,{previewText:cell.text,matchRanges:cell.matchRanges ?? []}); if (cell.truncated) td.append(document.createTextNode('…')); }
+      else if (merge?.anchorText) td.textContent=merge.anchorText+(merge.anchorTruncated ? '…' : '');
+      td.title = `${address}${cell ? ': '+cell.text+(cell.truncated ? '…' : '') : merge?.anchorText ? ': '+merge.anchorText : ''}`;
+      const format=styles.get(`${row}:${column}`);
+      if (format) {
+        if (format.horizontal) td.style.textAlign=format.horizontal;
+        if (format.vertical) td.style.verticalAlign=format.vertical==='center' ? 'middle' : format.vertical;
+        td.style.whiteSpace=format.wrap ? 'pre-wrap' : 'pre';
+        td.style.fontWeight=format.bold ? '700' : '400'; td.style.fontStyle=format.italic ? 'italic' : 'normal';
+        td.style.textDecoration=[format.underline ? 'underline' : '',format.strike ? 'line-through' : ''].filter(Boolean).join(' ') || 'none';
+        if (format.fontName) td.style.fontFamily=format.fontName;
+        if (Number.isFinite(format.fontSize)) td.style.fontSize=`${Math.max(6,Math.min(72,format.fontSize))}pt`;
+        if (format.color) td.style.color=format.color; if (format.fill) td.style.backgroundColor=format.fill;
+        for (const [index,side] of ['Top','Right','Bottom','Left'].entries()) {if(format.borders?.[index]) td.style[`border${side}`]=format.borders[index];}
+      }
+      let focus=address===context.focusAddress || evidenceAddresses.has(address);
       if (merge) {
+        td.rowSpan=Math.min(merge.lastRow,context.firstRow+context.rowCount-1)-row+1;
+        td.colSpan=Math.min(merge.lastColumn,lastColumn)-column+1;
         td.classList.add('excel-context-merged');
         td.title += ` · 結合 ${merge.anchorAddress}:${excelColumn(merge.lastColumn)}${merge.lastRow} · 起点 ${merge.anchorAddress}`;
+        for (let mergeR=Math.max(merge.firstRow,context.firstRow);mergeR<=Math.min(merge.lastRow,context.firstRow+context.rowCount-1);mergeR++) {
+          for (let mergeC=Math.max(merge.firstColumn,firstColumn);mergeC<=Math.min(merge.lastColumn,lastColumn);mergeC++) {
+            const mergedAddress=`${excelColumn(mergeC)}${mergeR}`;
+            if(mergedAddress===context.focusAddress || evidenceAddresses.has(mergedAddress)) focus=true;
+          }
+        }
       }
+      if(focus) td.classList.add('excel-context-focus');
       tr.append(td);
     }
     body.append(tr);
   }
   table.append(body); scroller.append(table);
   const notes = document.createElement('div'); notes.className = 'excel-context-notes';
+  for (const text of layout.notes) { const note=document.createElement('p');note.textContent=text;notes.append(note); }
   for (const merge of context.merges) {
     const note = document.createElement('p');
     const range = `${merge.anchorAddress}:${excelColumn(merge.lastColumn)}${merge.lastRow}`;
@@ -382,7 +562,7 @@ function renderExcelContext(host, context, load) {
 }
 function addExcelContext(item, hit) {
   if (!['xlsx', 'xlsm'].includes(hit.fileType.toLowerCase())) return;
-  if (!['cell', 'shape', 'excelRow'].includes(hit.sourceKind)) return;
+  if (!['cell', 'formula', 'shape', 'excelRow'].includes(hit.sourceKind)) return;
   if (hit.sourceKind === 'shape' && !hit.anchor) {
     const unavailable = document.createElement('span'); unavailable.className = 'excel-context-unavailable';
     unavailable.textContent = '図形のアンカー位置がないため、周辺セルを表示できません。';
@@ -423,6 +603,74 @@ function addExcelContext(item, hit) {
     void load(null);
   });
 }
+let activeEdit = null;
+function addEditAction(item, group, hit) {
+  const supported=hit.evidence?.length ? hit.evidence.some(evidence=>evidence.editAnchor) : Boolean(hit.editAnchor);
+  if (!supported || group.needsResearch) {
+    const reason=document.createElement('small'); reason.className='edit-unavailable';
+    reason.textContent=group.needsResearch ? '保存済みのため再検索してから編集できます。' : hit.sourceKind==='fileName' ? 'ファイル名一致は直接編集できません。' : 'Office形式・位置を特定できない結果は元ファイルを開いて編集してください。';
+    item.append(reason); return;
+  }
+  const button=document.createElement('button'); button.type='button'; button.className='edit-result'; button.textContent='一致箇所を編集';
+  button.addEventListener('click',()=>{
+    if (group.needsResearch) { set_text('general-error','このファイルは保存後の再検索が必要です。'); return; }
+    if (!reportFinished) { set_text('general-error','検索終了後に編集できます。'); return; }
+    if (activeEdit) { document.getElementById('result-editor').showModal(); return; }
+    const dialog=document.getElementById('result-editor');
+    const select=document.getElementById('edit-evidence'); select.replaceChildren();
+    const candidates=hit.evidence?.length ? hit.evidence.map((evidence,index)=>({evidence,index})).filter(item=>item.evidence.editAnchor) : [{evidence:hit,index:null}];
+    for (const {evidence,index} of candidates) { const option=document.createElement('option'); option.value=index===null ? '' : String(index); option.textContent=`${evidence.term ? evidence.term+' · ' : ''}${evidence.locationText ?? locationForEdit(evidence)} · 一致箇所`; select.append(option); }
+    select.disabled=candidates.length===1;
+    activeEdit={searchId:reportSearchId,hit,group,token:null,button,busy:false};
+    document.getElementById('edit-replacement').value='';
+    document.getElementById('edit-save').disabled=true;
+    set_text('edit-error',''); set_text('edit-location',group.path); set_text('edit-context','編集する根拠を選び、「読み込む」で元の一致箇所を取得してください。');
+    dialog.showModal();
+  }); item.append(button);
+}
+function locationForEdit(hit) { return hit.location?.lineNumber ? `行 ${hit.location.lineNumber}` : '選択した箇所'; }
+export function init_edit_actions() {
+  const dialog=document.getElementById('result-editor');
+  async function cancelEdit() {
+    if (!activeEdit || activeEdit.busy) return;
+    const edit=activeEdit; activeEdit=null; dialog.close();
+    document.getElementById('search').disabled=false;
+    if (edit.token) await window.__TAURI__.core.invoke('cancel_result_edit',{searchId:edit.searchId,token:edit.token}).catch(()=>{});
+    if (edit.button.isConnected) edit.button.focus();
+  }
+  dialog.addEventListener('cancel',event=>{event.preventDefault();void cancelEdit();});
+  document.getElementById('edit-cancel').addEventListener('click',()=>void cancelEdit());
+  document.getElementById('edit-evidence').addEventListener('change',()=>{document.getElementById('edit-save').disabled=true;set_text('edit-error','根拠を切り替えるには読み込みを選んでください。編集中の文字列は読み込むまで保持しています。');});
+  document.getElementById('edit-load').addEventListener('click',async()=>{
+    const edit=activeEdit; if (!edit || edit.busy) return;
+    edit.busy=true; document.getElementById('edit-load').disabled=true; document.getElementById('edit-save').disabled=true; document.getElementById('edit-evidence').disabled=true;
+    set_text('edit-error','');
+    try {
+      if (edit.token) await window.__TAURI__.core.invoke('cancel_result_edit',{searchId:edit.searchId,token:edit.token});
+      edit.token=null;
+      const value=document.getElementById('edit-evidence').value;
+      const prepared=await window.__TAURI__.core.invoke('prepare_result_edit',{searchId:edit.searchId,resultId:edit.hit.resultId,evidenceIndex:value==='' ? null : Number(value)});
+      if (activeEdit!==edit) return;
+      edit.token=prepared.token;
+      set_text('edit-location',`${prepared.view.filePath} · 行 ${prepared.view.lineNumber} · ${prepared.view.encoding}`);
+      set_text('edit-context',`${prepared.view.before}【${prepared.view.selectedText}】${prepared.view.after}`);
+      document.getElementById('edit-replacement').value=prepared.view.selectedText;
+      document.getElementById('edit-save').disabled=false; document.getElementById('edit-replacement').focus();
+      document.getElementById('search').disabled=true;
+    } catch (error) { set_text('edit-error',error?.message ?? String(error)); }
+    finally { edit.busy=false; document.getElementById('edit-load').disabled=false; document.getElementById('edit-evidence').disabled=document.getElementById('edit-evidence').options.length===1; }
+  });
+  document.getElementById('edit-save').addEventListener('click',async()=>{
+    const edit=activeEdit; if (!edit?.token || edit.busy) return;
+    edit.busy=true; document.getElementById('edit-save').disabled=true; document.getElementById('edit-load').disabled=true; document.getElementById('edit-evidence').disabled=true;
+    try {
+      await window.__TAURI__.core.invoke('save_result_edit',{searchId:edit.searchId,token:edit.token,replacement:document.getElementById('edit-replacement').value});
+      edit.group.needsResearch=true; activeEdit=null; dialog.close(); document.getElementById('search').disabled=false;
+      set_text('copy-status','一致箇所を保存しました。このファイルの検索結果は再検索して更新してください。'); applyResultFilter();
+    } catch (error) { set_text('edit-error',error?.message ?? String(error)); document.getElementById('edit-save').disabled=false; }
+    finally { edit.busy=false; document.getElementById('edit-load').disabled=false; document.getElementById('edit-evidence').disabled=document.getElementById('edit-evidence').options.length===1; }
+  });
+}
 function createMatch(group, { hit, location }) {
   const item = document.createElement('div'); item.className = 'match'; item.setAttribute('role', 'listitem');
   const heading = document.createElement('div'); heading.className = 'match-heading';
@@ -436,6 +684,7 @@ function createMatch(group, { hit, location }) {
   const labels = { exact: '完全一致', caseFolded: '表記揺れ', normalized: '表記揺れ', separatorVariant: '表記揺れ', identifier: '識別子一致', kanaVariant: '表記揺れ', prefix: '前方一致', substring: '部分一致', editDistance: 'タイプミス候補' };
   const reason = document.createElement('span'); reason.className = 'match-type'; reason.textContent = labels[hit.matchType] || '一致';
   heading.append(place, category, reason, copy);
+  if (hit.term) { const term = document.createElement('strong'); term.textContent = hit.term; heading.prepend(term); }
   item.append(heading);
   if (hit.evidence?.length) {
     const list = document.createElement('ul'); list.className = 'evidence-list';
@@ -453,6 +702,7 @@ function createMatch(group, { hit, location }) {
     item.append(preview);
   }
   addExcelContext(item, hit);
+  addEditAction(item, group, hit);
   copy.addEventListener('click', async () => {
     set_text('general-error', '');
     clearCopyStatus();
@@ -477,24 +727,25 @@ function scheduleRender() {
 }
 function renderPending() {
   renderFrame = null;
-  const fragment = document.createDocumentFragment();
   const until = Math.min(visibleLimit, filteredGroups.length);
   for (; shownGroups < until; shownGroups++) {
     const group = filteredGroups[shownGroups];
-    fragment.append(createGroup(group));
+    directoryHost(group).append(createGroup(group));
     pendingGroups.add(group);
   }
-  document.getElementById('results').append(fragment);
+  updateDirectoryCounts();
   let budget = pageSize;
   for (const group of Array.from(pendingGroups)) {
+    if (!group.matches) { pendingGroups.delete(group); continue; }
+    if (group.dirty) { group.matches.replaceChildren(); group.rendered=0; group.dirty=false; }
     const matches = document.createDocumentFragment();
-    while (group.rendered < group.hits.length && budget > 0) {
-      matches.append(createMatch(group, group.hits[group.rendered++]));
+    while (group.rendered < group.visibleHits.length && budget > 0) {
+      matches.append(createMatch(group, group.visibleHits[group.rendered++]));
       budget--;
     }
     group.matches.append(matches);
     pendingGroups.delete(group);
-    if (group.rendered < group.hits.length) pendingGroups.add(group);
+    if (group.rendered < group.visibleHits.length) pendingGroups.add(group);
     if (budget === 0) break;
   }
   updateMore();
@@ -524,9 +775,16 @@ export function clear_results() {
   const panel = document.getElementById('issues-panel'); panel.hidden = true; panel.open = false;
   set_text('issue-count', '0');
   fileGroups = []; filteredGroups = []; groupsByPath = new Map(); issuePaths = new Set(); availableTypes = new Set();
+  directoryStates = new Map(); directoryRows = new Map();
   reportRequest = null; reportFinished = null; reportSearchId = ''; reportIssues = [];
+  fileRankings = new Map(); rankedPaths = []; batchSummary = []; executionSummary = null;
+  document.getElementById('batch-results').hidden = true;
+  document.getElementById('batch-summary-list').replaceChildren(); document.getElementById('batch-matrix-content').replaceChildren();
+  document.getElementById('batch-matrix').ontoggle = null;
+  document.getElementById('batch-matrix').open = false;
   setReportEnabled(false);
-  filterQuery = ''; filterExtension = ''; totalHitCount = 0; filteredHitCount = 0;
+  filterQuery = ''; filterExtension = ''; filterInclude=''; filterExclude=''; totalHitCount = 0; filteredHitCount = 0;
+  document.getElementById('result-filter-include').value = ''; document.getElementById('result-filter-exclude').value = '';
   document.getElementById('result-filter-text').value = '';
   document.getElementById('export-scope').value = 'filtered';
   const typeSelect = document.getElementById('result-filter-extension');
@@ -539,33 +797,77 @@ export function clear_results() {
 export function add_hit(hit, location) {
   let group = groupsByPath.get(hit.filePath);
   if (!group) {
-    group = { path: hit.filePath, fileType: hit.fileType, hits: [], rendered: 0, hasIssue: issuePaths.has(hit.filePath), row: null, inFilter: false, filteredIndex: -1 };
+    group = { path: hit.filePath, fileType: hit.fileType, modifiedAt:hit.modifiedAt, hits: [], visibleHits:[], collapsed:false, dirty:false, needsResearch:false, rendered: 0, hasIssue: issuePaths.has(hit.filePath), row: null, inFilter: false, filteredIndex: -1 };
     groupsByPath.set(hit.filePath, group);
     fileGroups.push(group);
     addFilterType(hit.fileType);
-    group.inFilter = matchesFilter(group);
-    if (group.inFilter) { group.filteredIndex = filteredGroups.length; filteredGroups.push(group); }
   }
-  group.hits.push({ hit, location });
+  const item = {hit,location}; insertHit(group.hits,item);
   totalHitCount++;
-  if (group.inFilter) {
+  if (matchesFilter(group) && matchesBody(hit)) {
+    const position=insertHit(group.visibleHits,item);
+    if (!group.inFilter) { group.inFilter=true; group.filteredIndex=filteredGroups.length; filteredGroups.push(group); }
     filteredHitCount++;
-    if (group.count) group.count.textContent = `${group.hits.length} 件`;
+    group.dirty = group.dirty || position < group.rendered;
+    if (group.count) group.count.textContent = `${group.visibleHits.length} / ${group.hits.length} 件`;
     if (group.filteredIndex < visibleLimit) { pendingGroups.add(group); scheduleRender(); }
+    else scheduleRender();
   }
+  if (group.count) group.count.textContent = `${group.visibleHits.length} / ${group.hits.length} 件`;
   if (totalHitCount > 0) set_text('empty-state', filteredGroups.length === 0
     ? '現在の結果には絞り込みに一致するファイルがありません。' : '結果を表示しています…');
   updateFilterSummary();
   updateMore();
 }
+export function file_ranked(ranking) { fileRankings.set(ranking.filePath, ranking); }
+export function ranking_summary(files) { rankedPaths = files; }
+export function execution_summary(data) { executionSummary = data; }
 export function rank_results() {
-  const highest = group => group.hits.reduce((score, item) => Math.max(score, item.hit.score || 0), 0);
-  const nameHit = group => group.hits.some(item => item.hit.sourceKind === 'fileName') ? 1 : 0;
-  fileGroups.sort((a, b) => highest(b) - highest(a) || nameHit(b) - nameHit(a) || a.path.localeCompare(b.path));
+  const positions = new Map(rankedPaths.map((path,index)=>[path,index]));
+  fileGroups.sort((a,b)=>(positions.get(a.path) ?? Number.MAX_SAFE_INTEGER) - (positions.get(b.path) ?? Number.MAX_SAFE_INTEGER));
   for (const group of fileGroups) {
-    group.hits.sort((a, b) => (b.hit.score || 0) - (a.hit.score || 0) || a.location.localeCompare(b.location));
+    group.hits.sort(compareHits);
   }
   applyResultFilter();
+}
+export function batch_summary(terms) {
+  batchSummary = terms;
+  const host = document.getElementById('batch-summary-list'); host.replaceChildren();
+  for (const term of terms) {
+    const detail = document.createElement('details');
+    const heading = document.createElement('summary'); heading.textContent = `${term.term} · ${term.fileCount} ファイル / ${term.hitCount} 件 · ${term.status}`;
+    const list = document.createElement('div'); const more = document.createElement('button'); more.type = 'button'; more.textContent = 'さらに50件を表示';
+    let entries = null, shown = 0;
+    function render() {
+      if (entries === null) entries = rankedPaths.flatMap(path=>(groupsByPath.get(path)?.hits ?? []).filter(item=>item.hit.termId === term.termId).map(item=>({group:groupsByPath.get(path),item})));
+      const end = Math.min(shown+50, entries.length);
+      for (;shown<end;shown++) {
+        const {group,item} = entries[shown]; const card = document.createElement('div'); const name = document.createElement('button'); name.type='button'; name.textContent=group.path; name.addEventListener('click',()=>void open_file(group.path));
+        card.append(name, createMatch(group,item)); list.append(card);
+      }
+      more.hidden = shown === entries.length;
+    }
+    detail.addEventListener('toggle',()=>{ if (detail.open && entries === null) render(); }); more.addEventListener('click',render);
+    detail.append(heading,list,more); more.hidden=true; host.append(detail);
+  }
+  let termPage=0, filePage=0;
+  function renderMatrix() {
+    const host=document.getElementById('batch-matrix-content'); host.replaceChildren();
+    const table=document.createElement('table'); const head=document.createElement('tr'); const corner=document.createElement('th'); corner.textContent='検索語 / ファイル'; head.append(corner);
+    const files=rankedPaths.slice(filePage*20,filePage*20+20);
+    for (const path of files) { const th=document.createElement('th'); th.scope='col'; th.textContent=path; head.append(th); } table.append(head);
+    for (const term of terms.slice(termPage*20,termPage*20+20)) {
+      const row=document.createElement('tr'); const title=document.createElement('th'); title.scope='row'; title.textContent=term.term; row.append(title);
+      for (const path of files) { const cell=document.createElement('td'); cell.textContent=String((groupsByPath.get(path)?.hits ?? []).filter(item=>item.hit.termId===term.termId).length); row.append(cell); } table.append(row);
+    }
+    host.append(table);
+    for (const [label,enabled,action] of [['前の語',termPage>0,()=>termPage--],['次の語',(termPage+1)*20<terms.length,()=>termPage++],['前のファイル',filePage>0,()=>filePage--],['次のファイル',(filePage+1)*20<rankedPaths.length,()=>filePage++]]) {
+      const button=document.createElement('button'); button.type='button'; button.textContent=label; button.disabled=!enabled; button.addEventListener('click',()=>{action();renderMatrix();}); host.append(button);
+    }
+  }
+  const matrix=document.getElementById('batch-matrix');
+  matrix.ontoggle=()=>{if(matrix.open) renderMatrix();};
+  if (matrix.open) renderMatrix();
 }
 export function enable_more() { document.getElementById('more').addEventListener('click', () => { visibleLimit += pageSize; updateMore(); scheduleRender(); }); }
 export function add_issue(issue) {
@@ -580,6 +882,7 @@ export function add_issue(issue) {
     issuePaths.add(issue.path);
     const group = groupsByPath.get(issue.path);
     if (group) markGroupError(group);
+    updateDirectoryCounts();
   }
   document.getElementById('issues-panel').hidden = false;
   set_text('issue-count', String(list.childElementCount));
@@ -599,11 +902,16 @@ extern "C" {
     fn clear_results();
     fn add_hit(hit: JsValue, location: &str);
     fn rank_results();
+    fn file_ranked(ranking: JsValue);
+    fn ranking_summary(files: JsValue);
+    fn batch_summary(terms: JsValue);
+    fn execution_summary(data: JsValue);
     fn enable_more();
     fn init_result_filter();
     fn init_extension_summary();
     fn init_search_mode();
     fn init_folder_lists();
+    fn init_edit_actions();
     fn show_extension_picker();
     fn add_issue(issue: JsValue);
     fn report_started(search_id: &str, request: JsValue);
@@ -646,6 +954,48 @@ fn location(kind: &str, data: &Value) -> String {
     match kind {
         "fileName" => "ファイル名".into(),
         "cell" => format!("{}!{}", str_at("sheetName"), str_at("cellAddress")),
+        "formula" => format!(
+            "{}!{} / 数式{}",
+            str_at("sheetName"),
+            str_at("cellAddress"),
+            data.get("sharedIndex")
+                .and_then(Value::as_str)
+                .map(|id| format!("（共有式 {id}）"))
+                .unwrap_or_default()
+        ),
+        "excelComment" => format!(
+            "{}!{} / コメント {}",
+            str_at("sheetName"),
+            str_at("cellAddress"),
+            str_at("commentId")
+        ),
+        "note" => format!(
+            "スライド {} / ノート {} / 段落 {}",
+            num_at("slideNumber"),
+            str_at("shapeName"),
+            num_at("paragraphNumber")
+        ),
+        "wordHeader" | "wordFooter" | "wordComment" => {
+            let label = match kind {
+                "wordHeader" => "ヘッダー",
+                "wordFooter" => "フッター",
+                _ => "コメント",
+            };
+            let place = if data.get("tablePath").is_some() {
+                location("wordTableParagraph", data)
+            } else {
+                format!("段落 {}", num_at("paragraphNumber"))
+            };
+            format!(
+                "{label} {} {} / {place}",
+                str_at("partName"),
+                if kind == "wordComment" {
+                    str_at("commentId")
+                } else {
+                    str_at("sectionType")
+                }
+            )
+        }
         "excelRow" => format!("{} / 行 {}", str_at("sheetName"), num_at("row")),
         "fileMatch" => "ファイル全体".into(),
         "shape" if data.get("slideNumber").is_some() => format!(
@@ -701,30 +1051,38 @@ fn on_search() {
     let root = roots.first().cloned().unwrap_or_default();
     let additional: Vec<String> = roots.into_iter().skip(1).collect();
     let advanced = input("search-mode") == "conditions";
-    let query = if advanced {
+    let batch = input("search-mode") == "batch";
+    let query = if advanced || batch {
         String::new()
     } else {
         input("query")
     };
-    let query_spec = advanced.then(|| {
-        json!({
-            "mode": "conditions",
-            "scope": input("condition-scope"),
-            "all": input("all-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
-            "any": input("any-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
-            "not": input("not-terms").lines().map(str::to_owned).collect::<Vec<_>>()
+    let query_spec = if batch {
+        Some(
+            json!({"mode":"batch", "terms":input("batch-terms").lines().map(str::to_owned).collect::<Vec<_>>(), "matchMode":input("batch-match-mode")}),
+        )
+    } else {
+        advanced.then(|| {
+            json!({
+                "mode": "conditions",
+                "scope": input("condition-scope"),
+                "all": input("all-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
+                "any": input("any-terms").lines().map(str::to_owned).collect::<Vec<_>>(),
+                "not": input("not-terms").lines().map(str::to_owned).collect::<Vec<_>>()
+            })
         })
-    });
+    };
     let extensions: Vec<String> =
         serde_wasm_bindgen::from_value(selected_extensions()).unwrap_or_default();
     set_text("root-error", "");
     set_text("excluded-error", "");
     set_text("query-error", "");
     set_text("advanced-error", "");
+    set_text("batch-error", "");
     set_text("extensions-error", "");
     set_text("general-error", "");
     set_text("copy-status", "");
-    if !advanced && query.trim().is_empty() {
+    if !advanced && !batch && query.trim().is_empty() {
         set_text("query-error", "検索語を入力してください。");
         return;
     }
@@ -775,7 +1133,7 @@ fn on_search() {
     set_text("counts", "結果 0 · 処理 0 · エラー 0");
     disabled("search", true);
     disabled("cancel", false);
-    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "querySpec": query_spec, "recursive": true, "extensions": extensions, "useIndex": checked("use-index"), "fuzzySearch": checked("fuzzy-search")}, "searchId": id});
+    let args = json!({"request": {"rootDirectory": root, "additionalDirectories": additional, "excludedDirectories": excluded, "query": query, "querySpec": query_spec, "recursive": true, "extensions": extensions, "useIndex": checked("use-index"), "fuzzySearch": checked("fuzzy-search"), "includeNotes":checked("include-notes"), "includeFormulas":checked("include-formulas")}, "searchId": id});
     spawn_local(async move {
         if let Err(error) = JsFuture::from(invoke("start_search", js(&args))).await {
             let data = value(error.clone());
@@ -787,6 +1145,7 @@ fn on_search() {
                 "rootDirectory" | "additionalDirectories" => "root-error",
                 "excludedDirectories" => "excluded-error",
                 "query" => "query-error",
+                "querySpec" if batch => "batch-error",
                 "querySpec" => "advanced-error",
                 "extensions" => "extensions-error",
                 _ => "general-error",
@@ -896,6 +1255,10 @@ fn on_event(payload: JsValue) {
             );
         }
         "issue" => add_issue(js(&event["issue"])),
+        "fileRanked" => file_ranked(js(&event["ranking"])),
+        "rankingSummary" => ranking_summary(js(&event["files"])),
+        "batchSummary" => batch_summary(js(&event["terms"])),
+        "executionSummary" => execution_summary(js(&event)),
         _ => (),
     }
     if kind == "finished" {
@@ -944,6 +1307,7 @@ pub fn start() {
     init_extension_summary();
     init_search_mode();
     init_folder_lists();
+    init_edit_actions();
     let search = Closure::<dyn FnMut()>::new(on_search);
     bind("search-form", "submit", search.as_ref().unchecked_ref());
     search.forget();

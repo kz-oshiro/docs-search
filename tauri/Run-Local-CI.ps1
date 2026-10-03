@@ -4,23 +4,7 @@ $docSearch = Split-Path -Parent $here
 
 Push-Location $docSearch
 try {
-    python .\tests\test_generator.py
-    if ($LASTEXITCODE -ne 0) { throw '共通テストデータの検証に失敗しました。' }
-
-    python .\tauri\tests\run-backend-cases.py
-    if ($LASTEXITCODE -ne 0) { throw 'バックエンドの共通ケースに失敗しました。' }
-
-    python .\tauri\tests\run-context-cases.py
-    if ($LASTEXITCODE -ne 0) { throw 'Excel 周辺検索の受け入れケースに失敗しました。' }
-
-    python .\tauri\tests\run-condition-cases.py
-    if ($LASTEXITCODE -ne 0) { throw '高度な検索の受け入れケースに失敗しました。' }
-
-    cargo test --manifest-path .\tauri\core\Cargo.toml
-    if ($LASTEXITCODE -ne 0) { throw '検索コアのテストに失敗しました。' }
-
-    cargo check --manifest-path .\tauri\frontend\Cargo.toml --target wasm32-unknown-unknown
-    if ($LASTEXITCODE -ne 0) { throw 'WASM のチェックに失敗しました。' }
+    & (Join-Path $here 'Run-Automated-Tests.ps1')
 
     & (Join-Path $here 'Build.ps1')
     if (-not (Test-Path -LiteralPath (Join-Path $here 'docs-search-desktop.exe'))) {

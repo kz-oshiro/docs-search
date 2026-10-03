@@ -10,7 +10,7 @@ use std::time::UNIX_EPOCH;
 
 pub struct Index(Connection);
 const SCHEMA_VERSION: i64 = 2;
-pub const EXTRACTION_VERSION: i64 = 2;
+pub const EXTRACTION_VERSION: i64 = 4;
 pub const DEFAULT_SCOPE: i64 = 0;
 
 fn database_path() -> Option<PathBuf> {
@@ -51,10 +51,32 @@ fn initialize(connection: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS grams_unit ON grams(unit_id);\
         CREATE TABLE IF NOT EXISTS tokens(token TEXT NOT NULL, first TEXT NOT NULL, length INTEGER NOT NULL, unit_id INTEGER NOT NULL, PRIMARY KEY(token, unit_id));\
         CREATE INDEX IF NOT EXISTS tokens_lookup ON tokens(first, length);\
-        PRAGMA user_version=2;")
+        PRAGMA user_version=2;")?;
+    // Retire every old extraction record when indexing is next enabled, including
+    // files outside today's roots. No old phonetic text remains queryable.
+    let transaction = connection.unchecked_transaction()?;
+    let outdated = "SELECT path FROM files WHERE extraction_version<>?1";
+    transaction.execute(&format!("DELETE FROM grams WHERE unit_id IN (SELECT id FROM units WHERE file_path IN ({outdated}))"),[EXTRACTION_VERSION])?;
+    transaction.execute(&format!("DELETE FROM tokens WHERE unit_id IN (SELECT id FROM units WHERE file_path IN ({outdated}))"),[EXTRACTION_VERSION])?;
+    transaction.execute(
+        &format!("DELETE FROM units WHERE file_path IN ({outdated})"),
+        [EXTRACTION_VERSION],
+    )?;
+    transaction.execute(
+        "DELETE FROM files WHERE extraction_version<>?1",
+        [EXTRACTION_VERSION],
+    )?;
+    transaction.commit()
 }
 
 impl Index {
+    #[cfg(test)]
+    pub(crate) fn in_memory() -> rusqlite::Result<Self> {
+        let connection = Connection::open_in_memory()?;
+        initialize(&connection)?;
+        Ok(Self(connection))
+    }
+
     /// Composite conditions need every unit in a candidate scope, including NOT evidence.
     /// The initial implementation reads the complete indexed file to avoid false negatives.
     pub fn all_units(&self, path: &Path) -> rusqlite::Result<Vec<Unit>> {
@@ -192,6 +214,9 @@ impl Index {
         expected_stamp: (i64, i64),
         scope: i64,
     ) -> rusqlite::Result<bool> {
+        if !document.issues.is_empty() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         if stamp(path) != Some(expected_stamp) {
             return Ok(false);
         }
@@ -254,11 +279,12 @@ impl Index {
     ) -> rusqlite::Result<Vec<Unit>> {
         let needle = &query.loose;
         let gram_size = if needle.chars().count() >= 3 { 3 } else { 2 };
+        // Stored grams remove separators; queries retaining them cannot be
+        // rejected by those grams, including queries made only of separators.
         let query_grams = if !fuzzy_search
-            || (needle.chars().any(|c| c.is_ascii_digit())
-                && needle
-                    .chars()
-                    .any(|c| c.is_whitespace() || matches!(c, '_' | '-' | '.' | '/')))
+            || needle
+                .chars()
+                .any(|c| c.is_whitespace() || matches!(c, '_' | '-' | '.' | '/'))
         {
             Vec::new()
         } else {
@@ -287,6 +313,23 @@ impl Index {
             let rows = statement.query_map([path.to_string_lossy().as_ref()], |row| {
                 row.get::<_, i64>(0)
             })?;
+            for row in rows {
+                ids.insert(row?);
+            }
+        }
+        // A single-token match need not contain the full raw query's grams.
+        // Union exact/prefix token candidates before the final evaluator runs.
+        if fuzzy_search && query.tokens.len() == 1 {
+            let token = &query.tokens[0];
+            let mut statement = self.0.prepare("SELECT t.unit_id FROM tokens t JOIN units u ON u.id=t.unit_id WHERE u.file_path=?1 AND (t.token=?2 OR (?3 AND substr(t.token,1,length(?2))=?2))")?;
+            let rows = statement.query_map(
+                params![
+                    path.to_string_lossy().as_ref(),
+                    token,
+                    token.chars().count() >= 3
+                ],
+                |row| row.get::<_, i64>(0),
+            )?;
             for row in rows {
                 ids.insert(row?);
             }
@@ -357,6 +400,12 @@ fn source_kind(kind: &str) -> rusqlite::Result<&'static str> {
     match kind {
         "fileName" => Ok("fileName"),
         "cell" => Ok("cell"),
+        "formula" => Ok("formula"),
+        "note" => Ok("note"),
+        "excelComment" => Ok("excelComment"),
+        "wordHeader" => Ok("wordHeader"),
+        "wordFooter" => Ok("wordFooter"),
+        "wordComment" => Ok("wordComment"),
         "shape" => Ok("shape"),
         "slideTableCell" => Ok("slideTableCell"),
         "paragraph" => Ok("paragraph"),
@@ -434,6 +483,7 @@ mod tests {
             anchor: None,
         };
         let document = ExtractedDocument {
+            issues: vec![],
             units: vec![unit],
             sheets: vec![SheetMeta {
                 part_key: "xl/worksheets/sheet1.xml".into(),
@@ -446,6 +496,7 @@ mod tests {
                 }],
                 hidden_rows: vec![12],
                 hidden_columns: vec![],
+                ..SheetMeta::default()
             }],
         };
         assert!(index

@@ -1,19 +1,22 @@
 # Excel 周辺セル P2 の確認方針
 
+> 2026-10-03追記: 最新の自動/手動境界は [Playwright UI試験方針](playwright-ui-test-plan.md) を参照。ヘッドレスUIを自動テストへ常時追加し、下記のGUI項目のDOM・状態・要求はU01〜U39へ移す。実アプリ/OS連携・見た目はM1〜M5へ絞る。下記の未実施・GUI許可に関する記述は従来の実装時点の記録で、Playwright実行は今回未実施。
+
 実装対象は `.xlsx` / `.xlsm` のセル一致と、アンカーを取得できた図形一致の「周辺を表示」です。検証は次の実装確認段階で行います。この文書は確認項目、手順、期待結果を固定します。
 
 対応する[実装計画 P2](./implementation-plan.md)と[進捗レポート](./implementation-status.md)を参照してください。
 
 ## 準備
 
-`docs-search` 直下で最新のコードを対象にします。既存の共通検索ケースと Rust 単体テストを、次の順で実行します。
+`docs-search` 直下で最新のコードを対象にします。自動テストのみの依頼では、次の入口で共通検索ケース、Rust単体テスト、WASM型検査とヘッドレスPlaywrightを実行します。
 
-ローカルCIは[`run-context-cases.py`](../tauri/tests/run-context-cases.py)も実行し、セル・図形の検索位置と索引初回/再利用の同値性を専用の一時データで検証します。周辺表の画面操作は含みません。
+この入口は[`run-context-cases.py`](../tauri/tests/run-context-cases.py)も実行し、セル・図形の検索位置と索引初回/再利用の同値性を専用の一時データで検証します。周辺表のDOM・列移動・要求はヘッドレスPlaywrightで確認します。実アプリのOS連携・見た目は別の確認範囲です。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1
-.\tauri\Run-Local-CI.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Automated-Tests.ps1
 ```
+
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1` を使います。
 
 周辺表示用の独立した Excel 文書を作ります。出力先が既にある場合は別名にし、既存データを上書きしません。`outputs/` は Git の除外対象です。
 
@@ -37,6 +40,6 @@ GUI 確認はデスクトップアプリを起動して実施します。GUI テ
 | 変更・移動・削除 | 結果を表示した後、対象 `.xlsx` を編集して保存、または移動・削除し、その結果の周辺を開く | 再検索を促す局所エラー。元の検索結果と件数は残り、現在の値を古い結果へ混ぜない |
 | 新しい検索 | 周辺取得の直後に新しい検索を始める | 古い検索の応答が新しい結果に表示されない。新しい検索 ID と結果 ID だけが取得対象 |
 | 異常範囲 | バックエンドの `get_result_context` に行数6、列数0、範囲外、対象行を含まない範囲を渡す | `invalidRange`。正常な検索結果は残る |
-| 回帰 | 共通テスト、Rust単体テスト、ローカルCIを完了する | 従来の検索件数・場所・一致分類・索引動作と PowerShell 実装に差分がない |
+| 回帰 | 上記の自動テスト入口を完了する。配布ビルドは依頼された場合に追加 | 従来の検索件数・場所・一致分類・索引動作が維持され、ヘッドレスUIの状態・要求も一致する |
 
-周辺表は文書の保存済み値または数式の保存済み結果を示し、Excel の表示書式や数式の再計算結果との一致は要求しません。`Run-Local-CI.ps1` は GUI の操作性を検証しないため、表の操作とエラー表示は GUI で別途確認します。
+周辺表は文書の保存済み値または数式の保存済み結果を示し、数式を再計算しません。P2の保存値・座標の確認に加え、現在の書式近似表示は [イシュー #4の確認方針](issues-test-plan.md)を使います。ブラウザー内の表の操作と局所エラーはヘッドレスPlaywright、実Excelとの見た目の比較は同方針の実アプリGUI範囲で確認します。

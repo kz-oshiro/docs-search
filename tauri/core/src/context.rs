@@ -1,4 +1,4 @@
-use crate::extract::{self, CellRange, SheetMeta};
+use crate::extract::{self, CellRange, CellStyle, ColumnLayout, RowLayout, SheetMeta};
 use crate::index::{self, Index, DEFAULT_SCOPE};
 use crate::SearchHit;
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,7 @@ pub struct ContextTarget {
     focus_column: u32,
     focus_kind: &'static str,
     evidence_addresses: Vec<String>,
+    matching_ranges: BTreeMap<(u32, u32), Vec<[usize; 2]>>,
     expected_stamp: Option<(i64, i64)>,
     use_index: bool,
 }
@@ -41,6 +42,7 @@ pub struct ContextCell {
     pub address: String,
     pub text: String,
     pub truncated: bool,
+    pub match_ranges: Vec<[usize; 2]>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -70,6 +72,25 @@ pub struct ResultContext {
     pub merges: Vec<ContextMerge>,
     pub hidden_rows: Vec<u32>,
     pub hidden_columns: Vec<u32>,
+    pub layout: ContextLayout,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextLayout {
+    pub default_row_height: Option<f64>,
+    pub default_column_width: Option<f64>,
+    pub rows: Vec<RowLayout>,
+    pub columns: Vec<ColumnLayout>,
+    pub cells: Vec<ContextCellStyle>,
+    pub notes: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextCellStyle {
+    pub row: u32,
+    pub column: u32,
+    pub style: CellStyle,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -103,6 +124,7 @@ impl ContextTarget {
         let sheet_name = hit.location.get("sheetName")?.as_str()?.to_owned();
         let (focus_row, focus_column, focus_kind) = match hit.source_kind.as_str() {
             "cell" => (hit.row?, hit.column?, "cell"),
+            "formula" => (hit.row?, hit.column?, "formula"),
             "excelRow" => (hit.row?, hit.column?, "excelRow"),
             "shape" => {
                 let (row, column) = extract::parse_cell_address(hit.anchor.as_deref()?)?;
@@ -121,7 +143,7 @@ impl ContextTarget {
             hit.evidence
                 .iter()
                 .filter(|evidence| {
-                    evidence.source_kind == "cell"
+                    matches!(evidence.source_kind.as_str(), "cell" | "formula")
                         && evidence.part_key == hit.part_key
                         && evidence.row == hit.row
                 })
@@ -131,6 +153,30 @@ impl ContextTarget {
             Vec::new()
         };
         Some(Self {
+            matching_ranges: if hit.evidence.is_empty() {
+                if hit.source_kind == "cell" {
+                    BTreeMap::from([((focus_row, focus_column), hit.source_match_ranges.clone())])
+                } else {
+                    BTreeMap::new()
+                }
+            } else {
+                let mut ranges = BTreeMap::<_, Vec<_>>::new();
+                for evidence in &hit.evidence {
+                    if evidence.source_kind == "cell" && evidence.part_key == hit.part_key {
+                        if let (Some(row), Some(column)) = (evidence.row, evidence.column) {
+                            ranges
+                                .entry((row, column))
+                                .or_default()
+                                .extend(evidence.source_match_ranges.iter().copied());
+                        }
+                    }
+                }
+                for values in ranges.values_mut() {
+                    values.sort_unstable();
+                    values.dedup();
+                }
+                ranges
+            },
             expected_stamp: index::stamp(&path),
             path,
             part_key: hit.part_key.clone(),
@@ -327,6 +373,61 @@ fn assemble(
     merge_ranges: Vec<CellRange>,
     raw_cells: Vec<(u32, u32, String)>,
 ) -> ResultContext {
+    let saved = &sheet.layout;
+    let rows: Vec<_> = saved
+        .rows
+        .iter()
+        .filter(|item| (range.first_row..=end.0).contains(&item.row))
+        .cloned()
+        .collect();
+    let columns: Vec<_> = saved
+        .columns
+        .iter()
+        .filter(|item| item.first <= end.1 && item.last >= range.first_column)
+        .cloned()
+        .collect();
+    let style_indices: BTreeMap<_, _> = saved
+        .cells
+        .iter()
+        .filter(|cell| is_visible(cell.row, cell.column, range, end))
+        .map(|cell| ((cell.row, cell.column), cell.style))
+        .collect();
+    let mut formats = Vec::new();
+    for row in range.first_row..=end.0 {
+        for column in range.first_column..=end.1 {
+            let index = style_indices
+                .get(&(row, column))
+                .copied()
+                .or_else(|| {
+                    rows.iter()
+                        .find(|item| item.row == row)
+                        .and_then(|item| item.style)
+                })
+                .or_else(|| {
+                    columns
+                        .iter()
+                        .rev()
+                        .find(|item| item.first <= column && column <= item.last)
+                        .and_then(|item| item.style)
+                })
+                .unwrap_or(0);
+            if let Some(style) = saved.styles.get(index) {
+                formats.push(ContextCellStyle {
+                    row,
+                    column,
+                    style: style.clone(),
+                });
+            }
+        }
+    }
+    let layout = ContextLayout {
+        default_row_height: saved.default_row_height,
+        default_column_width: saved.default_column_width,
+        rows,
+        columns,
+        cells: formats,
+        notes: saved.notes.clone(),
+    };
     let mut values = BTreeMap::new();
     for (row, column, text) in raw_cells {
         values.entry((row, column)).or_insert(text);
@@ -336,6 +437,14 @@ fn assemble(
         if is_visible(row, column, range, end) {
             let (text, truncated) = clip(text);
             cells.push(ContextCell {
+                match_ranges: target
+                    .matching_ranges
+                    .get(&(row, column))
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|range| range[1] <= text.chars().count())
+                    .collect(),
                 row,
                 column,
                 address: cell_address(row, column),
@@ -392,6 +501,7 @@ fn assemble(
         merges,
         hidden_rows,
         hidden_columns,
+        layout,
     }
 }
 
@@ -423,6 +533,77 @@ mod tests {
     use super::*;
     use crate::extract::ColumnRange;
 
+    #[test]
+    fn response_limits_styles_to_window_and_preserves_original_match_positions() {
+        use crate::extract::{CellLayout, SheetLayout};
+        let mut focus = target(12, 2);
+        focus.matching_ranges.insert((12, 2), vec![[2, 4]]);
+        let range = ContextRange {
+            first_row: 10,
+            first_column: 2,
+            row_count: 5,
+            column_count: 5,
+        };
+        let style = CellStyle {
+            bold: true,
+            fill: Some("#ddeeff".into()),
+            ..Default::default()
+        };
+        let sheet = SheetMeta {
+            layout: SheetLayout {
+                styles: vec![CellStyle::default(), style],
+                cells: vec![
+                    CellLayout {
+                        row: 12,
+                        column: 2,
+                        style: 1,
+                    },
+                    CellLayout {
+                        row: 500,
+                        column: 2,
+                        style: 1,
+                    },
+                ],
+                rows: vec![
+                    RowLayout {
+                        row: 12,
+                        height: Some(30.0),
+                        style: None,
+                    },
+                    RowLayout {
+                        row: 500,
+                        height: Some(90.0),
+                        style: None,
+                    },
+                ],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let response = assemble(
+            &focus,
+            range,
+            (14, 6),
+            sheet,
+            vec![],
+            vec![(12, 2, "前文顧客後文".into())],
+        );
+        assert_eq!(response.layout.cells.len(), 25);
+        assert_eq!(response.layout.rows.len(), 1);
+        assert!(
+            response
+                .layout
+                .cells
+                .iter()
+                .find(|cell| cell.row == 12 && cell.column == 2)
+                .unwrap()
+                .style
+                .bold
+        );
+        assert!(response.layout.cells.iter().all(|cell| cell.row <= 14));
+        assert_eq!(response.cells[0].match_ranges, vec![[2, 4]]);
+    }
+
     fn target(row: u32, column: u32) -> ContextTarget {
         ContextTarget {
             path: PathBuf::new(),
@@ -432,6 +613,7 @@ mod tests {
             focus_column: column,
             focus_kind: "cell",
             evidence_addresses: vec![],
+            matching_ranges: BTreeMap::new(),
             expected_stamp: None,
             use_index: false,
         }
@@ -482,6 +664,7 @@ mod tests {
             merge_ranges: vec![],
             hidden_rows: vec![12],
             hidden_columns: vec![ColumnRange { first: 3, last: 4 }],
+            ..SheetMeta::default()
         };
         let merge = CellRange {
             first_row: 12,

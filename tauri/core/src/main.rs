@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: docs-search-cli <directory> <query> [--query-spec-json JSON] [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--use-index] [--fuzzy-search] [--cancel-on-start]");
+        eprintln!("Usage: docs-search-cli <directory> <query> [--query-spec-json JSON] [--add-directory path]... [--exclude-directory path]... [--extensions xlsx,txt,...] [--use-index] [--fuzzy-search] [--include-notes] [--include-formulas] [--cancel-on-start]");
         std::process::exit(2);
     }
     let mut extensions = default_extensions();
@@ -13,6 +13,8 @@ fn main() {
     let mut cancel_on_start = false;
     let mut use_index = false;
     let mut fuzzy_search = false;
+    let mut include_notes = false;
+    let mut include_formulas = false;
     let mut query_spec = None;
     let mut options = args[3..].iter();
     while let Some(option) = options.next() {
@@ -40,6 +42,8 @@ fn main() {
                 };
             }
             "--cancel-on-start" => cancel_on_start = true,
+            "--include-notes" => include_notes = true,
+            "--include-formulas" => include_formulas = true,
             "--query-spec-json" => {
                 let Some(raw) = options.next() else {
                     eprintln!("--query-spec-json requires JSON");
@@ -71,6 +75,8 @@ fn main() {
         extensions,
         use_index,
         fuzzy_search,
+        include_notes,
+        include_formulas,
     };
     let cancel = AtomicBool::new(false);
     if let Err(error) = run_search(request, "cli".into(), &cancel, |event| {

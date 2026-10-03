@@ -4,21 +4,22 @@
 
 ## 自動確認の順序
 
-`docs-search` を作業ディレクトリとして、次を順に実行する。
+`docs-search` を作業ディレクトリとして、自動テストのみの依頼では次を実行する。Rust/CLI・WASM型検査に加え、試験用WASM生成とヘッドレスPlaywrightを含む。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tests\run-powershell-tests.ps1
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Automated-Tests.ps1
 ```
+
+Windows配布ビルドまで依頼された場合は、上の入口に代えて `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\tauri\Run-Local-CI.ps1` を使う。
 
 | 確認項目 | 手順 | 期待結果 |
 | --- | --- | --- |
-| 既存検索の回帰 | 共通バックエンドケースとRust・WASM・Windowsビルドを実行 | 通常検索、あいまい検索、進捗、Issue、中断、結果件数に退行がない |
+| 既存検索の回帰 | 上記の自動試験を実行。配布ビルドは依頼された場合に追加 | 通常検索、あいまい検索、進捗、Issue、中断、結果件数に退行がなく、ヘッドレスUIの状態・要求も一致する |
 | Excel座標と行キー | 追加したRust単体ケースを実行 | A12とD12は同じ行キー、別シートのA12は別キー。XFD1048576まで有効、範囲外は位置を推測しない |
 | 疎なシート情報 | 結合セル・非表示行・非表示列の単体ケースを実行 | 結合範囲と非表示範囲を保持し、空セルを密な配列へ展開しない。結合範囲は結果件数を増やさない |
 | 索引往復 | メモリ内SQLiteの単体ケースを実行 | `unitKey`、`partKey`、`groupKey`、座標とシート情報が保存・再読込後も一致。抽出範囲が違う索引は再利用されない |
 | 旧索引と変更検出 | 旧版の索引を用意して検索し、読み取り中のファイル更新・削除も確認 | 旧索引は元文書から再構築される。サイズ・更新日時で検出できた変更は `changedDuringRead` として報告し、不完全な抽出を索引へ確定しない |
 | 索引の有無による同値性 | 共通生成文書の同じ検索語を索引なし、初回索引あり、再利用索引ありでCLI実行し、`resultId`と通知順以外を比較 | ヒットの場所・抜粋・一致方式・件数・新しい識別情報が一致する。索引なしでは保存済み索引を読み書きしない |
-| 予約入力 | `querySpec` を持つ要求をバックエンドへ渡す | `querySpec` の入力エラーで開始前に拒否され、通常の `query` の解釈は変わらない |
+| 条件入力（P3以降） | [P3の自動ケース](../tauri/tests/run-condition-cases.py)で有効な条件、通常語との併用、不正な条件を確認 | 有効な `querySpec` は受理し、併用・不正入力は開始前に拒否する。通常の `query` の解釈は変わらない。P0初期段階の「予約入力をすべて拒否」は現行の合格条件にしない |
 
-GUIの動作確認が必要な場合は実施前の確認を受け、既存結果の表示と一括出力を別途確認する。GUI確認の結果は自動確認と区別して報告する。
+ブラウザー内の表示・操作は [Playwright UI試験方針](playwright-ui-test-plan.md)の自動項目で確認する。実アプリのOS連携・見た目は同方針のM1〜M5へ絞り、明示依頼または事前確認がある場合に実施する。実アプリGUIの結果は自動確認と区別して報告する。

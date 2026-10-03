@@ -5,13 +5,43 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>docs-search</title>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./theme.css">
+  <script src="./theme.js"></script>
   <script type="module" src="./boot.js"></script>
 </head>
 <body>
   <main>
-    <header><div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div><p class="header-description">フォルダー内の文書を、まとめて検索。</p></header>
+    <header>
+      <div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div>
+      <div class="header-tools">
+        <p class="header-description">フォルダー内の文書を、まとめて検索。</p>
+        <details id="appearance-settings" class="appearance-settings">
+          <summary>設定</summary>
+          <div class="appearance-panel">
+            <label for="theme-color"><span class="theme-color-dot" aria-hidden="true"></span>テーマカラー</label>
+            <select id="theme-color" aria-describedby="theme-save-status">
+              <option value="sun">サンオレンジ（公式）</option>
+              <option value="amber">アンバー</option>
+              <option value="sunset">夕焼け</option>
+              <option value="teal">青緑</option>
+              <option value="blue">ブルー</option>
+              <option value="forest">フォレスト</option>
+            </select>
+            <p id="theme-save-status" role="status" aria-live="polite">選んだ色は次回起動時にも使います。</p>
+          </div>
+        </details>
+      </div>
+    </header>
     <form id="search-form">
-      <div class="field search-mode-field"><label for="search-mode">検索方法</label><select id="search-mode"><option value="standard">通常検索</option><option value="conditions">高度な検索</option></select></div>
+      <div class="field search-mode-field"><label for="search-mode">検索方法</label><select id="search-mode"><option value="standard">通常検索</option><option value="conditions">高度な検索</option><option value="batch">一括検索</option></select></div>
+      <fieldset id="batch-input" class="field" hidden>
+        <legend>複数ID・語句の一括検索</legend>
+        <label for="batch-terms">検索語（1行に1語、重複を除いて256語まで）</label><textarea id="batch-terms" rows="5" aria-describedby="batch-count batch-error"></textarea>
+        <small id="batch-count">入力 0 行</small>
+        <label for="batch-match-mode">照合方法</label><select id="batch-match-mode"><option value="identifier">識別子一致</option><option value="text">通常の文字列検索</option></select>
+        <small>識別子は英字・数字・アンダースコア（先頭は英字またはアンダースコア）。TAB_01 と TAB_010 を区別します。日本語・空白・記号を含む行は通常の文字列検索を選んでください。</small>
+        <small id="batch-error" class="error" role="alert"></small>
+      </fieldset>
       <div class="search-fields">
         <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
         <div id="normal-query-field" class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
@@ -24,10 +54,11 @@
           <div class="field"><label for="any-terms">いずれか含む（OR）</label><textarea id="any-terms" rows="3" placeholder="空欄ならこの条件を使いません"></textarea></div>
           <div class="field"><label for="not-terms">含まない（NOT）</label><textarea id="not-terms" rows="3" placeholder="除外する語句"></textarea></div>
         </div>
-        <div class="field"><label for="condition-scope">判定範囲</label><select id="condition-scope"><option value="excelRow">同じ行（Excel）</option><option value="unit">同じ検索箇所</option><option value="file">同じファイル</option></select><small>「同じ行」では Excel のセルだけを行にまとめます。他の形式と図形は検索箇所ごとに判定します。除外語は表記の正規化と大文字・小文字を無視した部分一致で判定します。</small></div>
+        <div class="field"><label for="condition-scope">判定範囲</label><select id="condition-scope"><option value="excelRow">同じ行（Excel）</option><option value="unit">同じ検索箇所</option><option value="file">同じファイル</option></select><small>「同じ行」では Excel のセルと選択範囲内の数式を行にまとめます。他の形式と図形は検索箇所ごとに判定します。除外語は表記の正規化と大文字・小文字を無視した部分一致で判定します。</small></div>
         <small id="advanced-error" class="error" role="alert"></small>
       </fieldset>
       <div class="field"><span class="field-label">対象外フォルダー</span><div id="excluded-folders" class="folder-list"></div><button id="add-excluded" class="folder-add" type="button" aria-label="対象外フォルダーを追加">追加</button><small id="excluded-error" class="error" role="alert"></small></div>
+      <p id="folder-save-status" class="folder-save-status" role="status">フォルダー入力は次回起動時にも使います。</p>
       <fieldset class="field" aria-describedby="extensions-error">
         <legend>対象ファイル</legend>
         <details class="extension-picker">
@@ -150,12 +181,15 @@
         <div class="search-option-list">
           <label class="search-option"><input id="use-index" type="checkbox"><span>検索用索引を作成・利用<small>オンの場合、索引を端末内に保存し、次回の検索でも再利用します。</small></span></label>
           <label class="search-option"><input id="fuzzy-search" type="checkbox"><span>あいまい検索<small>表記ゆれや一部のタイプミスも候補に含めます。</small></span></label>
+          <label class="search-option"><input id="include-notes" type="checkbox"><span>注記も検索<small>Excelコメント、PowerPointノート、Wordヘッダー・フッター・コメントを含めます。</small></span></label>
+          <label class="search-option"><input id="include-formulas" type="checkbox"><span>数式文字列も検索<small>Excelに保存された式を検索します。再計算はしません。</small></span></label>
         </div>
       </fieldset>
       <div class="actions"><button id="search" type="submit">検索</button><button id="cancel" type="button" disabled>中断</button></div>
     </form>
     <section class="summary" aria-live="polite"><strong id="status">待機中</strong><span id="counts">結果 0 · 処理 0 · エラー 0</span></section>
     <p id="general-error" class="notice notice-error" role="alert"></p>
+    <section id="batch-results" class="batch-results" hidden aria-label="検索語別の登場箇所"><h2>検索語別の登場箇所</h2><p>文字列の登場箇所です。実際の依存関係は元文書で確認してください。</p><div id="batch-summary-list"></div><details id="batch-matrix"><summary>語×ファイル一覧</summary><div id="batch-matrix-content"></div></details></section>
     <p id="copy-status" class="notice notice-success" role="status"></p>
     <details id="issues-panel" class="issues-panel" hidden>
       <summary>検索中のエラー <span id="issue-count">0</span> 件 <span class="issues-hint issues-hint-closed">詳細を表示</span><span class="issues-hint issues-hint-open">詳細を閉じる</span></summary>
@@ -167,9 +201,12 @@
       <div class="result-filters" role="group" aria-label="検索結果の絞り込み">
         <div class="filter-field"><label for="result-filter-text">ファイル名・パス</label><input id="result-filter-text" type="search" autocomplete="off" placeholder="結果内のファイルを絞り込む"></div>
         <div class="filter-field"><label for="result-filter-extension">拡張子</label><select id="result-filter-extension"><option value="">すべての拡張子</option></select></div>
+        <div class="filter-field"><label for="result-filter-include">本文に含む語句</label><input id="result-filter-include" type="search" autocomplete="off" placeholder="1つの語句・部分一致"></div>
+        <div class="filter-field"><label for="result-filter-exclude">本文に含まない語句</label><input id="result-filter-exclude" type="search" autocomplete="off" placeholder="1つの語句・部分一致"></div>
         <button id="result-filter-clear" type="button" disabled>絞り込みを解除</button>
       </div>
       <p id="result-filter-summary" class="result-filter-summary">絞り込み後 0 / 0 ファイル · 0 / 0 件</p>
+      <p class="filter-help">本文は表示された抜粋・根拠で判定します。大文字・小文字を区別せず、両条件を満たす一致箇所を表示します。</p>
       <div class="export-actions" role="group" aria-label="検索結果の一括出力">
         <label for="export-scope">出力対象</label>
         <select id="export-scope"><option value="filtered">現在の絞り込み結果</option><option value="all">全結果</option></select>
@@ -178,10 +215,20 @@
         <button id="save-csv" type="button" disabled>CSV保存</button>
         <button id="save-tsv" type="button" disabled>TSV保存</button>
         <button id="save-report" type="button" disabled>調査記録を保存</button>
+        <button id="save-matrix-csv" type="button" disabled hidden>語×ファイルCSV</button><button id="save-matrix-tsv" type="button" disabled hidden>語×ファイルTSV</button>
       </div>
       <p class="match-legend">一致検索：通常検索でも見つかる結果　／　あいまい検索：オンにしたときだけ見つかる結果</p>
       <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
     </section>
   </main>
+  <dialog id="result-editor" aria-labelledby="edit-title" aria-describedby="edit-location">
+    <h2 id="edit-title">一致箇所を編集</h2><p id="edit-location"></p>
+    <label for="edit-evidence">編集する根拠</label><select id="edit-evidence"></select><button id="edit-load" type="button">読み込む</button>
+    <pre id="edit-context" aria-label="一致箇所と前後の文脈"></pre>
+    <label for="edit-replacement">選択した一致箇所の置き換え</label><textarea id="edit-replacement" rows="5"></textarea>
+    <p>保存はこの一致範囲だけに反映されます。保存後は再検索してください。</p>
+    <p id="edit-error" class="error" role="alert"></p>
+    <div class="edit-actions"><button id="edit-save" type="button" disabled>元ファイルに保存</button><button id="edit-cancel" type="button">キャンセル</button></div>
+  </dialog>
 </body>
 </html>

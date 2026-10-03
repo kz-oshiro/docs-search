@@ -1,9 +1,15 @@
+pub mod batch;
 pub mod context;
+pub mod edit;
 mod extract;
 mod fuzzy;
 mod index;
 mod query;
+pub mod ranking;
 pub mod report;
+
+#[cfg(test)]
+mod property_tests;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -153,6 +159,10 @@ pub struct SearchRequest {
     pub use_index: bool,
     #[serde(default)]
     pub fuzzy_search: bool,
+    #[serde(default)]
+    pub include_notes: bool,
+    #[serde(default)]
+    pub include_formulas: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -174,6 +184,15 @@ pub struct Counts {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchHit {
+    pub source_match_ranges: Vec<[usize; 2]>,
+    pub document_order: Vec<u64>,
+    pub modified_at: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edit_anchor: Option<edit::EditAnchor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub term_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub term: Option<String>,
     pub result_id: usize,
     pub file_path: String,
     pub file_type: String,
@@ -202,6 +221,10 @@ pub struct SearchHit {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchEvidence {
+    pub source_match_ranges: Vec<[usize; 2]>,
+    pub document_order: Vec<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edit_anchor: Option<edit::EditAnchor>,
     pub term_id: String,
     pub term: String,
     pub unit_key: String,
@@ -254,6 +277,21 @@ pub enum EventKind {
     },
     Issue {
         issue: SearchIssue,
+    },
+    FileRanked {
+        ranking: ranking::FileRanking,
+    },
+    RankingSummary {
+        files: Vec<String>,
+    },
+    BatchSummary {
+        terms: Vec<batch::TermSummary>,
+    },
+    ExecutionSummary {
+        #[serde(rename = "extractedFiles")]
+        extracted_files: usize,
+        #[serde(rename = "reusedFiles")]
+        reused_files: usize,
     },
     Finished {
         reason: &'static str,
@@ -316,7 +354,11 @@ fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
                 message: "通常検索語と高度な検索条件は同時に指定できません。",
             });
         }
-        query::parse(spec)?;
+        if spec["mode"] == "batch" {
+            batch::parse(spec)?;
+        } else {
+            query::parse(spec)?;
+        }
     } else if request.query.trim().is_empty() {
         return Err(InputError {
             field: "query",
@@ -477,6 +519,54 @@ struct Emitter<F: FnMut(SearchEvent)> {
     sequence: usize,
     counts: Counts,
     emit: F,
+    file_hits: Vec<SearchHit>,
+    rankings: Vec<ranking::FileRanking>,
+    batch_counts: std::collections::HashMap<String, (usize, usize)>,
+    extracted_files: usize,
+    reused_files: usize,
+    same_row_terms: usize,
+    modified_at: Option<f64>,
+    edit_revision: Option<String>,
+}
+
+fn document_order(unit: &Unit) -> Vec<u64> {
+    let sequence = unit.meta.unit_key.parse().unwrap_or(0);
+    if unit.source_kind == "fileName" {
+        return vec![0];
+    }
+    if let Some(sheet) = unit.location["sheetIndex"].as_u64() {
+        let address = unit.location["cellAddress"]
+            .as_str()
+            .or(unit.meta.anchor.as_deref());
+        let position = address.and_then(extract::parse_cell_address);
+        let row = unit
+            .meta
+            .row
+            .or(position.map(|p| p.0))
+            .map(u64::from)
+            .unwrap_or(u64::MAX);
+        let column = unit
+            .meta
+            .column
+            .or(position.map(|p| p.1))
+            .map(u64::from)
+            .unwrap_or(u64::MAX);
+        let kind = match unit.source_kind {
+            "cell" => 0,
+            "formula" => 1,
+            "excelComment" => 2,
+            _ => 3,
+        };
+        return vec![1, sheet, row, column, kind, sequence];
+    }
+    vec![
+        1,
+        unit.location["lineNumber"]
+            .as_u64()
+            .or(unit.location["slideNumber"].as_u64())
+            .unwrap_or(sequence),
+        sequence,
+    ]
 }
 
 impl<F: FnMut(SearchEvent)> Emitter<F> {
@@ -499,30 +589,68 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
         self.send(EventKind::Issue { issue });
     }
     fn hit(&mut self, path: &Path, file_type: &str, unit: Unit, matched: fuzzy::Match) {
+        self.term_hit(path, file_type, unit, matched, None);
+    }
+    fn publish(&mut self, hit: SearchHit) {
+        if let Some(id) = &hit.term_id {
+            self.batch_counts.entry(id.clone()).or_default().1 += 1;
+        }
+        self.file_hits.push(hit.clone());
+        self.send(EventKind::Result { hit });
+    }
+    fn finish_file(&mut self) {
+        let mut ids = HashSet::new();
+        for hit in &self.file_hits {
+            if let Some(id) = &hit.term_id {
+                ids.insert(id.clone());
+            }
+        }
+        for id in ids {
+            self.batch_counts.entry(id).or_default().0 += 1;
+        }
+        if let Some(ranking) = ranking::summarize(&self.file_hits, self.same_row_terms) {
+            self.rankings.push(ranking.clone());
+            self.send(EventKind::FileRanked { ranking });
+        }
+        self.file_hits.clear();
+        self.same_row_terms = 0;
+    }
+    fn term_hit(
+        &mut self,
+        path: &Path,
+        file_type: &str,
+        unit: Unit,
+        matched: fuzzy::Match,
+        term: Option<&batch::Term>,
+    ) {
         self.counts.result_count += 1;
         let (preview_text, preview_truncated, range) = preview(&unit.text, matched.range);
-        self.send(EventKind::Result {
-            hit: SearchHit {
-                result_id: self.counts.result_count,
-                file_path: display_path(path),
-                file_type: file_type.to_owned(),
-                source_kind: unit.source_kind.to_owned(),
-                unit_key: unit.meta.unit_key,
-                part_key: unit.meta.part_key,
-                group_key: unit.meta.group_key,
-                row: unit.meta.row,
-                column: unit.meta.column,
-                content_class: unit.meta.content_class,
-                anchor: unit.meta.anchor,
-                location: unit.location,
-                preview_text,
-                preview_truncated,
-                match_ranges: vec![range],
-                match_type: matched.kind,
-                match_category: matched.category,
-                score: matched.score,
-                evidence: vec![],
-            },
+        self.publish(SearchHit {
+            source_match_ranges: vec![matched.range],
+            document_order: document_order(&unit),
+            modified_at: self.modified_at,
+            edit_anchor: edit::anchor(&unit, matched.range, self.edit_revision.as_deref()),
+            term_id: term.map(|term| term.id.clone()),
+            term: term.map(|term| term.text.clone()),
+            result_id: self.counts.result_count,
+            file_path: display_path(path),
+            file_type: file_type.to_owned(),
+            source_kind: unit.source_kind.to_owned(),
+            unit_key: unit.meta.unit_key,
+            part_key: unit.meta.part_key,
+            group_key: unit.meta.group_key,
+            row: unit.meta.row,
+            column: unit.meta.column,
+            content_class: unit.meta.content_class,
+            anchor: unit.meta.anchor,
+            location: unit.location,
+            preview_text,
+            preview_truncated,
+            match_ranges: vec![range],
+            match_type: matched.kind,
+            match_category: matched.category,
+            score: matched.score,
+            evidence: vec![],
         });
     }
     fn condition_hit(&mut self, path: &Path, file_type: &str, group: query::GroupMatch<'_>) {
@@ -545,6 +673,13 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
                 let (preview_text, preview_truncated, range) =
                     preview(&candidate.unit.text, candidate.matched.range);
                 SearchEvidence {
+                    source_match_ranges: vec![candidate.matched.range],
+                    document_order: document_order(candidate.unit),
+                    edit_anchor: edit::anchor(
+                        candidate.unit,
+                        candidate.matched.range,
+                        self.edit_revision.as_deref(),
+                    ),
                     term_id: candidate.term_id,
                     term: candidate.term,
                     unit_key: candidate.unit.meta.unit_key.clone(),
@@ -565,28 +700,36 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
             .collect();
         let primary = &evidence[0];
         self.counts.result_count += 1;
-        self.send(EventKind::Result {
-            hit: SearchHit {
-                result_id: self.counts.result_count,
-                file_path: display_path(path),
-                file_type: file_type.into(),
-                source_kind: source_kind.into(),
-                unit_key,
-                part_key,
-                group_key,
-                row,
-                column,
-                content_class,
-                anchor,
-                location,
-                preview_text: primary.preview_text.clone(),
-                preview_truncated: primary.preview_truncated,
-                match_ranges: primary.match_ranges.clone(),
-                match_type: primary.match_type,
-                match_category,
-                score: primary.score,
-                evidence,
-            },
+        self.publish(SearchHit {
+            source_match_ranges: primary.source_match_ranges.clone(),
+            document_order: evidence
+                .iter()
+                .map(|item| item.document_order.clone())
+                .min()
+                .unwrap_or_default(),
+            modified_at: self.modified_at,
+            edit_anchor: None,
+            term_id: None,
+            term: None,
+            result_id: self.counts.result_count,
+            file_path: display_path(path),
+            file_type: file_type.into(),
+            source_kind: source_kind.into(),
+            unit_key,
+            part_key,
+            group_key,
+            row,
+            column,
+            content_class,
+            anchor,
+            location,
+            preview_text: primary.preview_text.clone(),
+            preview_truncated: primary.preview_truncated,
+            match_ranges: primary.match_ranges.clone(),
+            match_type: primary.match_type,
+            match_category,
+            score: primary.score,
+            evidence,
         });
     }
     fn condition_hits(
@@ -598,7 +741,14 @@ impl<F: FnMut(SearchEvent)> Emitter<F> {
         fuzzy_search: bool,
         cancel: &AtomicBool,
     ) {
-        for group in query::evaluate(units, file_type, spec, fuzzy_search, cancel) {
+        let groups = query::evaluate(units, file_type, spec, fuzzy_search, cancel);
+        if spec.scope == query::Scope::File
+            && !groups.is_empty()
+            && matches!(file_type, "xlsx" | "xlsm")
+        {
+            self.same_row_terms = query::same_row_terms(units, spec, fuzzy_search, cancel);
+        }
+        for group in groups {
             if cancel.load(Ordering::Relaxed) {
                 break;
             }
@@ -616,17 +766,41 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     emit: F,
 ) -> Result<(), InputError> {
     let paths = validate_paths(&request)?;
-    let conditions = request.query_spec.as_ref().map(query::parse).transpose()?;
+    let batch = request
+        .query_spec
+        .as_ref()
+        .filter(|spec| spec["mode"] == "batch")
+        .map(batch::parse)
+        .transpose()?;
+    let conditions = request
+        .query_spec
+        .as_ref()
+        .filter(|spec| spec["mode"] != "batch")
+        .map(query::parse)
+        .transpose()?;
     let excluded_keys: Vec<PathBuf> = paths.excluded.iter().map(|path| path_key(path)).collect();
     let query = fuzzy::Query::new(&request.query);
     let use_index = request.use_index;
     let fuzzy_search = request.fuzzy_search;
+    let extraction_options = extract::ExtractionOptions {
+        include_notes: request.include_notes,
+        include_formulas: request.include_formulas,
+    };
+    let extraction_scope = extraction_options.scope();
     let selected: HashSet<String> = request.extensions.iter().cloned().collect();
     let mut sink = Emitter {
         id: search_id,
         sequence: 0,
         counts: Counts::default(),
         emit,
+        file_hits: Vec::new(),
+        rankings: Vec::new(),
+        batch_counts: std::collections::HashMap::new(),
+        extracted_files: 0,
+        reused_files: 0,
+        same_row_terms: 0,
+        modified_at: None,
+        edit_revision: None,
     };
     sink.send(EventKind::Started { request });
     sink.progress("discovery");
@@ -709,9 +883,38 @@ pub fn run_search<F: FnMut(SearchEvent)>(
             break;
         }
         sink.counts.processed_files += 1;
+        sink.modified_at = fs::metadata(&path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs_f64() * 1000.0);
+        sink.edit_revision = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
+            fs::metadata(&path)
+                .ok()
+                .filter(|metadata| metadata.len() <= MAX_TEXT_BYTES)
+                .and_then(|_| fs::read(&path).ok())
+                .map(|bytes| edit::revision(&bytes))
+        } else {
+            None
+        };
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         let filename_unit = file_name_unit(name.to_string());
-        if let Some(spec) = &conditions {
+        if let Some(spec) = &batch {
+            for term in &spec.terms {
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let Some(matched) = spec.matched(term, &filename_unit.text, fuzzy_search) {
+                    sink.term_hit(
+                        &path,
+                        &file_type,
+                        filename_unit.clone(),
+                        matched,
+                        Some(term),
+                    );
+                }
+            }
+        } else if let Some(spec) = &conditions {
             if spec.scope != query::Scope::File {
                 sink.condition_hits(
                     &path,
@@ -727,15 +930,38 @@ pub fn run_search<F: FnMut(SearchEvent)>(
         }
         let cached_stamp = index::stamp(&path);
         if let Some(cache) = search_index.as_ref() {
-            if cache.current(&path, index::DEFAULT_SCOPE) {
-                let cached = if conditions.is_some() {
+            if cache.current(&path, extraction_scope) {
+                let cached = if conditions.is_some() || batch.is_some() {
                     cache.all_units(&path)
                 } else {
                     cache.candidates(&path, &query, fuzzy_search)
                 };
                 if let Ok(units) = cached {
                     if cached_stamp.is_some() && cached_stamp == index::stamp(&path) {
-                        if let Some(spec) = &conditions {
+                        sink.reused_files += 1;
+                        if let Some(spec) = &batch {
+                            for unit in &units {
+                                for term in &spec.terms {
+                                    if cancel.load(Ordering::Relaxed) {
+                                        break;
+                                    }
+                                    if let Some(matched) =
+                                        spec.matched(term, &unit.text, fuzzy_search)
+                                    {
+                                        sink.term_hit(
+                                            &path,
+                                            &file_type,
+                                            unit.clone(),
+                                            matched,
+                                            Some(term),
+                                        );
+                                    }
+                                }
+                                if cancel.load(Ordering::Relaxed) {
+                                    break;
+                                }
+                            }
+                        } else if let Some(spec) = &conditions {
                             let mut scoped = if spec.scope == query::Scope::File {
                                 vec![&filename_unit]
                             } else {
@@ -762,6 +988,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                                 }
                             }
                         }
+                        sink.finish_file();
                         sink.progress("search");
                         continue;
                     }
@@ -769,6 +996,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
             }
         }
         let expected_stamp = index::stamp(&path);
+        sink.extracted_files += 1;
         let result = if !OFFICE_EXTENSIONS.contains(&file_type.as_str()) {
             fs::metadata(&path)
                 .map_err(extract::ExtractError::from)
@@ -790,10 +1018,11 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                     extract::text_units(&bytes).map(|units| extract::ExtractedDocument {
                         units,
                         sheets: vec![],
+                        issues: vec![],
                     })
                 })
         } else {
-            extract::office_units(&path, &file_type)
+            extract::office_units_with_options(&path, &file_type, extraction_options)
         };
         match result {
             Ok(document) => {
@@ -804,17 +1033,37 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                         code: "changedDuringRead",
                         reason: "検索中にファイルが変更されました。再検索してください。".into(),
                     });
+                    sink.finish_file();
                     sink.progress("search");
                     continue;
                 }
-                if let Some(spec) = &conditions {
+                for issue in &document.issues {
+                    sink.issue(issue_for(Some(&path), "read", issue));
+                }
+                if let Some(spec) = &batch {
+                    for unit in &document.units {
+                        for term in &spec.terms {
+                            if cancel.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            if let Some(matched) = spec.matched(term, &unit.text, fuzzy_search) {
+                                sink.term_hit(&path, &file_type, unit.clone(), matched, Some(term));
+                            }
+                        }
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
+                    }
+                } else if let Some(spec) = &conditions {
                     let mut scoped = if spec.scope == query::Scope::File {
                         vec![&filename_unit]
                     } else {
                         Vec::new()
                     };
                     scoped.extend(document.units.iter());
-                    sink.condition_hits(&path, &file_type, &scoped, spec, fuzzy_search, cancel);
+                    if document.issues.is_empty() || spec.scope != query::Scope::File {
+                        sink.condition_hits(&path, &file_type, &scoped, spec, fuzzy_search, cancel);
+                    }
                 } else {
                     for unit in &document.units {
                         if cancel.load(Ordering::Relaxed) {
@@ -829,13 +1078,13 @@ pub fn run_search<F: FnMut(SearchEvent)>(
                         }
                     }
                 }
-                if !cancel.load(Ordering::Relaxed) {
+                if !cancel.load(Ordering::Relaxed) && document.issues.is_empty() {
                     if let Some(cache) = search_index.as_mut() {
                         match cache.replace(
                             &path,
                             &document,
                             expected_stamp.unwrap(),
-                            index::DEFAULT_SCOPE,
+                            extraction_scope,
                         ) {
                             Ok(true) => (),
                             Ok(false) => sink.issue(SearchIssue {
@@ -852,6 +1101,7 @@ pub fn run_search<F: FnMut(SearchEvent)>(
             }
             Err(error) => sink.issue(issue_for(Some(&path), "read", &error)),
         }
+        sink.finish_file();
         sink.progress("search");
     }
     let reason = if cancel.load(Ordering::Relaxed) {
@@ -859,6 +1109,46 @@ pub fn run_search<F: FnMut(SearchEvent)>(
     } else {
         "completed"
     };
+    sink.rankings.sort_by(ranking::compare);
+    let files = sink
+        .rankings
+        .iter()
+        .map(|ranking| ranking.file_path.clone())
+        .collect();
+    sink.send(EventKind::RankingSummary { files });
+    sink.send(EventKind::ExecutionSummary {
+        extracted_files: sink.extracted_files,
+        reused_files: sink.reused_files,
+    });
+    if let Some(batch) = batch {
+        let status = if reason == "cancelled" {
+            "未確定（中断）"
+        } else if sink.counts.issue_count > 0 {
+            "未確定（一部エラーあり）"
+        } else {
+            "確認完了"
+        };
+        let terms = batch
+            .terms
+            .into_iter()
+            .map(|term| {
+                let (file_count, hit_count) =
+                    sink.batch_counts.get(&term.id).copied().unwrap_or_default();
+                batch::TermSummary {
+                    term_id: term.id,
+                    term: term.text,
+                    file_count,
+                    hit_count,
+                    status: if hit_count == 0 && status == "確認完了" {
+                        "指定範囲内で該当なし".into()
+                    } else {
+                        status.into()
+                    },
+                }
+            })
+            .collect();
+        sink.send(EventKind::BatchSummary { terms });
+    }
     sink.send(EventKind::Finished {
         reason,
         counts: sink.counts.clone(),
@@ -883,6 +1173,8 @@ mod tests {
             extensions: vec!["txt".into()],
             use_index: false,
             fuzzy_search: false,
+            include_notes: false,
+            include_formulas: false,
         };
         assert_eq!(validate(&request).unwrap_err().field, "querySpec");
     }
