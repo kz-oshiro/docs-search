@@ -3,11 +3,34 @@ use crate::*;
 use std::{collections::HashMap, io::Write};
 #[derive(Clone)]
 struct Shape {
-    kind: String,
     fill: Option<[u8; 3]>,
     stroke: Option<[u8; 3]>,
-    numbers: HashMap<String, f64>,
-    points: Vec<(f64, f64)>,
+    geometry: Geometry,
+}
+#[derive(Clone)]
+enum Geometry {
+    Rect {
+        left: f64,
+        top: f64,
+        width: f64,
+        height: f64,
+        radius: f64,
+    },
+    Circle {
+        cx: f64,
+        cy: f64,
+        radius: f64,
+        half_stroke: f64,
+    },
+    Line {
+        x1: f64,
+        y1: f64,
+        dx: f64,
+        dy: f64,
+        length_squared: f64,
+        half_stroke: f64,
+    },
+    Polygon(Vec<(f64, f64)>),
 }
 fn color(value: Option<&str>) -> Result<Option<[u8; 3]>> {
     match value {
@@ -35,20 +58,17 @@ fn parse(source: &str) -> Result<Vec<Shape>> {
         if !["rect", "circle", "line", "polygon"].contains(&kind) {
             return Err(format!("unsupported icon element: {kind}").into());
         }
-        let mut shape = Shape {
-            kind: kind.into(),
-            fill: color(element.attribute("fill"))?,
-            stroke: color(element.attribute("stroke"))?,
-            numbers: HashMap::new(),
-            points: vec![],
-        };
+        let fill = color(element.attribute("fill"))?;
+        let stroke = color(element.attribute("stroke"))?;
+        let mut numbers: HashMap<String, f64> = HashMap::new();
+        let mut points = vec![];
         for attribute in element.attributes() {
             match attribute.name() {
                 "fill" | "stroke" => {}
                 "points" => {
                     for p in attribute.value().split_whitespace() {
                         let (x, y) = p.split_once(',').ok_or("invalid polygon point")?;
-                        shape.points.push((x.parse()?, y.parse()?));
+                        points.push((x.parse()?, y.parse()?));
                     }
                 }
                 "stroke-linecap" => {
@@ -57,7 +77,7 @@ fn parse(source: &str) -> Result<Vec<Shape>> {
                     }
                 }
                 key => {
-                    shape.numbers.insert(key.into(), attribute.value().parse()?);
+                    numbers.insert(key.into(), attribute.value().parse()?);
                 }
             }
         }
@@ -70,38 +90,72 @@ fn parse(source: &str) -> Result<Vec<Shape>> {
             "line" => &["x1", "y1", "x2", "y2"],
             _ => &[],
         };
-        if required.iter().any(|key| !shape.numbers.contains_key(*key))
-            || (kind == "polygon" && shape.points.len() < 3)
+        if required.iter().any(|key| !numbers.contains_key(*key))
+            || (kind == "polygon" && points.len() < 3)
         {
             return Err("icon shape is incomplete".into());
         }
-        if kind == "line"
-            && shape.numbers["x1"] == shape.numbers["x2"]
-            && shape.numbers["y1"] == shape.numbers["y2"]
-        {
+        if kind == "line" && numbers["x1"] == numbers["x2"] && numbers["y1"] == numbers["y2"] {
             return Err("zero-length icon line".into());
         }
-        shapes.push(shape);
+        // Resolve attributes and shape-only arithmetic once, outside pixel sampling.
+        let n = |key: &str, default: f64| *numbers.get(key).unwrap_or(&default);
+        let geometry = match kind {
+            "rect" => {
+                let width = n("width", 0.);
+                let height = n("height", 0.);
+                Geometry::Rect {
+                    left: n("x", 0.),
+                    top: n("y", 0.),
+                    width,
+                    height,
+                    radius: n("rx", 0.).min(width / 2.).min(height / 2.),
+                }
+            }
+            "circle" => Geometry::Circle {
+                cx: n("cx", 0.),
+                cy: n("cy", 0.),
+                radius: n("r", 0.),
+                half_stroke: n("stroke-width", 1.) / 2.,
+            },
+            "line" => {
+                let x1 = n("x1", 0.);
+                let y1 = n("y1", 0.);
+                let dx = n("x2", 0.) - x1;
+                let dy = n("y2", 0.) - y1;
+                Geometry::Line {
+                    x1,
+                    y1,
+                    dx,
+                    dy,
+                    length_squared: dx * dx + dy * dy,
+                    half_stroke: n("stroke-width", 1.) / 2.,
+                }
+            }
+            _ => Geometry::Polygon(points),
+        };
+        shapes.push(Shape {
+            fill,
+            stroke,
+            geometry,
+        });
     }
     Ok(shapes)
 }
 impl Shape {
-    fn n(&self, key: &str, default: f64) -> f64 {
-        *self.numbers.get(key).unwrap_or(&default)
-    }
     fn paint(&self, x: f64, y: f64) -> Option<[u8; 3]> {
-        match self.kind.as_str() {
-            "rect" => {
-                let (left, top, width, height) = (
-                    self.n("x", 0.),
-                    self.n("y", 0.),
-                    self.n("width", 0.),
-                    self.n("height", 0.),
-                );
+        match &self.geometry {
+            Geometry::Rect {
+                left,
+                top,
+                width,
+                height,
+                radius,
+            } => {
+                let (left, top, width, height, r) = (*left, *top, *width, *height, *radius);
                 if !(left <= x && x <= left + width && top <= y && y <= top + height) {
                     return None;
                 }
-                let r = self.n("rx", 0.).min(width / 2.).min(height / 2.);
                 let cx = x.clamp(left + r, left + width - r);
                 let cy = y.clamp(top + r, top + height - r);
                 if (x - cx).powi(2) + (y - cy).powi(2) <= r * r {
@@ -110,35 +164,40 @@ impl Shape {
                     None
                 }
             }
-            "circle" => {
-                let d = (x - self.n("cx", 0.)).hypot(y - self.n("cy", 0.));
-                let r = self.n("r", 0.);
-                if self.stroke.is_some() && (d - r).abs() <= self.n("stroke-width", 1.) / 2. {
+            Geometry::Circle {
+                cx,
+                cy,
+                radius,
+                half_stroke,
+            } => {
+                let d = (x - cx).hypot(y - cy);
+                if self.stroke.is_some() && (d - radius).abs() <= *half_stroke {
                     self.stroke
-                } else if d <= r {
+                } else if d <= *radius {
                     self.fill
                 } else {
                     None
                 }
             }
-            "line" => {
-                let dx = self.n("x2", 0.) - self.n("x1", 0.);
-                let dy = self.n("y2", 0.) - self.n("y1", 0.);
-                let f = (((x - self.n("x1", 0.)) * dx + (y - self.n("y1", 0.)) * dy)
-                    / (dx * dx + dy * dy))
-                    .clamp(0., 1.);
-                if (x - self.n("x1", 0.) - f * dx).hypot(y - self.n("y1", 0.) - f * dy)
-                    <= self.n("stroke-width", 1.) / 2.
-                {
+            Geometry::Line {
+                x1,
+                y1,
+                dx,
+                dy,
+                length_squared,
+                half_stroke,
+            } => {
+                let f = (((x - x1) * dx + (y - y1) * dy) / length_squared).clamp(0., 1.);
+                if (x - x1 - f * dx).hypot(y - y1 - f * dy) <= *half_stroke {
                     self.stroke
                 } else {
                     None
                 }
             }
-            _ => {
+            Geometry::Polygon(points) => {
                 let mut inside = false;
-                let mut previous = *self.points.last().unwrap();
-                for &(x2, y2) in &self.points {
+                let mut previous = *points.last().unwrap();
+                for &(x2, y2) in points {
                     let (x1, y1) = previous;
                     if (y1 > y) != (y2 > y) && x < (x2 - x1) * (y - y1) / (y2 - y1) + x1 {
                         inside = !inside;
@@ -156,6 +215,9 @@ impl Shape {
 }
 pub fn rasterize(source: &str, size: usize) -> Result<Vec<u8>> {
     let shapes = parse(source)?;
+    Ok(rasterize_shapes(&shapes, size))
+}
+fn rasterize_shapes(shapes: &[Shape], size: usize) -> Vec<u8> {
     let mut pixels = vec![];
     let scale = 128. / size as f64;
     for y in 0..size {
@@ -166,7 +228,8 @@ pub fn rasterize(source: &str, size: usize) -> Result<Vec<u8>> {
                 for sx in 0..4 {
                     let px = (x as f64 + (sx as f64 + 0.5) / 4.) * scale;
                     let py = (y as f64 + (sy as f64 + 0.5) / 4.) * scale;
-                    let pixel = shapes.iter().filter_map(|s| s.paint(px, py)).last();
+                    // The last painted shape wins; transparent shapes do not cover it.
+                    let pixel = shapes.iter().rev().find_map(|s| s.paint(px, py));
                     if let Some(pixel) = pixel {
                         covered += 1;
                         for i in 0..3 {
@@ -185,7 +248,7 @@ pub fn rasterize(source: &str, size: usize) -> Result<Vec<u8>> {
             }
         }
     }
-    Ok(pixels)
+    pixels
 }
 fn bitmap(size: usize, rgba: &[u8]) -> Vec<u8> {
     let mut pixels = vec![];
@@ -245,6 +308,7 @@ fn png(size: usize, rgba: &[u8]) -> Result<Vec<u8>> {
 }
 pub fn generate(directory: &Path) -> Result<()> {
     let source = fs::read_to_string(directory.join("icon.svg"))?;
+    let shapes = parse(&source)?;
     let sizes = [16, 20, 24, 32, 48, 64, 128, 256];
     let mut header = vec![];
     for v in [0u16, 1, 8] {
@@ -254,7 +318,7 @@ pub fn generate(directory: &Path) -> Result<()> {
     let mut offset = 6 + 16 * sizes.len();
     let mut large = None;
     for size in sizes {
-        let rgba = rasterize(&source, size)?;
+        let rgba = rasterize_shapes(&shapes, size);
         let data = bitmap(size, &rgba);
         let dimension = if size == 256 { 0 } else { size as u8 };
         header.extend([dimension, dimension, 0, 0]);

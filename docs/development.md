@@ -22,6 +22,10 @@ cargo xtask ui --case "^U23:"
 
 `test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、ランナー内で別のビルドをしません。CLI の LOCALAPPDATA は子プロセスごとに独立しています。共通 load データは実行内で共有し、変更する文書と索引は別の一時領域に置きます。
 
+バックエンドのCargo試験とフロントエンド試験は別の実行枝で同時に開始し、両方の終了後に結果を合流します。Cargoの各工程は順次実行します。CPU使用率の計算・worker選択のNode単体試験もバックエンド側の必須工程です。いずれかが失敗しても他方と独立した残りの工程を続けます。
+
+フロントエンドのworker数は開始前に200ms間隔で3回CPU時間の差分を測って決めます。利用可能CPU数は `os.availableParallelism()`、負荷は `os.cpus()` の累積時間を使います。3区間の最大使用率から80%目標までの空きを計算し、利用可能CPUの半分・6 workersを上限、1 workerを下限にします。測定不能時は理由付きで1にします。各実行で再計測し、同じPlaywright実行中は決定値を共有します。ファイル内の試験順序は維持し、ファイル間だけを並列化します。[CI性能検証方針](test-plans/ci-performance-test-plan.md)に計算例と確認手順を記載しています。
+
 フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。Tauri/OS の応答をモックにして実 HTML/CSS/JS を操作し、DOM・状態・要求引数で判定します。画像/動画/トレースは無効です。[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)と[今回の移行検証](test-plans/cargo-native-ui-test-plan.md)を読んでから実施します。
 
 試験区分はバックエンド試験（Rustの単体/API/性質/実CLI）、フロントエンド試験（Playwright＋Tauri境界モック）、アプリケーション結合試験（Playwright＋実Tauri）に統一します。バックエンド試験・フロントエンド試験でカバーできる確認は各区分で担当し、個別試験では確認できない接続上の不具合だけを結合試験に回します。個別試験の不足はその区分で補い、結合試験で代用しません。構造・6テーマの配色G01/G02はフロントエンド試験、生成器・資材・ハッシュは共通の検証基盤で担当します。
@@ -41,6 +45,8 @@ cargo xtask ci
 
 各実行は新規 `outputs/runs/<実行ID>/` に `report.json` / `report.md`、工程別 stdout/stderr、Git commit/dirty、Rust/Cargo/Node/npm、Playwright の前提と実測版、所要時間、順位 Top-5、UI JSON/テキスト失敗記録を残します。レポートは異なる実行の成功ログを混ぜません。
 
+並列試験のログには `backend-` / `frontend-` を付け、工程の開始時刻と経過時間を記録します。工程時間は重なるため総時間として加算しません。総時間は `finishedAtUnixMs - metadata.startedAtUnixMs`、外側のCargo起動・xtaskコンパイル込みは別に計測します。`ui/workers.json` にCPU各区間・平均/最大使用率・利用可能CPU数・選択worker数・fallback理由を保存し、トップレポートから参照します。proptestの件数/seedの環境変数もmetadataに残します。
+
 `target/debug` / `target/release` / staged frontend を削除しません。旧配置の target・outputs・UI cache も自動削除しません。キャッシュの保持はコンパイルの再利用であり、テストは毎回実行します。
 
 ## データとアイコン
@@ -53,6 +59,8 @@ cargo xtask icons
 ```
 
 生成先は新規または空のフォルダーに限ります。省略時は outputs/test-data の新しい実行別フォルダーです。`--kind common|context|conditions|office|issues` を指定できます。[在庫と役割](../tests/README.md)を参照してください。`Generate-Test-Data.cmd` は Cargo を呼ぶだけの入口で、ダブルクリックでは保存先を開き、従来の `-Profile` / `-NoOpen` も受け付けます。通常の cargo xtask fixtures は開かず、--open 指定時だけ開きます。アイコン生成は承認済み SVG の限定した図形のみを Rust でラスタライズし、通常の test / build では書き換えません。
+
+アイコンはSVGの解析結果を8サイズで共有し、属性と図形固有の計算をサンプル処理の外へ移しています。各サンプルでは後ろに定義された可視図形から評価します。4×4サンプリング・画素の丸め・ICO/PNG形式を維持し、承認済み画素と2回生成の再現性を毎回検証します。Cargoのコンパイル最適化設定は変更していません。
 
 ## 静的確認と検証範囲
 

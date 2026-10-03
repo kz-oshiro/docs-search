@@ -22,6 +22,7 @@ struct Phase {
     name: String,
     status: String,
     exit_code: Option<i32>,
+    started_at_unix_ms: u128,
     duration_ms: u128,
     stdout: Option<String>,
     stderr: Option<String>,
@@ -31,9 +32,24 @@ struct Run {
     root: PathBuf,
     dir: PathBuf,
     target: PathBuf,
+    log_prefix: &'static str,
     phases: Vec<Phase>,
     metadata: Value,
     artifacts: Vec<Value>,
+}
+fn unix_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+fn panic_reason(error: Box<dyn std::any::Any + Send>) -> String {
+    let message = error
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| error.downcast_ref::<&str>().copied())
+        .unwrap_or("unknown panic");
+    format!("test runner panicked: {message}")
 }
 fn capture(root: &Path, program: &str, args: &[&str]) -> Value {
     match Command::new(program).args(args).current_dir(root).output() {
@@ -65,7 +81,7 @@ impl Run {
         fs::create_dir(&dir)?;
         let metadata = json!({"schemaVersion":1,"command":command,"startedAtUnixMs":stamp,"commit":capture(&root,"git",&["rev-parse","HEAD"]),
             "workingTree":capture(&root,"git",&["status","--porcelain"]),"rustc":capture(&root,"rustc",&["--version"]),"cargo":capture(&root,"cargo",&["--version"]),
-            "node":capture(&root,"node",&["--version"]),"npm":capture(&root,npm(),&["--version"]),"playwright":capture(&root,"node",&["-p","require('./tests/ui/node_modules/@playwright/test/package.json').version"]),"playwrightRequired":"1.63.0","platform":std::env::consts::OS,"architecture":std::env::consts::ARCH});
+            "node":capture(&root,"node",&["--version"]),"npm":capture(&root,npm(),&["--version"]),"playwright":capture(&root,"node",&["-p","require('./tests/ui/node_modules/@playwright/test/package.json').version"]),"playwrightRequired":"1.63.0","platform":std::env::consts::OS,"architecture":std::env::consts::ARCH,"proptest":{"casesEnv":std::env::var("PROPTEST_CASES").ok(),"rngSeedEnv":std::env::var("PROPTEST_RNG_SEED").ok()}});
         let output = Command::new("cargo")
             .args(["metadata", "--no-deps", "--locked", "--format-version", "1"])
             .current_dir(&root)
@@ -83,10 +99,26 @@ impl Run {
             root,
             dir,
             target,
+            log_prefix: "",
             phases: vec![],
             metadata,
             artifacts: vec![],
         })
+    }
+    fn branch(&self, log_prefix: &'static str) -> Self {
+        Self {
+            root: self.root.clone(),
+            dir: self.dir.clone(),
+            target: self.target.clone(),
+            log_prefix,
+            phases: vec![],
+            metadata: self.metadata.clone(),
+            artifacts: vec![],
+        }
+    }
+    fn absorb(&mut self, branch: Self) {
+        self.phases.extend(branch.phases);
+        self.artifacts.extend(branch.artifacts);
     }
     fn relative(&self, path: &Path) -> String {
         path.strip_prefix(&self.root)
@@ -100,6 +132,7 @@ impl Run {
             name: name.into(),
             status: "skipped".into(),
             exit_code: None,
+            started_at_unix_ms: unix_ms(),
             duration_ms: 0,
             stdout: None,
             stderr: None,
@@ -115,10 +148,15 @@ impl Run {
         env: &[(&str, &Path)],
     ) -> bool {
         println!("START {name}");
+        let started_at_unix_ms = unix_ms();
         let start = Instant::now();
         let index = self.phases.len() + 1;
-        let out = self.dir.join(format!("{index:02}-{name}.stdout.log"));
-        let err = self.dir.join(format!("{index:02}-{name}.stderr.log"));
+        let out = self
+            .dir
+            .join(format!("{}{index:02}-{name}.stdout.log", self.log_prefix));
+        let err = self
+            .dir
+            .join(format!("{}{index:02}-{name}.stderr.log", self.log_prefix));
         let result = (|| -> Result<_> {
             let mut cmd = Command::new(program);
             cmd.args(args)
@@ -147,6 +185,7 @@ impl Run {
             name: name.into(),
             status: if passed { "passed" } else { "failed" }.into(),
             exit_code: code,
+            started_at_unix_ms,
             duration_ms: duration,
             stdout: Some(self.relative(&out)),
             stderr: Some(self.relative(&err)),
@@ -159,6 +198,7 @@ impl Run {
         F: FnOnce(&mut Self) -> Result<()>,
     {
         println!("START {name}");
+        let started_at_unix_ms = unix_ms();
         let start = Instant::now();
         let result = action(self);
         let success = result.is_ok();
@@ -176,6 +216,7 @@ impl Run {
             name: name.into(),
             status: if success { "passed" } else { "failed" }.into(),
             exit_code: Some(if success { 0 } else { 1 }),
+            started_at_unix_ms,
             duration_ms: duration,
             stdout: None,
             stderr: None,
@@ -233,7 +274,13 @@ impl Run {
         });
         let node = self.phase("ui-node", "node", &["check-node.mjs"], &folder, &[]);
         let prepared = if node {
-            self.phase("ui-preflight", "node", &["preflight.mjs"], &folder, &[])
+            self.phase(
+                "ui-preflight",
+                "node",
+                &["preflight.mjs"],
+                &folder,
+                &[("DOCS_SEARCH_UI_ARTIFACTS", &artifacts)],
+            )
         } else {
             self.skipped(
                 "ui-preflight",
@@ -248,6 +295,10 @@ impl Run {
             );
             return false;
         }
+        self.artifacts.push(json!({
+            "kind": "ui-workers",
+            "path": self.relative(&artifacts.join("workers.json")),
+        }));
         let mut args = vec!["node_modules/@playwright/test/cli.js", "test"];
         if let Some(case) = case {
             args.extend(["--grep", case]);
@@ -264,6 +315,48 @@ impl Run {
         )
     }
     fn tests(&mut self) -> bool {
+        self.metadata["automaticTestExecution"] = json!({
+            "backendFrontendParallel": true,
+            "cargoPhases": "sequential",
+        });
+        let mut backend = self.branch("backend-");
+        let mut frontend = self.branch("frontend-");
+        // Only the independent Node/browser group overlaps the Cargo group.
+        // Each branch owns its reports and logs; no Run state is shared mutably.
+        let (joined, frontend_passed) = std::thread::scope(|scope| {
+            let background = scope.spawn(move || {
+                let passed = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    backend.backend_tests()
+                })) {
+                    Ok(passed) => passed,
+                    Err(error) => {
+                        backend.local("backend-runner", |_| Err(panic_reason(error).into()))
+                    }
+                };
+                (backend, passed)
+            });
+            let passed = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                frontend.ui(None)
+            })) {
+                Ok(passed) => passed,
+                Err(error) => {
+                    frontend.local("frontend-runner", |_| Err(panic_reason(error).into()))
+                }
+            };
+            (background.join(), passed)
+        });
+        let backend_passed = match joined {
+            Ok((backend, passed)) => {
+                self.absorb(backend);
+                passed
+            }
+            Err(error) => self.local("backend-runner", |_| Err(panic_reason(error).into())),
+        };
+        self.absorb(frontend);
+        self.phases.sort_by_key(|phase| phase.started_at_unix_ms);
+        backend_passed && frontend_passed
+    }
+    fn backend_tests(&mut self) -> bool {
         let root = self.root.clone();
         let corpus = self.dir.join("corpus");
         let shared=self.local("fixture-corpus",|run|{let manifest=common::generate(&corpus,"load")?;run.artifacts.push(json!({"kind":"fixture-manifest","path":run.relative(&corpus.join("manifest.json")),"files":manifest["files"].as_array().unwrap().len(),"seed":manifest["seed"]}));Ok(())});
@@ -334,7 +427,14 @@ impl Run {
                 &child_env,
             );
         }
-        success &= self.ui(None);
+        let folder = self.root.join("tests/ui");
+        success &= self.phase(
+            "worker-policy",
+            "node",
+            &["--test", "workers.test.mjs"],
+            &folder,
+            &[],
+        );
         success
     }
     fn build(&mut self) -> bool {
@@ -401,12 +501,12 @@ impl Run {
         installed && checked
     }
     fn report(&self, success: bool) -> Result<()> {
-        let document = json!({"metadata":self.metadata,"finishedAtUnixMs":SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),"success":success,"phases":self.phases,"artifacts":self.artifacts});
+        let document = json!({"metadata":self.metadata,"finishedAtUnixMs":unix_ms(),"success":success,"phases":self.phases,"artifacts":self.artifacts});
         fs::write(
             self.dir.join("report.json"),
             serde_json::to_string_pretty(&document)? + "\n",
         )?;
-        let mut md=format!("# Cargo {} report\n\nResult: **{}**\n\n| Phase | Status | Exit | Duration (ms) | Logs / reason |\n|---|---|---:|---:|---|\n",self.metadata["command"].as_str().unwrap(),if success {"passed"} else {"failed"});
+        let mut md=format!("# Cargo {} report\n\nResult: **{}**\n\n| Phase | Status | Exit | Start offset (ms) | Duration (ms) | Logs / reason |\n|---|---|---:|---:|---:|---|\n",self.metadata["command"].as_str().unwrap(),if success {"passed"} else {"failed"});
         for phase in &self.phases {
             let detail =
                 phase
@@ -421,15 +521,33 @@ impl Run {
                         _ => "—".into(),
                     });
             md += &format!(
-                "| {} | {} | {} | {} | {} |\n",
+                "| {} | {} | {} | {} | {} | {} |\n",
                 phase.name,
                 phase.status,
                 phase
                     .exit_code
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| "—".into()),
+                phase.started_at_unix_ms.saturating_sub(
+                    self.metadata["startedAtUnixMs"].as_u64().unwrap_or(0) as u128,
+                ),
                 phase.duration_ms,
                 detail.replace('|', "\\|").replace('\n', " ")
+            );
+        }
+        if self.metadata["automaticTestExecution"]["backendFrontendParallel"] == true {
+            md += "\nBackend and frontend phases overlap. Phase durations must not be summed as wall time.\n";
+        }
+        if let Some(workers) = self
+            .artifacts
+            .iter()
+            .find(|artifact| artifact["kind"] == "ui-workers")
+        {
+            let path = workers["path"].as_str().unwrap();
+            let prefix = format!("{}/", self.relative(&self.dir));
+            let relative = path.strip_prefix(prefix.as_str()).unwrap_or(path);
+            md += &format!(
+                "\nUI CPU measurement and selected workers: [workers.json]({relative}).\n"
             );
         }
         md += "\nMetadata and artifact SHA256: [report.json](report.json).\n";

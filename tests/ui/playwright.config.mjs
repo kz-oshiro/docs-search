@@ -1,18 +1,22 @@
 import { defineConfig } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateWorkerPlan } from './workers.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const artifacts = process.env.DOCS_SEARCH_UI_ARTIFACTS;
 if (!artifacts || !process.env.DOCS_SEARCH_UI_SITE) {
   throw new Error('Run cargo xtask ui to stage the real frontend and allocate a new output directory.');
 }
+// The preflight measures once. Every worker reads the same immutable decision.
+const workers = validateWorkerPlan(JSON.parse(fs.readFileSync(path.join(artifacts, 'workers.json'), 'utf8')));
 
 export default defineConfig({
   testDir: './specs',
   testMatch: '**/*.spec.mjs',
   fullyParallel: false,
-  workers: 1,
+  workers,
   retries: 0,
   timeout: 30_000,
   expect: { timeout: 5_000 },

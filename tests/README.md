@@ -2,6 +2,8 @@
 
 全自動検証はルートの `cargo xtask test`、初回 UI 依存準備は `cargo xtask setup` です。保存データは `cargo xtask fixtures` / `Generate-Test-Data.cmd` で作ります。Python/PowerShell のランナーは撤去しました。
 
+バックエンドとフロントエンドは同時に開始し、独立した失敗もすべて収集します。Cargoの工程は順次実行し、全必須成功後にだけ `cargo xtask ci` のReleaseビルドへ進みます。CPU負荷を見たworker選択、並列実行の終了/記録、性能の比較は[CI性能検証方針](../docs/test-plans/ci-performance-test-plan.md)を参照してください。
+
 ## 原本と生成器
 
 `tests/fixtures/backend-cases.json` は共通27ケースの入力・結果・Issue・終了集計の原本です。`test-support` の Rust 生成器は検索エンジンから独立しており、core の dev-dependency と xtask だけが使います。配布アプリにはリンクしません。
@@ -32,9 +34,13 @@
 
 個別診断は `cargo test --locked -p docs-search-core --test cli_index -- --nocapture` のように実行できます。全件の結果には mandatory UI を含む `cargo xtask test` を使います。各子 CLI はそのテストの LOCALAPPDATA だけを使用し、プロセス全体の環境を変更しません。core の既存単体/API/proptest は継続します。
 
+worker数の計算・CPU差分・測定不能時のfallbackを `node --test tests/ui/workers.test.mjs` で個別診断できます。OS値と待機を注入した8件の単体試験であり、実CPUへの負荷やPlaywright起動は発生させません。この計算の試験はバックエンド区分とし、`cargo xtask test` / `ci` の `worker-policy` 工程に含めます。
+
 ## フロントエンド試験とアプリケーション結合試験
 
 [フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)に対応する現行ケースは54件です。実フロントエンドをヘッドレス Chromium で操作し、Tauri/OS 境界だけをモックにします。画像・動画・トレースは使いません。実施結果は実行ごとのレポートと[公開・検証記録](../docs/releases/README.md)を参照してください。
+
+開始前のCPU使用率から1〜6 workersを選び、ファイル間を並列化します。決定値は実行中固定で、全workerが同じ `ui/workers.json` を読みます。測定値・上限・fallback理由とUI結果の `config.workers` が一致することも確認します。
 
 [移行検証方針](../docs/test-plans/cargo-native-ui-test-plan.md)には、旧生成器との一度の比較、ZIP 内容/順序/日時/圧縮方式、再生成の SHA256、cold/warm の性能計測手順を履歴として保存しています。通常の実行手順は[開発手順](../docs/development.md)、移行時の結果は[公開・検証記録](../docs/releases/README.md)を参照します。
 
