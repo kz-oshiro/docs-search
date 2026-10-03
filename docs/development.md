@@ -2,6 +2,16 @@
 
 Rust 検索コア、Tauri の OS/IPC 境界、HTML/CSS/JavaScript の画面で構成します。`frontend/app.js` が要求と検索状態、`view.js` が DOM・周辺・編集・出力、`tauri.js` が接続、`theme.js` がテーマを担当します。利用者向けの検索仕様は [Rust 要求仕様](specifications/rust-requirements.md)を参照してください。
 
+## エージェントの作業ルール
+
+- 機能修正では設計・実装・変更に応じた確認項目/手順/期待結果を用意します。実装依頼は必要な差分・文書の静的確認と報告までとし、型検査・テスト・ビルド・アプリ起動・GUI操作・リモート反映へ進みません。
+- 報告は[文書作成ガイド](documentation.md#実装報告のひな型)に従い、未実施項目と次の担当が実行できる確認手順を残します。テスト・ビルド以降を別のモデルへ引き継ぎ、テスト全体をユーザーへ依頼しません。
+- テスト依頼では、直近の実装報告と対象の試験設計を読み、確認項目・手順・期待結果を把握してから実行します。テスト・ビルド・リモート反映は依頼された範囲を途中で止めず完了し、非対話的なテスト・ビルドの実行前に再確認を求めません。
+- 自動テストには実HTML/CSS/JavaScriptを操作するヘッドレスPlaywrightと必要な資材stagingを常時含めます。実EXE用ランナー導入後は、必要なビルド・起動・Playwright操作も自動テスト依頼の範囲に含め、GUI操作の再確認を求めません。現行ランナーと導入後の設計は[実装状況](reports/implementation-status.md#試験の実装と振り分け)で区別します。
+- 対話的にAIが操作するGUIテストだけは実施前に確認します。今回の依頼で明示されていれば再確認は不要です。確認を待つ間も依頼済みの自動テストを進めます。
+- 試験設計と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)に従います。[フロントエンドの判定方法](test-plans/playwright-ui-test-plan.md#確認境界と実行依頼の意味)と[OS連携の保証対象外](test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を読み、必須の手動確認票や一律の「GUI未検証」を報告に追加しません。
+- 文書の作成・更新は[文書作成ガイド](documentation.md)、テスト・ビルド結果の扱いと公開は[記録の自動生成と公開](#記録の自動生成と公開)に従います。
+
 ## 準備
 
 Rust/MSVC 1.91.1（rustup が toolchain ファイルに従う）、Windows C++ Build Tools、WebView2 を用意します。WASM target / wasm-bindgen-cli / Python / PowerShell の準備は不要です。UI 試験を行う開発環境には Node.js 20 以上と npm を用意し、初回だけルートで次を実行します。
@@ -26,11 +36,11 @@ cargo xtask ui --case "U23:"
 
 フロントエンドのworker数は開始前に200ms間隔で3回CPU時間の差分を測って決めます。利用可能CPU数は `os.availableParallelism()`、負荷は `os.cpus()` の累積時間を使います。3区間の最大使用率から80%目標までの空きを計算し、利用可能CPUの半分・6 workersを上限、1 workerを下限にします。測定不能時は理由付きで1にします。各実行で再計測し、同じPlaywright実行中は決定値を共有します。ファイル内の試験順序は維持し、ファイル間だけを並列化します。[CI性能検証方針](test-plans/ci-performance-test-plan.md)に計算例と確認手順を記載しています。
 
-フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。Tauri/OS の応答をモックにして実 HTML/CSS/JS を操作し、DOM・状態・要求引数で判定します。画像/動画/トレースは無効です。[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)と[今回の移行検証](test-plans/cargo-native-ui-test-plan.md)を読んでから実施します。
+フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。判定方法・確認項目は[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)、対象機能の試験設計は[実装状況](reports/implementation-status.md)を参照してください。移行の検証時だけ[移行検証方針](test-plans/cargo-native-ui-test-plan.md)も読みます。
 
-試験区分はバックエンド試験（Rustの単体/API/性質/実CLI）、フロントエンド試験（Playwright＋Tauri境界モック）、アプリケーション結合試験（Playwright＋実Tauri）に統一します。バックエンド試験・フロントエンド試験でカバーできる確認は各区分で担当し、個別試験では確認できない接続上の不具合だけを結合試験に回します。個別試験の不足はその区分で補い、結合試験で代用しません。構造・6テーマの配色G01/G02はフロントエンド試験、生成器・資材・ハッシュは共通の検証基盤で担当します。
+試験の分類と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)を参照してください。
 
-上記コマンドは現行ランナーの説明です。[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md)では、Rustの入口を維持し、test/ciの両方にReleaseビルドと結合試験を追加します。追加ランナー、診断入口cargo xtask exe、フロントエンド試験のG01/G02拡張は未実装です。導入後は試験済みEXEを成果物として再利用します。結果を3区分で報告し、検証基盤の確認を併記します。Rust製OS操作補助は作らず、OS固有の操作・表示は保証対象外として文書化し、人の確認を通常の完了条件にしません。
+上記コマンドは現行ランナーの説明です。実EXE用ランナー・test/ciの拡張は[実装状況](reports/implementation-status.md#試験の実装と振り分け)、導入後の実行契約は[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md#1-現行と導入後の実行契約)を参照してください。
 
 ## Windows ビルドと CI
 
@@ -49,6 +59,45 @@ cargo xtask ci
 
 `target/debug` / `target/release` / staged frontend を削除しません。旧配置の target・outputs・UI cache も自動削除しません。キャッシュの保持はコンパイルの再利用であり、テストは毎回実行します。
 
+## 記録の自動生成と公開
+
+`cargo xtask release-record` と `record-contracts` 工程はリモートのmainには未導入です。以下の記録生成コマンド・公開照合・契約試験は導入後の手順として扱います。現行のテスト・ビルドによる実行別レポートの保存は実装済みです。
+
+テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。通常は `report.md` の概要を読み、失敗工程だけログを調べます。正常ログ・件数・環境・ハッシュやUI JSONの全文を版別検証文書・実装状況・試験設計へ転記しません。
+
+公開時は下記の `release-record` でRelease本文と検証記録を生成・添付し、公開後に `--published` で照合します。毎回の索引行追加や公開確認だけの文書コミットは不要です。
+
+| 従来の記載 | 今後の出力・入力 |
+| --- | --- |
+| 試験件数・3区分の成否・未実装の結合試験 | `report.json` の `summary` と自動生成の `report.md` |
+| 環境・コマンド・開始/終了・時間・commit/dirty・proptest入力 | レポートへ自動収集。工程時間を合計しない |
+| ソース/UI/配布資材の照合・EXEサイズ/SHA256 | 同じ実行で機械照合し記録 |
+| 版別の検証記録・Release本文への結果転記 | 下記 `release-record` で生成しReleaseへ添付 |
+| 公開タグ・main・Release状態・Latest・アセット照合 | 公開後の `--published` で収集。追記の文書コミットは不要 |
+| 利用者向け変更点・変更理由・例外の判断 | 手書きの短い変更説明。実行結果を実装状況・試験設計へ重複記載しない |
+
+公開依頼を受けた担当は、対象ソースのコミット後に `cargo xtask ci` を実行し、短いUTF-8変更説明を `outputs/release-changes.md` に書きます。記録生成の入口は次です。
+
+```text
+cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/release-changes.md
+```
+
+同じ実行の `release/vX.Y.Z/` に `release-notes.md`、`validation.md`、`validation.json` を生成します。JSONにはCI原本、工程別stdout/stderr、Playwright全ケース、worker計測、順位Top-5、生成manifestを格納し、ローカルoutputsへのリンクだけに依存しない公開記録にします。追加依存はありません。`--repo OWNER/REPO` の既定値は `kz-oshiro/docs-search` です。
+
+成功した新形式（`metadata.schemaVersion=2`）のci、開始/終了とも同じcleanなコミット、全必須工程、件数、資材ハッシュ、保存EXEを照合します。対象は存在するローカルタグ、未作成なら現在のHEADです。試験後の差分は `docs/` のMarkdown/HTML・ルートREADME/AGENTSだけを許容し、製品・依存・試験・ビルドコードの変更時は新しいCIが必要です。旧レポートを新形式の証拠へ読み替えません。
+
+公開依頼の範囲でmain/タグをpushし、`gh release create --verify-tag --notes-file <生成先>/release-notes.md` に同じ実行のEXEと `validation.md` / `validation.json` を渡します。公開後は同じ `release-record` に `--published` を付け、生成し直した検証記録2ファイルを `gh release upload --clobber` で添付更新します。公開照合はread-onlyの `gh api` と `git ls-remote` で行い、不一致・取得失敗は理由を保存して非ゼロで終了します。これらの入口はpush・タグ作成・Release作成・uploadを実行しません。
+
+### 次の検証担当の確認方針
+
+| 区分 | 手順 | 期待結果 |
+| --- | --- | --- |
+| バックエンド試験 | 依頼範囲の `cargo xtask test` / `ci` | 既存Rust/CLI/worker試験が成功。Rust関数数とNodeケース数を別々に実測集計 |
+| フロントエンド試験 | 上記全自動入口の必須Playwright | 既存全件を実行。statsとerrorsから実測を集計し、JSON欠落・skipped/flakyを全体成功にしない |
+| アプリケーション結合試験 | 今回の記録処理では追加なし | 現行ランナーは未実装のまま `not-implemented`。EXEビルドを結合試験の成功に数えない |
+| 共通の検証基盤 | `cargo test --locked -p xtask`（全自動入口にも `record-contracts` として組込み）と資材最終照合 | 集計・欠落・旧形式・dirty・版不一致・公開digest不一致の契約試験が成功。内部PASS行を加算せず、ソース/UI/配布の8資材が一致 |
+| 公開記録 | cleanな対象の成功ciに対して生成。公開依頼時だけ `--published` と添付更新 | 3ファイル生成、原ログをJSONに格納。同じEXE/タグを確認し、取得失敗を成功として書かない |
+
 ## データとアイコン
 
 ```text
@@ -64,4 +113,4 @@ cargo xtask icons
 
 ## 静的確認と検証範囲
 
-実装依頼で行うのは `cargo metadata --no-deps --locked`、`cargo fmt --all -- --check`、`node --check`、文書/差分の静的確認までです。型検査・テスト・ビルド・起動は依頼された範囲で実施します。コマンド、対象ソース、ログ、成果物は実行ごとのレポートと[公開・検証記録](releases/README.md)に記録します。現行文書に製品版番号を付けず、改訂はGitで管理します。
+変更に応じて `cargo metadata --no-deps --locked`、`cargo fmt --all -- --check`、`node --check`、文書のリンク/内容照合、`git diff --check` を使います。書換えを行う整形コマンドは静的確認に含めません。実行範囲は[エージェントの作業ルール](#エージェントの作業ルール)、文書の確認項目は[文書作成ガイド](documentation.md#静的確認)を参照してください。

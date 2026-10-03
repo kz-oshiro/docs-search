@@ -2,7 +2,7 @@
 
 現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
-> 2026-10-04方針更新: 試験はバックエンド試験・フロントエンド試験・アプリケーション結合試験の3区分とする。バックエンド試験・[フロントエンド試験](playwright-ui-test-plan.md)でカバーできないもののみ[アプリケーション結合試験](playwright-exe-test-plan.md)へ回す。要求引数・表示・構造/配色はフロントエンド試験で担当し、G01/G02を実EXEへ重複させない。追加ランナー・拡張は未実装。Rust製OS操作補助は導入せず、ネイティブダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は保証対象外とする。M1〜M5の必須手動票は廃止。以下のGUI手順・未実施・許可の記述は旧方針の参考記録であり、現在の必須手動作業として依頼しない。
+試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。以下のGUI手順・未実施・許可の記述は旧方針の参考記録として扱う。
 
 作成日: 2026-10-03。対象: [実装計画](../plans/implementation-plan.md)のP4a・P4b・P5・P6、要求A-16〜A-18。
 自動テストは `cargo xtask test` を使う。要求対応と実施結果は[Rust要求仕様](../specifications/rust-requirements.md)と[公開・検証記録](../releases/README.md)を参照。下記の未実施は初回実装時点の記録。

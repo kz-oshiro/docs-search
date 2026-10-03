@@ -2,7 +2,7 @@
 
 全自動検証はルートの `cargo xtask test`、初回 UI 依存準備は `cargo xtask setup` です。保存データは `cargo xtask fixtures` / `Generate-Test-Data.cmd` で作ります。Python/PowerShell のランナーは撤去しました。
 
-バックエンドとフロントエンドは同時に開始し、独立した失敗もすべて収集します。Cargoの工程は順次実行し、全必須成功後にだけ `cargo xtask ci` のReleaseビルドへ進みます。CPU負荷を見たworker選択、並列実行の終了/記録、性能の比較は[CI性能検証方針](../docs/test-plans/ci-performance-test-plan.md)を参照してください。
+実行順序・失敗時の扱いは[開発手順](../docs/development.md#テスト)、worker選択・並列実行・性能比較の確認は[CI性能検証方針](../docs/test-plans/ci-performance-test-plan.md)を参照してください。
 
 ## 原本と生成器
 
@@ -38,12 +38,8 @@ worker数の計算・CPU差分・測定不能時のfallbackを `node --test test
 
 ## フロントエンド試験とアプリケーション結合試験
 
-[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)に対応する現行ケースは54件です。実フロントエンドをヘッドレス Chromium で操作し、Tauri/OS 境界だけをモックにします。画像・動画・トレースは使いません。実施結果は実行ごとのレポートと[公開・検証記録](../docs/releases/README.md)を参照してください。
-
-開始前のCPU使用率から1〜6 workersを選び、ファイル間を並列化します。決定値は実行中固定で、全workerが同じ `ui/workers.json` を読みます。測定値・上限・fallback理由とUI結果の `config.workers` が一致することも確認します。
+ケースと判定方法は[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)、試験ランナーの実装済み・設計のみの区別は[実装状況](../docs/reports/implementation-status.md#試験の実装と振り分け)を参照してください。実施結果は[開発手順の実行記録](../docs/development.md#記録の自動生成と公開)と[公開・検証記録](../docs/releases/README.md)から確認します。
 
 [移行検証方針](../docs/test-plans/cargo-native-ui-test-plan.md)には、旧生成器との一度の比較、ZIP 内容/順序/日時/圧縮方式、再生成の SHA256、cold/warm の性能計測手順を履歴として保存しています。通常の実行手順は[開発手順](../docs/development.md)、移行時の結果は[公開・検証記録](../docs/releases/README.md)を参照します。
 
-基本方針は、バックエンド試験・フロントエンド試験でカバーできないもののみアプリケーション結合試験に回すことです。処理・計算の網羅はバックエンド試験、DOM・操作・要求引数・応答表示・構造/配色はフロントエンド試験で担当します。個別試験の不足はその区分で補います。生成器・資材・ハッシュは共通の検証基盤として併記します。
-
-[アプリケーション結合試験設計](../docs/test-plans/playwright-exe-test-plan.md)には有効なE01/E02/E04/E06〜E11の9ケース群ごとに、個別試験では確認できない理由・手順・期待結果を記載しました。旧E03/E05のルート/条件/順位と旧E12のTSV整形は個別試験へ振り分け、独立した結合ケースを廃止しました。G01/G02は[フロントエンド試験の拡張](../docs/test-plans/playwright-ui-test-plan.md#設計中のフロントエンド試験の拡張g01g02)として管理し、実EXEへ重複させません。test/ciへのReleaseビルド・結合試験追加とフロントエンド試験の拡張は未実装・未実行です。Rust製OS操作補助は追加せず、ネイティブダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は保証対象外とし、手動票を必須にしません。現行のcargo xtask test/ciが実EXEを試験しているとは扱いません。結果は3区分で報告します。
+試験の担当と結果報告は[試験区分と振り分け](../docs/test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携の範囲は[保証対象外の定義](../docs/test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照してください。

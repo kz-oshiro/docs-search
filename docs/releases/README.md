@@ -1,8 +1,10 @@
 # 公開・検証記録
 
-配布ファイルは[最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)を参照する。現行の仕様・開発手順・試験設計は版番号を付けず同じ文書を更新し、変更履歴をGitで管理する。文書改訂だけで製品版を上げる必要はない。
+配布ファイルは[最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)を参照する。文書と版情報の扱いは[文書作成ガイド](../documentation.md#更新ルール)に従う。
 
-リリースノート・検証記録は対象成果物を特定するため版番号を残す。検証記録には対象コミット、実行ID、環境、実施範囲、配布ファイルのSHA256を記載する。過去の記録を現行仕様へ書き換えない。依存ツール・API契約・データ形式などの技術上必要な版情報はそれぞれの設定や仕様に残す。
+変更点は[GitHub Releasesの一覧](https://github.com/kz-oshiro/docs-search/releases)で案内する。記録生成コマンドの導入後は、検証・公開記録を各Releaseに添付する自動生成の `validation.md` / `validation.json` で案内する。導入状態と手順は[生成・公開手順](../development.md#記録の自動生成と公開)を参照する。
+
+過去の手書き記録は以下に保存する。
 
 | 公開版 | 変更点 | 検証・公開の記録 |
 | --- | --- | --- |

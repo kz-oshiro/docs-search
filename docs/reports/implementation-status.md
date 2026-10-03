@@ -9,6 +9,8 @@
 | 機能 | 状況 | 確認方針 |
 | --- | --- | --- |
 | 検索単位・Excel行・索引基盤（P0） | 実装済み | [検索基盤](../test-plans/search-foundation-test-plan.md) |
+| あいまい検索 | 実装済み | [あいまい検索](../test-plans/fuzzy-search-test-plan.md) |
+| 結果ラベル・エラー表示 | 実装済み | [結果ラベル・エラー](../test-plans/result-match-error-test-plan.md) |
 | 一括コピー・CSV/TSV・JSON出力（P1） | 実装済み | [出力](../test-plans/result-export-test-plan.md) |
 | Excel周辺セル・変更検出（P2） | 実装済み | [周辺](../test-plans/excel-context-test-plan.md) |
 | AND/OR/除外・判定範囲（P3） | 実装済み | [条件](../test-plans/condition-search-test-plan.md) |
@@ -20,11 +22,13 @@
 
 ## 試験の実装と振り分け
 
-- バックエンド試験はコアの単体/API/性質、実CLIの6群が実装済み。接続を必要としないTauriコマンド内の処理/状態もこの区分で検証する。
+- バックエンド試験はコアの単体/API/性質、実CLIの6群が実装済み。[性質テストの設計](../test-plans/property-testing-test-plan.md)と[試験コード・データの対応](../../tests/README.md)を参照する。
 - フロントエンド試験は実HTML/CSS/JavaScript＋Tauri境界モックのUケースが実装済み。[G01/G02の構造・配色拡張](../test-plans/playwright-ui-test-plan.md#設計中のフロントエンド試験の拡張g01g02)は設計のみで未実装。
-- 個別のバックエンド試験・フロントエンド試験でカバーできないもののみ、[アプリケーション結合試験](../test-plans/playwright-exe-test-plan.md)に回す。有効なE01/E02/E04/E06〜E11の9ケース群、実EXEランナーとtest/ciへの組込みは設計のみで未実装。廃止E03/E05/E12は再利用しない。
+- [アプリケーション結合試験](../test-plans/playwright-exe-test-plan.md)の有効なE01/E02/E04/E06〜E11の9ケース群、実EXEランナーとtest/ciへの組込みは設計のみで未実装。
 - 現行の `cargo xtask test` は実装済みの個別試験と生成器検証、`cargo xtask ci` はその成功後のWindows配布ビルドを実行する。現行入口が実EXEを試験しているとは扱わない。
 - CI性能改善としてアイコンの属性事前計算/描画打切り、バックエンドとフロントエンドの同時実行、CPU負荷を計測したUI worker選択を実装した。コンパイル最適化設定は変更しない。[性能検証方針](../test-plans/ci-performance-test-plan.md)に新規8件のworker計算試験と検証基盤・並列実行の確認手順を記載した。
-- ネイティブダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は設計で保証対象外とし、人の確認を通常の完了条件にしない。性能の合格基準は未決定。
+- 性能の合格基準は未決定。
+
+試験の担当・結果報告の分類は[試験区分と振り分け](../test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携は[保証対象外の定義](../test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照する。配置・移行の確認方針は[ディレクトリ配置](../test-plans/directory-layout-test-plan.md)と[Cargo・ネイティブUI移行](../test-plans/cargo-native-ui-test-plan.md)に保存している。
 
 次の実装は、有効な結合ケースとCargoランナー、フロントエンドのG01/G02拡張を対象とする。実装後の検証依頼ではE01の実接続を確認し、全必須工程へ進む。
