@@ -49,3 +49,10 @@ SHA256 b7ce33ab0bb97c63acb1c165b22c1e2832401a2aaf2c40c5068aefe0f47f96af
 ネイティブダイアログ・実クリップボード・既定アプリ・排他ロック・OS表示は試験設計で保証対象外とする。必須の手動確認票にはしない。今回、実EXEは起動していない。
 
 検証後の公開準備ではこの記録・リリースノート・索引だけを追加する。テスト済みの実行コード、製品版、依存、試験コードは変更せず、再ビルドしない。
+
+## 公開の確認
+
+- mainと注釈付きタグ `v3.0.2` を同時にpushし、タグの対象 `6b6b0aa747ffdb98b6f00a78f60cb70a1bf993cd` をremoteで確認した。テスト対象 `4b36315` との差分は上記3文書だけである。
+- 2026-10-04 01:18:28 JSTに [v3.0.2 GitHub Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.2) を公開した。APIでdraft=false、prerelease=false、Latest=v3.0.2を確認した。
+- 公開アセット [docs-search-desktop.exe](https://github.com/kz-oshiro/docs-search/releases/download/v3.0.2/docs-search-desktop.exe)（asset ID `608118140`）はuploaded、13,027,328 bytes。GitHubのdigest `sha256:b7ce33ab0bb97c63acb1c165b22c1e2832401a2aaf2c40c5068aefe0f47f96af` が今回のCIのEXEと一致した。
+- 公開直後はremote mainとタグの対象が `6b6b0aa` に一致し、ahead/behind `0 0` とcleanな作業ツリーを確認した。この公開確認の追記だけを後続の文書コミットでmainに反映し、タグとアセットは維持する。
