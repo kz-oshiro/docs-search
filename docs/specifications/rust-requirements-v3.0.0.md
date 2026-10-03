@@ -1,0 +1,93 @@
+# Rust 要求仕様 v3.0.0
+
+制定日: 2026-10-03。対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、Rust→WASM 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、この版の機能基準には含めない。Cargo 3パッケージと Tauri の製品版番号を `3.0.0` に揃える。仕様の版を確定したことと Windows 配布物のビルド・公開は別である。
+
+本書はここまでの要求を Rust 実装向けに整理した基準である。[全体仕様](requirements.md)の A-01〜A-27、[バックエンド](backend.md)、[境界契約](boundary.md)、[GUI](gui.md)が詳細を定める。P0〜P6とイシュー #1〜#9、テーマ設定を含み、追加の製品機能は要求しない。過去の実装報告の「未実施」は報告時点の記録とし、今回の検証結果は [v3.0.0 検証記録](../releases/validation-v3.0.0.md)へ集約する。
+
+## 適用範囲と責務
+
+利用者がローカルフォルダーを指定すれば使える検索を提供する。辞書登録、学習データ、LLM/API、外部検索サービスを必要としない。Windows 10/11・WebView2を配布対象とし、性能の時間・メモリの合格値は対象端末と文書量を決めた後に定める。
+
+| 実装 | 責務 |
+| --- | --- |
+| `core/src/lib.rs` と抽出・照合・索引・条件・一括・順位モジュール | 入力検証、列挙、読み取り、通知と集計。画面なしで公開APIとCLIを検査できる |
+| `core/src/context.rs` / `edit.rs` / `report.rs` | 周辺情報、明示したテキスト編集、出力。検索とは操作・失敗の範囲を分ける |
+| `src-tauri/src/main.rs` | 検索セッション、イベント転送、最新結果IDからの操作、OSダイアログ・起動・保存 |
+| `frontend/src/lib.rs`、HTML/CSS/テーマJS | 入力、表示、絞り込み、折りたたみ、設定と保存復元 |
+
+## 機能要求
+
+| ID | 要求と期待結果 | 既存要求 |
+| --- | --- | --- |
+| R3-01 | `SearchRequest` はcamelCaseで受け渡す。追加/除外フォルダー省略は空、querySpec省略/nullは通常検索。索引・あいまい・注記・数式は独立した指定で、省略/初期値はオフ。APIでextensions省略は従来5種類、GUIは93種類すべて選択 | A-09/A-10/A-16 |
+| R3-02 | 空検索語、非再帰、空/非対応拡張子、存在しない/ファイルのフォルダー指定、通常語とquerySpecの併用を開始前に項目別拒否する。入力拒否には検索イベントを出さない | A-07/A-10 |
+| R3-03 | 複数ルートの再帰列挙、正規化パスで重複/子ルート除去、除外優先。未選択形式・除外配下・シンボリックリンク・Officeの`~$`一時ファイルを件数に含めない。拡張子のファイル名上の大小文字を吸収し、隠し/ドットファイルを対象とする。全ルート除外も正常な0件完了 | A-01/A-11 |
+| R3-04 | 4 Office形式＋89テキスト形式を扱う。Excelの保存値/図形、PPT図形/表、Word本文/入れ子表、テキスト各行を場所付きで抽出。テキストはUTF-8 BOM→UTF-8→Shift_JIS、デコード失敗はIssue。Excel数値は保存文字列、論理値はTRUE/FALSE。非表示シート/スライドも対象 | A-01/A-03 |
+| R3-05 | 通常検索は前後空白を除く1語句の部分一致。正規表現やAND等を演算しない。1検索単位最大1件、別行/セル/段落とファイル名は別結果。行をまたぐ一致をしない | A-02/A-03 |
+| R3-06 | NFC＋Unicode case folding、原文と元のUnicode文字範囲を保持。幅・かな差は通常検索へ含めない。抜粋が省略されても一致を残し、preview内の範囲とsource全文の範囲を区別する | A-02/A-20 |
+| R3-07 | あいまい検索はNFKC/区切り/識別子/かな/前方/部分/限定英字タイプミスを追加。N-gramは候補のみ。通常でも成立する結果はstandardを保持。方式・点数は下表。辞書/同義語/アクセント除去を使わない | A-02/A-17 |
+| R3-08 | 索引オフは既存DBも読み書きせず、毎回直接抽出。オンはユーザーローカル領域のSQLiteでサイズ・mtime・抽出版4・範囲ビットを確認。変更は再抽出、削除は掃除、旧仕様/破損は再構築、利用不可は直接抽出。読み取り中変更/注記の部分障害/中断を索引へ確定しない | A-13/A-16/A-27 |
+| R3-09 | 高度な条件は全all AND いずれかany AND NOTいずれもnot。unit/excelRow/fileを区別し、成立した正の語句の最良根拠を返す。NOTは同じ範囲全体の通常部分一致。fileには名前と内容、excelRowには同じシート・物理行のcell/formulaだけを合流。本文不完全のfile条件は成立させない | A-15 |
+| R3-10 | 一括は空行・NFC/case folding重複を除き最初の表記/順序を保持。既定identifierはASCII識別子の全体境界（隣接Unicode英数字/_も継続扱い）でTAB_01/TAB_010を区別。textは通常/あいまい規則。語×Unit最大1件。列挙/抽出を語数分繰り返さない。語別ファイル/箇所数と0件の確定/不確定を返す | A-18 |
+| R3-11 | Startedを1回、searchId一定、sequenceは1から連番、Finishedを最後に1回。終端前に順位・抽出統計・一括要約を通知。通知済みResult/Issueと終端件数は厳密一致、processed≤discovered。中断は部分結果を残し、順位も通知済みIDだけを使う | A-05/A-08/A-17/A-18 |
+| R3-12 | ファイル/部品単位の失敗を隔離して残りを継続。個別Issueがあっても処理完了はcompleted＋issueCount。注記障害は本文を残し重複Issueを防ぐ。入力拒否はfailedではない。failedは境界上の全体障害用だが、現コアには任意の内部障害を注入して終端を保証する試験口はない | A-04 |
+| R3-13 | ファイル順位は最弱の語別最良品質→異なる語数→同じ行の語数→本文根拠→全根拠（根拠数は各5上限）→正規化/元パス。ファイル内はdocumentOrderの数値列、同点はtermId/unitKey/resultId。Excelはブック順・行・列、他形式は保存文書の位置/抽出順 | A-17/A-25 |
+| R3-14 | 注記/数式をオンにしたときだけ追加。Excel保存式は保存値と別、共有従属式を再構成しない。PPTノートの番号等を除外。Word共有部品、コメント取得済みExcel VMLを重複させない。返信番地は取得できる親からのみ継承。非表示ふりがなrPh/phoneticPrを可視文字から除外し全検索/周辺へ適用 | A-16/A-27 |
+| R3-15 | 検索は元バイト/mtimeを変更せず対象フォルダーへ作業ファイルを作らない。modifiedAtは元ファイルのepochミリ秒、取得不可はnull。マクロ/コード/数式を実行せず外部参照を取得しない。リソース制限は下表 | A-04/A-23 |
+| R3-16 | 終了後も最新searchId/resultIdからExcel周辺を要求時取得。最大5×5の疎な保存値、結合起点、非表示行列、取得可能な保存書式を返す。ファイル変更/削除はchangedSinceSearch、検索結果/件数を保持。書式は近似で再現できない理由を示す | A-14/A-22 |
+| R3-17 | 終了した最新検索のテキスト一致/条件根拠を選んで編集。元行/全文リビジョン/Unicode範囲を検証、対象外の元バイト・BOM・改行・文字コードを保持。表現不能文字/外部変更/非対応/書込み不可を拒否。キャンセルは元文書を変えない。保存後は旧ドラフト/周辺を無効にし再検索を案内 | A-20 |
+| R3-18 | TSVコピー、CSV/TSV/JSON、語×ファイル行列は保持済み全結果または選択した絞り込み結果から作る。未描画/折りたたみは件数に影響しない。CSVはUTF-8 BOM、TSVはUTF-8。引用/制御文字/数式先頭を扱い、JSONに条件・集計・Issue・根拠・順位・語別/抽出統計・表示条件を残す | A-12/A-18/A-21 |
+| R3-19 | GUIは絶対パスで親フォルダー/ファイルの折りたたみを独立保持。同じ検索内で状態維持、新検索で展開。名前/パス/拡張子と本文に含む/含まない各1語句を併用し、本文は保存済み表示抜粋と根拠のみ判定。解除で全件へ戻す。時刻は端末タイムゾーン付き、Issueは色と文言で区別 | A-06/A-19/A-21/A-23/A-26 |
+| R3-20 | フォルダー欄の数/順序を復元、無効欄のみ空、検索自動開始なし。6テーマは検索状態と独立して保存し、初期/不正値はサンオレンジ、既存有効色は継承、保存例外で起動を妨げない。公式アイコンは固定。これらの実画面・OS操作は別GUI試験 | A-24 |
+
+## 上限と一致方式
+
+| 対象 | 上限・規則 |
+| --- | --- |
+| 条件群 | all/any/notそれぞれ正規化後32語句、各200 Unicode文字、元入力それぞれ128要素。不明項目/モード/範囲、正の群なし、allとnotの同語は拒否 |
+| 一括入力 | 正規化後256語、各200 Unicode文字、元入力4096要素。不明項目/照合方式と不正識別子は拒否 |
+| タイプミス | 英字だけの単一語、6〜10文字は距離1、11文字以上は距離2、先頭一致、距離/語長≤0.2。短語/数字/混在ID/日本語は対象外 |
+| 読み取り | テキスト32MiB、Office部品32MiB、総展開128MiB、ZIP部品4096、Word表の深さ16。超過はresourceLimit |
+| 周辺情報 | 行列は各1〜5、対象行を含む、Excel最大行/列以内。セル表示300文字、結合25件、セル書式25件。空欄を全シートへ展開しない |
+| 注記返信 | 親への継承最大16段。解決できない番地は推測しない |
+| 順位 | 本文根拠/全根拠は異なる場所を数え各最大5 |
+
+| matchType | score | 内容 |
+| --- | --- | --- |
+| exact / caseFolded | 100 / 98 | 原文の語句一致 / NFC・大小文字差を吸収した語句一致 |
+| normalized / separatorVariant / identifier / kanaVariant | 95 / 92 / 90 / 88 | 幅 / 区切り / 識別子分割 / かな種別差 |
+| prefix / substring / editDistance | 80 / 70 / 50 | 前方 / 部分 / 限定タイプミス |
+
+点数は順位値で確率ではない。通常の部分一致はsubstring=70/standard。一括identifierはidentifier=90/standardで、あいまい拡張をしない。高度な結果のscore/matchTypeは先頭根拠の単一語句の値、matchCategoryは条件全体が通常でも成立するかで決める。
+
+## 自動受け入れ試験との対応
+
+固定ケースに加えて [proptestの確認方針](../test-plans/property-testing-test-plan.md) の17性質で生成入力を検証する。Unicode/候補漏れ/索引/条件範囲/一括件数/順位/中断/編集/出力を対象とし、失敗seedを再実行する。
+
+検査条件・期待結果は上記表の各行に定め、以下のテストコードを対応先とする。`requirements_v3.rs` は公開APIから実ファイルを生成して要求を確認し、内部の実装手順に依存しない。CLIランナーは独立した一時文書/LOCALAPPDATAを使い、索引が利用者の領域へ残らないようにする。
+
+| 要求 | 自動テストコード |
+| --- | --- |
+| R3-01〜R3-07 | [公開API受け入れ](../../core/tests/requirements_v3.rs)の同じIDのテスト、[共通27ケース](../../tests/cli/run-backend-cases.py)、`extract.rs` / `fuzzy.rs` の単体試験 |
+| R3-08 | [索引専用CLI](../../tests/cli/run-index-cases.py)、`index.rs`、[Excel旧抽出版](../../tests/cli/run-issue-cases.py)、P2/P3/P4の直接/初回/再利用比較 |
+| R3-09 | 公開API上限テスト、`query.rs`、[条件CLI](../../tests/cli/run-condition-cases.py) |
+| R3-10〜R3-11 | 公開APIの一括/中断/通知整合、`batch.rs`、[Office・順位・一括CLI](../../tests/cli/run-office-search-cases.py) |
+| R3-12〜R3-15 | 公開APIの個別エラー/資源制限/位置順/読取専用、`extract.rs` / `ranking.rs`、Office CLI固定20クエリ、イシューCLI |
+| R3-16 | `context.rs` の窓/結合/非表示/書式試験、[周辺CLI](../../tests/cli/run-context-cases.py)の直接/初回/再利用・変更/削除試験 |
+| R3-17 | `edit.rs` のBOM/CRLF/Unicode/省略抜粋/外部変更/Shift_JIS/根拠選択試験（Windowsでは実際の置換処理を通る） |
+| R3-18 | `report.rs` のCSV/TSV/JSON/根拠/行列試験 |
+| R3-19〜R3-20 | [Playwright方針](../test-plans/playwright-ui-test-plan.md)のU01〜U39をヘッドレスChromiumで51件実行し成功。実アプリ/OS連携と見た目はM1〜M5 |
+
+## 実行手順と対象外
+
+最新の [P4〜P6方針](../test-plans/office-ranking-batch-test-plan.md)、[イシュー方針](../test-plans/issues-test-plan.md)、[テーマ方針](../test-plans/theme-settings-test-plan.md)の確認項目を引き継ぐ。Rustの自動テスト専用入口は次のとおり。順位の比較記録もこの1回で保存できる。
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\Run-Automated-Tests.ps1 -RankingReport .\outputs\v3-check-YYYYMMDD-HHMMSS\ranking-comparison.json
+```
+
+生成器検証→共通→周辺→条件→Office/順位/一括→イシュー→索引→Rust単体/公開API→WASM型検査→ヘッドレスPlaywrightの順。UI試験の初回準備は [こちら](../test-plans/playwright-ui-test-plan.md#実装と準備)。失敗時は原因と修正を記録し、失敗した確認を再実施して残りを続行する。テスト/CLIのコンパイルと試験用WASM生成は必要だが、Windows配布ビルド・実アプリ起動は含まない。`Run-Local-CI.ps1` はこの入口の後にWindows配布ビルドを追加する従来の用途を保つ。
+
+自動テスト・Windows配布ビルドとv3.0.0のcommit/push/タグ/Releaseは完了した。結果は[検証記録](../releases/validation-v3.0.0.md)を参照する。ヘッドレスUIではDOM・状態・要求引数を確認した。実アプリ起動/GUI、性能測定、実Office文書の網羅的互換性、イシュー完了操作は未実施。実EXEでの編集セッションtoken、Windowsクリップボード/保存先選択と、テーマ・アイコン・周辺書式などの見た目の成功を自動試験から推定しない。
+
+PDF、旧Officeバイナリ形式、OCR、クラウド専用API、正規表現/括弧式、Office編集、履歴、設計書の意味的差分表示はこの版の対象外。テキスト編集後のコード/JSON等の構文検証もしない。検索全体の一貫したスナップショットや、サイズ/mtimeが変わらない外部更新の検知は保証しない。

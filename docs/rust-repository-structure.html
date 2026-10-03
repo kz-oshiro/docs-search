@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="docs-search Rust版のリポジトリ構造、主要モジュール、検索データの流れをまとめたガイド">
+  <meta name="theme-color" content="#f6f4ef">
+  <title>Rust版 docs-search | 構造ガイド</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #242b34;
+      --muted: #596575;
+      --soft: #778292;
+      --paper: #fffefa;
+      --canvas: #f6f4ef;
+      --line: #d9d8d2;
+      --orange: #bb542b;
+      --orange-soft: #f7e8df;
+      --blue: #315d78;
+      --blue-soft: #e5eef3;
+      --green: #356852;
+      --green-soft: #e8f1eb;
+      --shadow: 0 16px 40px rgb(38 43 50 / 7%);
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 90% 0, rgb(241 216 197 / 42%), transparent 34rem),
+        var(--canvas);
+      color: var(--ink);
+      line-height: 1.65;
+    }
+    a { color: #285a79; text-underline-offset: 0.18em; }
+    a:hover { color: var(--orange); }
+    code, pre, kbd { font-family: Consolas, "Cascadia Code", "Yu Gothic UI", monospace; }
+    code {
+      overflow-wrap: anywhere;
+      color: #7d3c21;
+      font-size: 0.92em;
+    }
+    .page { width: min(1080px, calc(100% - 36px)); margin: 0 auto; }
+    .hero { padding: 42px 0 28px; }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--orange);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 800px; margin-bottom: 12px; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.12; letter-spacing: -0.04em; }
+    .lead { max-width: 780px; margin-bottom: 20px; color: var(--muted); font-size: clamp(1rem, 2vw, 1.18rem); }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgb(255 254 250 / 72%);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 650;
+    }
+    nav {
+      position: sticky;
+      z-index: 2;
+      top: 0;
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding: 10px 0;
+      border-block: 1px solid rgb(217 216 210 / 85%);
+      background: rgb(246 244 239 / 94%);
+      backdrop-filter: blur(12px);
+      scrollbar-width: thin;
+    }
+    nav a {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    nav a:hover, nav a:focus-visible { background: var(--paper); color: var(--orange); }
+    main { padding: 12px 0 58px; }
+    section { scroll-margin-top: 74px; margin: 26px 0; }
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+    h2 { margin-bottom: 0; font-size: clamp(1.35rem, 3vw, 1.8rem); line-height: 1.25; letter-spacing: -0.025em; }
+    .section-note { margin: 4px 0 0; color: var(--muted); font-size: 0.94rem; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .architecture { padding: 18px; }
+    .actor {
+      width: fit-content;
+      margin: 0 auto 11px;
+      padding: 7px 13px;
+      border: 1px solid #e5c6b3;
+      border-radius: 999px;
+      background: var(--orange-soft);
+      color: #743a21;
+      font-weight: 800;
+      text-align: center;
+    }
+    .flow-arrow { height: 27px; color: var(--soft); font-size: 1.35rem; font-weight: 800; line-height: 1; text-align: center; }
+    .layer {
+      display: grid;
+      grid-template-columns: minmax(145px, 0.8fr) 2fr;
+      gap: 12px;
+      align-items: stretch;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .layer.front { border-left-color: var(--orange); }
+    .layer.bridge { border-left-color: var(--blue); }
+    .layer.core { border-left-color: var(--green); }
+    .layer.io { border-left-color: #79649b; }
+    .layer h3 { margin: 2px 0 3px; font-size: 1.04rem; }
+    .layer-label { color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+    .layer-body { color: var(--muted); font-size: 0.93rem; }
+    .layer-body p { margin: 0; }
+    .layer-body p + p { margin-top: 5px; }
+    .direction {
+      display: block;
+      margin-top: 5px;
+      color: var(--orange);
+      font-size: 0.81rem;
+      font-weight: 750;
+    }
+    .side-paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+    .side-path {
+      padding: 12px;
+      border: 1px dashed #c7c7c0;
+      border-radius: 11px;
+      background: #faf9f5;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+    .side-path strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .crate {
+      min-height: 174px;
+      padding: 17px;
+      border-top: 4px solid var(--orange);
+    }
+    .crate:nth-child(2) { border-top-color: var(--blue); }
+    .crate:nth-child(3) { border-top-color: var(--green); }
+    .crate h3 { margin: 7px 0; font-size: 1.08rem; }
+    .crate p { margin-bottom: 8px; color: var(--muted); font-size: 0.92rem; }
+    .crate .badge { color: var(--soft); font-size: 0.77rem; font-weight: 800; letter-spacing: 0.06em; }
+    .flow-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; counter-reset: flow; }
+    .flow-step {
+      position: relative;
+      min-height: 143px;
+      padding: 15px 15px 14px 52px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--paper);
+      counter-increment: flow;
+    }
+    .flow-step::before {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: grid;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--orange-soft);
+      color: #793b21;
+      content: counter(flow);
+      font-weight: 850;
+    }
+    .flow-step h3 { margin: 0 0 5px; font-size: 0.98rem; }
+    .flow-step p { margin: 0; color: var(--muted); font-size: 0.88rem; }
+    .contract {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .contract article { padding: 15px; }
+    .contract h3 { margin-bottom: 7px; font-size: 1rem; }
+    .contract p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .module-tools { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+    .module-tools label { flex: 0 0 auto; font-weight: 700; }
+    .module-tools input {
+      width: min(100%, 460px);
+      min-height: 42px;
+      padding: 8px 12px;
+      border: 1px solid #bfc4c8;
+      border-radius: 9px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+    .module-tools input:focus { outline: 3px solid rgb(49 93 120 / 23%); border-color: var(--blue); }
+    .module-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+    details.module {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--paper);
+    }
+    details.module[hidden] { display: none; }
+    details.module summary {
+      display: block;
+      padding: 12px 14px;
+      cursor: pointer;
+      list-style: none;
+    }
+    details.module summary::-webkit-details-marker { display: none; }
+    details.module summary::after { float: right; color: var(--soft); content: "+"; font-weight: 800; }
+    details.module[open] summary::after { content: "−"; }
+    .module-title { display: block; font-weight: 800; }
+    .module-role { display: block; margin-top: 2px; color: var(--muted); font-size: 0.86rem; }
+    .module-detail { padding: 0 14px 13px; color: var(--muted); font-size: 0.89rem; }
+    .module-detail p { margin: 0 0 8px; }
+    .source-links { display: flex; flex-wrap: wrap; gap: 7px; }
+    .source-links a, .source-links span {
+      display: inline-block;
+      padding: 3px 8px;
+      border: 1px solid #d9ddd9;
+      border-radius: 7px;
+      background: #f8f8f4;
+      font-size: 0.79rem;
+    }
+    .tree { overflow-x: auto; padding: 18px; }
+    .tree pre {
+      min-width: 610px;
+      margin: 0;
+      color: #354252;
+      font-size: 0.87rem;
+      line-height: 1.68;
+      white-space: pre;
+    }
+    .tree code { color: inherit; }
+    .tree-note { margin: 12px 0 0; color: var(--muted); font-size: 0.88rem; }
+    .build-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .build-card { padding: 16px; }
+    .build-card h3 { margin-bottom: 6px; font-size: 1.02rem; }
+    .build-card p { margin-bottom: 8px; color: var(--muted); font-size: 0.9rem; }
+    .sequence { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.9rem; }
+    .sequence li + li { margin-top: 4px; }
+    .reading { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+    .reading a {
+      display: block;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper);
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+    }
+    .reading a span { display: block; margin-top: 3px; color: var(--muted); font-size: 0.82rem; font-weight: 500; }
+    .note {
+      padding: 13px 15px;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 9px 9px 0;
+      background: var(--blue-soft);
+      color: #354c5b;
+      font-size: 0.9rem;
+    }
+    footer { padding: 0 0 35px; color: var(--muted); font-size: 0.82rem; }
+    footer p { margin: 5px 0; }
+    @media (max-width: 740px) {
+      .page { width: min(100% - 24px, 620px); }
+      .hero { padding-top: 27px; }
+      .layer { grid-template-columns: 1fr; gap: 5px; }
+      .side-paths, .grid-3, .flow-list, .contract, .build-grid { grid-template-columns: 1fr; }
+      .crate, .flow-step { min-height: auto; }
+      .module-grid { grid-template-columns: 1fr; }
+      .reading { grid-template-columns: repeat(2, 1fr); }
+      .architecture { padding: 12px; }
+      .module-tools { align-items: stretch; flex-direction: column; gap: 5px; }
+      .module-tools input { width: 100%; }
+      section { margin: 21px 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <p class="eyebrow">Repository guide · Rust edition</p>
+      <h1>docs-search の構造</h1>
+      <p class="lead">検索処理、デスクトップ連携、画面、テストがどこにあり、検索要求がどう流れるかを1ページにまとめました。スマートフォンでも読みやすいよう、図と各モジュールを縦にたどれる構成にしています。</p>
+      <div class="meta">
+        <span class="pill">Rust版 v3.0.0</span>
+        <span class="pill">調査日 2026-10-03</span>
+        <span class="pill">ローカル文書検索</span>
+      </div>
+    </header>
+
+    <nav aria-label="ページ内目次">
+      <a href="#architecture">全体像</a>
+      <a href="#crates">3つのRust crate</a>
+      <a href="#search-flow">検索の流れ</a>
+      <a href="#modules">コアのモジュール</a>
+      <a href="#repository">リポジトリ</a>
+      <a href="#build">ビルドと確認</a>
+      <a href="#start-here">読む順番</a>
+    </nav>
+
+    <main>
+      <section id="architecture">
+        <div class="section-heading">
+          <div>
+            <h2>全体像</h2>
+            <p class="section-note">画面は検索コアを直接呼ばず、Tauriのコマンドとイベントを通して接続します。</p>
+          </div>
+        </div>
+        <div class="panel architecture">
+          <div class="actor">利用者が検索条件を入力</div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="layer front">
+            <div>
+              <span class="layer-label">画面・WASM</span>
+              <h3><code>frontend/</code></h3>
+            </div>
+            <div class="layer-body">
+              <p><code>index.html</code> と CSS が画面を定義し、Rust→WASM の <code>src/lib.rs</code> が検索状態とイベント処理を担います。</p>
+              <p>WASM内のJavaScript連携コードがDOM更新やTauri API呼び出しを行います。<code>boot.js</code> がWASMを起動します。</p>
+              <span class="direction">検索要求 → Tauri IPC の <code>start_search</code></span>
+            </div>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="layer bridge">
+            <div>
+              <span class="layer-label">デスクトップ境界</span>
+              <h3><code>src-tauri/</code></h3>
+            </div>
+            <div class="layer-body">
+              <p>Tauriコマンドが入力・状態・OS操作を扱います。検索をワーカースレッドで実行し、結果イベントを <code>search-events</code> として画面へ返します。</p>
+              <p>ここからRust検索コアを呼び出します。フォルダー選択、ファイルを開く、保存ダイアログもこの境界にあります。</p>
+              <span class="direction">イベント → <code>searchId</code> と順序番号付きの検索結果</span>
+            </div>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="layer core">
+            <div>
+              <span class="layer-label">検索エンジン</span>
+              <h3><code>core/</code></h3>
+            </div>
+            <div class="layer-body">
+              <p><code>docs-search-core</code> は入力検証、フォルダー走査、文書抽出、照合、順位付けを行います。Tauriに依存せず、同じコアをCLIからも実行できます。</p>
+              <p><code>SearchRequest</code> を受け取り、開始・進捗・結果・Issue・完了のイベントをコールバックへ渡します。</p>
+              <span class="direction">ファイル読み取り・必要に応じて索引参照</span>
+            </div>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="layer io">
+            <div>
+              <span class="layer-label">ローカル入出力</span>
+              <h3>文書と任意の索引</h3>
+            </div>
+            <div class="layer-body">
+              <p>ユーザーが指定したフォルダー内のテキスト文書・Office文書を読みます。Office形式はZIP内のOOXMLを解析します。</p>
+              <p>SQLite索引は設定で有効にした場合に使います。通常は索引なしでファイルを抽出して検索します。</p>
+            </div>
+          </div>
+          <div class="side-paths">
+            <div class="side-path"><strong>周辺セル表示</strong><code>context</code> がExcel結果の近傍データを用意し、Tauriコマンド経由で画面へ返します。</div>
+            <div class="side-path"><strong>結果の編集・出力</strong><code>edit</code> と <code>report</code> が明示した保存処理を担当します。</div>
+            <div class="side-path"><strong>CLI・自動確認</strong><code>core/src/main.rs</code> がJSONイベントを標準出力へ出し、受け入れランナーが利用します。</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="crates">
+        <div class="section-heading">
+          <div>
+            <h2>3つのRust crate</h2>
+            <p class="section-note">crateの依存から、責務の境界が読み取れます。</p>
+          </div>
+        </div>
+        <div class="grid-3">
+          <article class="panel crate">
+            <span class="badge">SEARCH ENGINE</span>
+            <h3><code>docs-search-core</code></h3>
+            <p><code>core/</code> にある検索ライブラリとCLI。Tauriを知らず、コールバックでイベントを通知します。</p>
+            <a href="../core/Cargo.toml">Cargo.toml</a> · <a href="../core/src/lib.rs">公開API</a>
+          </article>
+          <article class="panel crate">
+            <span class="badge">DESKTOP HOST</span>
+            <h3><code>docs-search-desktop</code></h3>
+            <p><code>src-tauri/</code> にあるWindowsデスクトップアプリ。検索コアを依存crateとして使い、Tauriコマンドを登録します。</p>
+            <a href="../src-tauri/Cargo.toml">Cargo.toml</a> · <a href="../src-tauri/src/main.rs">コマンドと状態</a>
+          </article>
+          <article class="panel crate">
+            <span class="badge">WEBASSEMBLY UI</span>
+            <h3><code>docs-search-ui</code></h3>
+            <p><code>frontend/</code> にある画面制御。WASMにコンパイルされ、Tauri IPCを通してデスクトップ側と話します。</p>
+            <a href="../frontend/Cargo.toml">Cargo.toml</a> · <a href="../frontend/src/lib.rs">画面制御</a>
+          </article>
+        </div>
+        <p class="note" style="margin-top:12px">依存境界: <code>src-tauri → core</code>。WASM画面は <code>docs-search-core</code> を直接リンクせず、TauriのIPCで通信します。このため、検索はデスクトップ側で動き、WASM側は入力・画面状態・表示を担当します。</p>
+      </section>
+
+      <section id="search-flow">
+        <div class="section-heading">
+          <div>
+            <h2>検索の流れ</h2>
+            <p class="section-note">要求を受けてから画面に結果が届くまで。</p>
+          </div>
+        </div>
+        <div class="flow-list">
+          <article class="flow-step">
+            <h3>画面が要求を作る</h3>
+            <p>検索フォルダー、語句、拡張子、検索設定から <code>SearchRequest</code> を作成します。</p>
+          </article>
+          <article class="flow-step">
+            <h3>Tauriが検証して開始</h3>
+            <p><code>start_search</code> が要求を検証し、同時検索を防いで検索セッションとキャンセル状態を用意します。</p>
+          </article>
+          <article class="flow-step">
+            <h3>コアが文書を調べる</h3>
+            <p>対象フォルダーを走査し、選択形式を抽出して、通常・高度・一括の検索条件を評価します。</p>
+          </article>
+          <article class="flow-step">
+            <h3>イベントを順に発行</h3>
+            <p><code>Started</code>、<code>Progress</code>、<code>Result</code>、<code>Issue</code>、<code>Finished</code> などで状態を通知します。</p>
+          </article>
+          <article class="flow-step">
+            <h3>Tauriがまとめて転送</h3>
+            <p>結果を最大128件単位でまとめ、その他の境界イベントとともに <code>search-events</code> を送ります。</p>
+          </article>
+          <article class="flow-step">
+            <h3>WASMが表示を更新</h3>
+            <p>イベントが現在の検索IDに属するかを確認し、件数・進捗・ファイルごとの結果・Issueを画面に反映します。</p>
+          </article>
+        </div>
+        <div class="contract">
+          <article class="panel">
+            <h3>境界の要求</h3>
+            <p><code>SearchRequest</code> は検索場所と条件を表します。Tauri側はコア実行前にも検証し、実行中は検索IDに紐づけてキャンセル要求を管理します。</p>
+          </article>
+          <article class="panel">
+            <h3>境界のイベント</h3>
+            <p><code>SearchEvent</code> は <code>searchId</code>、コアが発行ごとに増やす <code>sequence</code>、イベント種別を持ちます。個別ファイルの問題はIssueイベントとして結果と分けて扱います。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="modules">
+        <div class="section-heading">
+          <div>
+            <h2>検索コアのモジュール</h2>
+            <p class="section-note">カードを開くと主な役割とソースへのリンクが見られます。</p>
+          </div>
+        </div>
+        <div class="module-tools">
+          <label for="module-filter">モジュールを探す</label>
+          <input id="module-filter" type="search" placeholder="例: 抽出、Excel、索引、順位" autocomplete="off">
+        </div>
+        <div class="module-grid" id="module-grid">
+          <details class="module" data-search="lib orchestrator API request paths traversal event search main">
+            <summary><span class="module-title"><code>core/src/lib.rs</code></span><span class="module-role">検索コアの公開APIと全体進行</span></summary>
+            <div class="module-detail">
+              <p><code>validate</code> と <code>run_search</code> を公開します。要求・フォルダーの検証、走査、検索結果の組み立て、進捗と完了イベントをまとめる中心です。</p>
+              <div class="source-links"><a href="../core/src/lib.rs">ソースを開く</a><span>SearchRequest / SearchEvent</span><span>run_search</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="extract parser Office OOXML text xlsx xlsm pptx docx unit cell sheet slide word">
+            <summary><span class="module-title"><code>core/src/extract.rs</code></span><span class="module-role">文書形式ごとのテキスト抽出</span></summary>
+            <div class="module-detail">
+              <p>テキストとOffice文書から検索単位（Unit）を作ります。Excelのセル・図形、PowerPoint、Wordの位置情報も保持します。</p>
+              <div class="source-links"><a href="../core/src/extract.rs">ソースを開く</a><span>Unit / location</span><span>OOXML ZIP/XML</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="fuzzy match normalize Unicode kana identifier edit distance">
+            <summary><span class="module-title"><code>core/src/fuzzy.rs</code></span><span class="module-role">Unicode正規化と照合</span></summary>
+            <div class="module-detail">
+              <p>通常一致に加え、設定時の幅・かな・識別子表記の正規化や、限定したタイプミス候補を評価します。一致範囲も返します。</p>
+              <div class="source-links"><a href="../core/src/fuzzy.rs">ソースを開く</a><span>Match / Query</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="query conditions AND OR NOT scope row file group">
+            <summary><span class="module-title"><code>core/src/query.rs</code></span><span class="module-role">高度な検索条件の評価</span></summary>
+            <div class="module-detail">
+              <p>AND・OR・NOT条件を、検索単位、Excel行、ファイル全体の指定範囲で評価し、条件ごとの根拠を返します。</p>
+              <div class="source-links"><a href="../core/src/query.rs">ソースを開く</a><span>conditions / scope</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="batch terms identifier multiple query">
+            <summary><span class="module-title"><code>core/src/batch.rs</code></span><span class="module-role">複数語句の一括検索</span></summary>
+            <div class="module-detail">
+              <p>一括検索語の検証と識別子・通常文字列の照合ルールを管理します。</p>
+              <div class="source-links"><a href="../core/src/batch.rs">ソースを開く</a></div>
+            </div>
+          </details>
+          <details class="module" data-search="index SQLite cache persistent freshness candidates">
+            <summary><span class="module-title"><code>core/src/index.rs</code></span><span class="module-role">任意のSQLite検索索引</span></summary>
+            <div class="module-detail">
+              <p>文書単位の抽出結果を保存し、ファイルの鮮度を見て再利用します。利用・削除は画面から選べます。</p>
+              <div class="source-links"><a href="../core/src/index.rs">ソースを開く</a><span>SQLite</span><span>候補取得</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="ranking score relevance file order quality">
+            <summary><span class="module-title"><code>core/src/ranking.rs</code></span><span class="module-role">ファイル単位の関連度順位</span></summary>
+            <div class="module-detail">
+              <p>一致品質や同じ行・本文などの根拠を集約し、ファイル結果の順序と説明に使う情報を作ります。</p>
+              <div class="source-links"><a href="../core/src/ranking.rs">ソースを開く</a></div>
+            </div>
+          </details>
+          <details class="module" data-search="context Excel neighborhood cells layout merged hidden rows columns">
+            <summary><span class="module-title"><code>core/src/context.rs</code></span><span class="module-role">Excel一致箇所の周辺表示</span></summary>
+            <div class="module-detail">
+              <p>検索結果に紐づくセル近傍・結合範囲・非表示行列などを取得し、画面へ返す構造にします。</p>
+              <div class="source-links"><a href="../core/src/context.rs">ソースを開く</a></div>
+            </div>
+          </details>
+          <details class="module" data-search="edit replacement save text range encoding revision">
+            <summary><span class="module-title"><code>core/src/edit.rs</code></span><span class="module-role">一致箇所の明示的な編集保存</span></summary>
+            <div class="module-detail">
+              <p>対応テキスト形式の一致範囲について、内容の版を確認しながら編集案を作り、保存処理を行います。</p>
+              <div class="source-links"><a href="../core/src/edit.rs">ソースを開く</a><span>編集アンカー</span></div>
+            </div>
+          </details>
+          <details class="module" data-search="report CSV TSV JSON export serialize">
+            <summary><span class="module-title"><code>core/src/report.rs</code></span><span class="module-role">検索記録と表形式出力</span></summary>
+            <div class="module-detail">
+              <p>検索要求・集計・行・Issueを含むレポートを検証し、CSV/TSVやJSONなどの出力用データに変換します。</p>
+              <div class="source-links"><a href="../core/src/report.rs">ソースを開く</a><span>CSV / TSV / JSON</span></div>
+            </div>
+          </details>
+        </div>
+        <p id="module-empty" class="section-note" hidden>一致するモジュールはありません。</p>
+      </section>
+
+      <section id="repository">
+        <div class="section-heading">
+          <div>
+            <h2>リポジトリの見取り図</h2>
+            <p class="section-note">実装と共有仕様・データの置き場所。</p>
+          </div>
+        </div>
+        <div class="panel tree">
+<pre><code>docs-search/
+├─ core/                  Rust検索コア・CLI・Rustテスト
+├─ frontend/              Rust→WASM・HTML・CSS・JavaScript
+├─ src-tauri/             Windowsアプリ・Tauri設定・アイコン
+├─ scripts/               ビルド・自動試験・データ生成の入口
+├─ tests/
+│  ├─ fixtures/           文書生成器・ケース原本・生成器検証
+│  ├─ cli/                CLI受け入れランナー
+│  └─ ui/                 ヘッドレスPlaywright
+├─ docs/
+│  ├─ specifications/     要求仕様・GUI・バックエンド・境界契約
+│  ├─ test-plans/         試験方針
+│  ├─ plans/              実装計画・移行計画
+│  ├─ reports/            実装報告・実装状況
+│  ├─ releases/           リリースノート・検証記録
+│  ├─ development.md      開発・ビルド・試験手順
+│  └─ rust-repository-structure.html
+├─ outputs/               Git管理外のデータ・記録・成果物
+└─ Generate-Test-Data.cmd 保存用テストデータ生成</code></pre>
+          <p class="tree-note"><code>target/</code> と <code>outputs/build/.frontend-build/</code> はビルド生成物です。<code>core/src/main.rs</code> はGUIを起動せず検索イベントをJSONで出すCLIエントリです。</p>
+        </div>
+      </section>
+
+      <section id="build">
+        <div class="section-heading">
+          <div>
+            <h2>ビルドと確認の境界</h2>
+            <p class="section-note">ソースコードからデスクトップ版と自動確認ができるまで。</p>
+          </div>
+        </div>
+        <div class="build-grid">
+          <article class="panel build-card">
+            <h3>デスクトップ版のビルド</h3>
+            <ol class="sequence">
+              <li><code>Build-Frontend.ps1</code> がRust画面をWASMへコンパイルし、JavaScript接続ファイルを生成。</li>
+              <li>HTML・CSS・テーマ関連ファイルを <code>outputs/build/.frontend-build/</code> に配置。</li>
+              <li>Cargo/TauriがWASM画面とRustコアをWindows実行ファイルにまとめる。</li>
+              <li><code>Build.ps1</code> は一時画面・Cargo release生成物を片付け、EXEを <code>outputs/build/</code> に残す。</li>
+            </ol>
+          </article>
+          <article class="panel build-card">
+            <h3>自動確認の構成</h3>
+            <ol class="sequence">
+              <li>共通データ・CLI受け入れランナーがコアの入出力を確認。</li>
+              <li>CargoのRustテストとWASM向け型検査がエンジンと画面のコードを確認。</li>
+              <li>Playwrightが実際のHTML/CSS/WASM画面をヘッドレス操作。Tauri IPC境界はテスト用モックを使う。</li>
+              <li>実アプリGUI、Windows OS連携、配布ビルドは自動テスト入口と別の範囲。</li>
+            </ol>
+          </article>
+        </div>
+        <p class="note" style="margin-top:12px">このページはソース構造の読み取り結果です。作成にあたりテスト、ビルド、アプリ起動は実行していません。現在の公開・検証状況は <a href="releases/validation-v3.0.0.md">v3.0.0検証記録</a>を参照してください。</p>
+      </section>
+
+      <section id="start-here">
+        <div class="section-heading">
+          <div>
+            <h2>読む順番</h2>
+            <p class="section-note">目的別に最初に見るファイル。</p>
+          </div>
+        </div>
+        <div class="reading">
+          <a href="../core/src/lib.rs">検索の入口<span>要求、イベント、検索全体の進行</span></a>
+          <a href="../src-tauri/src/main.rs">Tauri連携<span>コマンド、状態、IPCイベント</span></a>
+          <a href="../frontend/src/lib.rs">画面の動き<span>WASMイベントと結果表示</span></a>
+          <a href="development.md">開発・実行手順<span>必要環境、ビルド、自動確認</span></a>
+          <a href="specifications/rust-requirements-v3.0.0.md">Rust要求仕様<span>機能と受け入れ条件</span></a>
+          <a href="specifications/boundary.md">境界契約<span>画面と検索処理の責務</span></a>
+          <a href="test-plans/playwright-ui-test-plan.md">UI試験方針<span>自動試験と手動確認の範囲</span></a>
+          <a href="releases/validation-v3.0.0.md">検証記録<span>直近の確認済み範囲</span></a>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <p>このガイドはローカルリポジトリのREADME、Cargoマニフェスト、Rustソース、ビルド・自動確認スクリプトをもとに作成しています。</p>
+      <p><a href="../README.md">リポジトリREADME</a> · <a href="development.md">Tauri実装README</a></p>
+    </footer>
+  </div>
+  <script>
+    const filter = document.getElementById('module-filter');
+    const modules = Array.from(document.querySelectorAll('.module'));
+    const empty = document.getElementById('module-empty');
+    filter.addEventListener('input', () => {
+      const query = filter.value.trim().toLocaleLowerCase('ja');
+      let visible = 0;
+      for (const module of modules) {
+        const searchable = module.innerText + ' ' + module.dataset.search;
+        const match = !query || searchable.toLocaleLowerCase('ja').includes(query);
+        module.hidden = !match;
+        if (match) visible++;
+      }
+      empty.hidden = visible !== 0;
+    });
+  </script>
+</body>
+</html>
