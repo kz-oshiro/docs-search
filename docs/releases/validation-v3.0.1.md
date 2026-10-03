@@ -71,4 +71,7 @@ SHA256 39ea2a6f2846193fbc3af5f50fff9bb3e959280a5a03df6b4e81cfa003974328
 
 ## 公開の確認
 
-公開先は [v3.0.1 GitHub Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.1)。この文書の公開準備時点では push・タグ・Release の確認はまだ行っていない。公開後の API/remote 照合結果を追記する。
+- main にソース/検証文書を push し、コミット `cb21c673ea875c7c2df2919583628ce019a2b270` を指す注釈付きタグ `v3.0.1` を push した。最終テスト対象 `7c550f6` との差分は README と docs のみ。
+- 2026-10-03 22:50:01 JST に [v3.0.1 GitHub Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.1) を公開した。API で draft=false、prerelease=false、Latest=v3.0.1 を確認した。
+- 公開アセット [docs-search-desktop.exe](https://github.com/kz-oshiro/docs-search/releases/download/v3.0.1/docs-search-desktop.exe)（asset ID `607887820`）は uploaded、13,027,840 bytes。GitHub の digest `sha256:39ea2a6f2846193fbc3af5f50fff9bb3e959280a5a03df6b4e81cfa003974328` が最終 CI のローカル EXE と一致した。
+- 公開直後の remote main とタグの対象コミットが上記 `cb21c67` に一致し、ahead/behind `0 0` と clean な作業ツリーを確認した。この公開確認の追記だけを後続の文書コミットで main に反映する。タグとアセットはテスト済みソースに対応するまま維持する。

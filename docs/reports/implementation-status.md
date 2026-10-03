@@ -1,6 +1,6 @@
 # 追加機能の実装状況
 
-2026-10-03追記（Cargo 集約・WASM 撤去）: v3.0.1 の Rust 64件、生成器3件、CLI 全6群、ヘッドレス Playwright 54件と Windows Release ビルドが成功した。旧/新 fixture は6種類の契約一致と、新生成器453ファイルの再現性を確認した。[検証記録](../releases/validation-v3.0.1.md)と[リリースノート](../releases/release-notes-v3.0.1.md)を参照する。実アプリ GUI と旧版との性能比較は未実施。
+2026-10-03追記（Cargo 集約・WASM 撤去）: v3.0.1 の Rust 64件、生成器3件、CLI 全6群、ヘッドレス Playwright 54件と Windows Release ビルドが成功した。旧/新 fixture は6種類の契約一致と、新生成器453ファイルの再現性を確認した。結果をレビューして [v3.0.1](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.1) を公開し、公開 EXE のサイズ/SHA256 と Latest を確認した。[検証記録](../releases/validation-v3.0.1.md)と[リリースノート](../releases/release-notes-v3.0.1.md)を参照する。実アプリ GUI と旧版との性能比較は未実施。
 
 2026-10-03追記: Rust版の自動テスト一式、Playwright 51件、Windows Releaseビルドが成功した。U31で見つかった一括入力プレビューの過剰要求を120msの遅延集約で修正し、再実行で確認した。結果をレビューし、[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を公開した。成果物・実施範囲は [v3.0.0検証記録](../releases/validation-v3.0.0.md)。アプリ起動・実GUIは未実施。
 
@@ -14,11 +14,11 @@
 
 更新日: 2026-10-03（日本時間）
 
-現在のソース/配布用ビルドは **v3.0.1**。検索の要求契約は [Rust要求仕様 v3.0.0](../specifications/rust-requirements-v3.0.0.md)を継続し、移行後の実行結果は [v3.0.1 検証記録](../releases/validation-v3.0.1.md)を基準とする。画面は HTML/CSS/JavaScript、入口は Cargo に集約した。旧公開記録は履歴として保持する。実アプリGUIは未実施。
+現在のソース/配布版は **v3.0.1**。検索の要求契約は [Rust要求仕様 v3.0.0](../specifications/rust-requirements-v3.0.0.md)を継続し、移行後の実行結果・公開確認は [v3.0.1 検証記録](../releases/validation-v3.0.1.md)を基準とする。画面は HTML/CSS/JavaScript、入口は Cargo に集約した。旧公開記録は履歴として保持する。実アプリGUIは未実施。
 
 proptestをテスト専用依存へ追加し、17性質を各1,024ケースで実行した。Rustは64件成功（固定回帰/公開API47件＋17性質）。生成で発見したあいまい候補漏れを修正し、保存seed・固定例・直接/索引CLI比較を追加した。[確認方針](../test-plans/property-testing-test-plan.md)と検証記録の追記を参照。
 対象: [Workから移管した実装計画](../plans/implementation-plan.md)
-移行前に確認したリリース: [`v3.0.0`](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)、対象コミット`f96af8605840306a50c76c34356b13ca3e62bf1a`。v3.0.1 の公開確認は [最新記録](../releases/validation-v3.0.1.md)を参照する。
+確認した最新リリース: [`v3.0.1`](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.1)、タグ対象コミット `cb21c673ea875c7c2df2919583628ce019a2b270`。テスト対象ソースと公開アセットの照合は [最新記録](../releases/validation-v3.0.1.md)を参照する。
 
 この文書は計画の進捗を記録する。**実装済み**はコードと文書が作業ツリーにあること、**確認済み**は実際に行った検証、**公開済み**はリリースをそれぞれ指す。テスト方針の存在だけを検証完了とは扱わない。
 
