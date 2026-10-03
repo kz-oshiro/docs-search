@@ -21,10 +21,10 @@
 | 移行元の HEAD | `e875fbbaf4dbe09c833df878a289ae4f894d6342` |
 | 作業ツリー | v3.0.0 関連の変更・未追跡ファイルが多数ある。HEAD と現在のファイルは一致しない |
 | PowerShell 本体 | `powershell/Search-Excel.ps1`、`powershell/docs-search.ps1`、`powershell/Start-docs-search.vbs`（移行前の配置。移行先は [docs-search-ps](https://github.com/kz-oshiro/docs-search-ps)） |
-| データ生成 | [生成器](../../tests/fixtures/generate-fixtures.py)・[ケース原本](../../tests/fixtures/backend-cases.json)・[生成器検証](../../tests/fixtures/test_generator.py) を Rust 側も使用 |
+| データ生成 | [生成器](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/tests/fixtures/generate-fixtures.py)・[ケース原本](../../tests/fixtures/backend-cases.json)・[生成器検証](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/tests/fixtures/test_generator.py) を Rust 側も使用 |
 | 現行データの静的な期待値 | acceptance 33 文書、load 148 文書、ケース原本 27 件、固定 seed `20260927` |
 | PowerShell の確認内容 | `tests/run-powershell-tests.ps1`（移行前の配置）は文書を共用するが、27 ケースを PowerShell API で実行するものではない |
-| 自動テストの現行入口 | Rust は [Run-Automated-Tests.ps1](../../scripts/Run-Automated-Tests.ps1)。配布ビルド込みは [Run-Local-CI.ps1](../../scripts/Run-Local-CI.ps1) |
+| 自動テストの現行入口 | Rust は [Run-Automated-Tests.ps1](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/scripts/Run-Automated-Tests.ps1)。配布ビルド込みは [Run-Local-CI.ps1](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/scripts/Run-Local-CI.ps1) |
 
 この表は移行前の記録であり、移行先のローカル配置は M1 で作成済みである。後続作業の開始時には移行記録と現在のリモート状態・HEAD・件数を再確認する。文書に記載済みの以前の検証結果は、移行後の検証結果として流用しない。
 

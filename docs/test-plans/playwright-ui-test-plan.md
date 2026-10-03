@@ -1,6 +1,6 @@
-# v3.0.0 Playwright UI試験とユーザー確認の境界
+# Playwright UI試験とユーザー確認の境界
 
-Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](../test-plans/cargo-native-ui-test-plan.md)を優先する。v3.0.0の成功記述は移行前の記録である。
+Cargo/WASM撤去後の現行手順と未実施の確認は[移行検証方針](cargo-native-ui-test-plan.md)を優先する。v3.0.1 は実 HTML/CSS/JavaScript の54件が成功した。[最新の検証記録](../releases/validation-v3.0.1.md)に結果を記載した。v3.0.0の成功記述は移行前の記録である。
 
 2026-10-03。Playwrightの導入・テストコード・文書整備の方針。導入時点ではテスト実行・WASM/Windowsビルドを未実施だったが、同日の後続検証でヘッドレスUI 51件とWindows Releaseビルドが成功し、v3.0.0を公開した。実アプリ起動・GUIは未実施。[導入時の実装報告](../reports/implementation-report-playwright.md)と[最新の検証記録](../releases/validation-v3.0.0.md)を併せて読む。
 
@@ -60,7 +60,7 @@ Rust 1.91.1 を toolchain ファイルで固定する。WASM target / wasm-bindg
 
 R3-19/R3-20のブラウザー内操作とR3-16〜R3-18の画面部分を対象とする。生の通知が描画されることは、実コアがその通知を生成する証拠ではない。実配布アプリの機能成功は下の確認を合わせて報告する。
 
-U40〜U42に資材/WASM要求なし、起動資材失敗、CRLF条件要求を追加する。既存51件の期待値は継続し、合計54件は今回未実行。
+U40〜U42に資材/WASM要求なし、起動資材失敗、CRLF条件要求を追加した。既存51件の期待値を継続し、v3.0.1 の最終 CI で合計54件が成功した。失敗・skipped・flaky はいずれも0。
 
 ## 結果と失敗診断
 

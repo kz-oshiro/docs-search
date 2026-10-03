@@ -5,8 +5,8 @@
 ## 変更
 
 - Playwright 1.63.0を独立した [npmパッケージ](../../tests/ui/package.json)へ固定し、lockfileを作成した。Chromium/ヘッドレス/1 worker/再試行なし、画像・動画・トレースなし。npmはlockfile生成だけ実施し、依存インストールは行っていない。
-- 配布と試験の [WASM画面生成](../../scripts/Build-Frontend.ps1)を共通化した。配布側の資材コピーを置換し、既存のEXEコピーとビルド後削除は保持した。UI側は専用出力/キャッシュへdebug WASMを生成し、Windows EXEを作らない。
-- [UI入口](../../scripts/Run-Ui-Tests.ps1)を追加し、既存自動入口の末尾へ常時接続した。依存/Chromiumの不足は準備コマンド付きで失敗する。環境変数と作業ディレクトリはfinallyで復元する。
+- 配布と試験の [WASM画面生成](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/scripts/Build-Frontend.ps1)を共通化した。配布側の資材コピーを置換し、既存のEXEコピーとビルド後削除は保持した。UI側は専用出力/キャッシュへdebug WASMを生成し、Windows EXEを作らない。
+- [UI入口](https://github.com/kz-oshiro/docs-search/blob/750c4674df79c3a0d7f9bd014462ace525e8dcbc/scripts/Run-Ui-Tests.ps1)を追加し、既存自動入口の末尾へ常時接続した。依存/Chromiumの不足は準備コマンド付きで失敗する。環境変数と作業ディレクトリはfinallyで復元する。
 - UIソースを実WASM初期化から操作し、Tauri/クリップボード境界だけモック化。U01〜U39とパラメーター別ケースで入力、状態、結果、階層、フィルター、周辺、編集、出力、一括、テーマ、復元、キーボードを検査するコードを追加した。
 - 実コアを呼ばない固定応答を、実検索・ファイル保存の成功と呼ばない。失敗記録はテキストだけを残し、ユーザー確認はM1〜M5へ絞った。
 - AGENTS/README/各機能方針/要求対応表に、ヘッドレス自動と実アプリGUIの区別を追記した。従来の検証記録は当時の結果として維持する。

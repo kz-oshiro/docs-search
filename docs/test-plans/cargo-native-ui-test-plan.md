@@ -1,6 +1,6 @@
 # Cargo 集約・WASM 撤去の検証方針
 
-2026-10-03。今回は実装と静的確認のみ。次の検証担当はこの方針と[実装報告](../reports/implementation-report-cargo-native-ui.md)を読んでから、依頼された範囲を実行する。実アプリ起動/GUI・リモート反映は別の依頼範囲である。
+2026-10-03。この方針の作成時点では実装と静的確認のみだった。同日の後続依頼で手順1〜4の準備・全自動試験・旧生成器比較・Windows Release ビルドが成功した。[v3.0.1 検証記録](../releases/validation-v3.0.1.md)を参照する。手順5の旧/新 cold・warm 比較と実アプリ起動/GUIは未実施。次の検証担当はこの方針と[実装報告](../reports/implementation-report-cargo-native-ui.md)を読んで、依頼された範囲を実行する。
 
 ## 自動検証の手順と期待結果
 

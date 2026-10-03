@@ -2,7 +2,7 @@
 
 Rust の検索コアと Tauri を使う Windows 向け文書検索ツールです。画面は HTML/CSS/JavaScript の ES modules で動きます。検索と索引はネイティブ Rust で処理し、WASM は使用しません。
 
-公開済みの [v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0) は移行前の版です。今回の Cargo 集約・WASM 撤去は実装と静的確認までで、テスト・ビルド・公開は未実施です。[実装報告](docs/reports/implementation-report-cargo-native-ui.md)と[検証方針](docs/test-plans/cargo-native-ui-test-plan.md)を参照してください。過去の[検証記録](docs/releases/validation-v3.0.0.md)は今回の変更の合格証拠にはなりません。
+現在の版は **v3.0.1**。Cargo 集約・WASM 撤去後の Rust 64件、CLI 全6群、生成器、ヘッドレス Playwright 54件と Windows Release ビルドが成功しました。[リリースノート](docs/releases/release-notes-v3.0.1.md)と[検証記録](docs/releases/validation-v3.0.1.md)を参照してください。実アプリの OS 連携・見た目と、旧版との性能比較は未確認です。公開先は [GitHub Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.1)です。
 
 ## 開発と検証
 

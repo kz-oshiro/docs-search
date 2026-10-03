@@ -1,5 +1,7 @@
 # 追加機能の実装状況
 
+2026-10-03追記（Cargo 集約・WASM 撤去）: v3.0.1 の Rust 64件、生成器3件、CLI 全6群、ヘッドレス Playwright 54件と Windows Release ビルドが成功した。旧/新 fixture は6種類の契約一致と、新生成器453ファイルの再現性を確認した。[検証記録](../releases/validation-v3.0.1.md)と[リリースノート](../releases/release-notes-v3.0.1.md)を参照する。実アプリ GUI と旧版との性能比較は未実施。
+
 2026-10-03追記: Rust版の自動テスト一式、Playwright 51件、Windows Releaseビルドが成功した。U31で見つかった一括入力プレビューの過剰要求を120msの遅延集約で修正し、再実行で確認した。結果をレビューし、[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を公開した。成果物・実施範囲は [v3.0.0検証記録](../releases/validation-v3.0.0.md)。アプリ起動・実GUIは未実施。
 
 2026-10-03追記（Playwright導入時点）: [Playwright導入報告](implementation-report-playwright.md)と [自動/手動境界](../test-plans/playwright-ui-test-plan.md)を追加した。この時点ではヘッドレスUI試験コードの実行は未実施。従来の自動検証結果をUI成功へ読み替えない。
@@ -12,11 +14,11 @@
 
 更新日: 2026-10-03（日本時間）
 
-現在の要求/ソース/配布版は **v3.0.0**。[Rust要求仕様](../specifications/rust-requirements-v3.0.0.md)と [検証記録](../releases/validation-v3.0.0.md)を基準とする。v2系公開記録は履歴として保持する。Rust/CLI/WASM/Playwrightの自動検証とWindows配布ビルドを確認して公開済み。実アプリGUIは未実施。
+現在のソース/配布用ビルドは **v3.0.1**。検索の要求契約は [Rust要求仕様 v3.0.0](../specifications/rust-requirements-v3.0.0.md)を継続し、移行後の実行結果は [v3.0.1 検証記録](../releases/validation-v3.0.1.md)を基準とする。画面は HTML/CSS/JavaScript、入口は Cargo に集約した。旧公開記録は履歴として保持する。実アプリGUIは未実施。
 
 proptestをテスト専用依存へ追加し、17性質を各1,024ケースで実行した。Rustは64件成功（固定回帰/公開API47件＋17性質）。生成で発見したあいまい候補漏れを修正し、保存seed・固定例・直接/索引CLI比較を追加した。[確認方針](../test-plans/property-testing-test-plan.md)と検証記録の追記を参照。
 対象: [Workから移管した実装計画](../plans/implementation-plan.md)
-確認したリリース: [`v3.0.0`](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)、対象コミット`f96af8605840306a50c76c34356b13ca3e62bf1a`
+移行前に確認したリリース: [`v3.0.0`](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)、対象コミット`f96af8605840306a50c76c34356b13ca3e62bf1a`。v3.0.1 の公開確認は [最新記録](../releases/validation-v3.0.1.md)を参照する。
 
 この文書は計画の進捗を記録する。**実装済み**はコードと文書が作業ツリーにあること、**確認済み**は実際に行った検証、**公開済み**はリリースをそれぞれ指す。テスト方針の存在だけを検証完了とは扱わない。
 
@@ -50,9 +52,9 @@ proptestをテスト専用依存へ追加し、17性質を各1,024ケースで�
 | 段階 | 要求と契約 | 主な実装 | 確認方針 |
 | --- | --- | --- | --- |
 | P0 | [A-13](../specifications/requirements.md)、[境界契約](../specifications/boundary.md)、[抽出と索引](../specifications/backend.md) | [`extract.rs`](../../core/src/extract.rs)、[`index.rs`](../../core/src/index.rs) | [P0](../test-plans/search-foundation-test-plan.md) |
-| P1 | [A-12](../specifications/requirements.md)、[GUI仕様](../specifications/gui.md)、[出力契約](../specifications/boundary.md) | [`report.rs`](../../core/src/report.rs)、[`frontend/src/lib.rs`](../../frontend/src/lib.rs)、[`src-tauri/src/main.rs`](../../src-tauri/src/main.rs) | [P1](../test-plans/result-export-test-plan.md) |
-| P2 | [A-14](../specifications/requirements.md)、[GUI仕様](../specifications/gui.md)、[周辺取得契約](../specifications/boundary.md) | [`context.rs`](../../core/src/context.rs)、[`extract.rs`](../../core/src/extract.rs)、[`frontend/src/lib.rs`](../../frontend/src/lib.rs) | [P2](../test-plans/excel-context-test-plan.md)、[専用データ生成器](../../tests/fixtures/generate-context-fixture.py) |
-| P3 | [A-15](../specifications/requirements.md)、[検索規則](../specifications/backend.md)、[条件の境界契約](../specifications/boundary.md) | [`query.rs`](../../core/src/query.rs)、[`core/src/lib.rs`](../../core/src/lib.rs)、[`frontend/src/lib.rs`](../../frontend/src/lib.rs) | [P3](../test-plans/condition-search-test-plan.md)、[専用データ生成器](../../tests/fixtures/generate-conditions-fixture.py) |
+| P1 | [A-12](../specifications/requirements.md)、[GUI仕様](../specifications/gui.md)、[出力契約](../specifications/boundary.md) | [`report.rs`](../../core/src/report.rs)、[`view.js`](../../frontend/view.js)、[`src-tauri/src/main.rs`](../../src-tauri/src/main.rs) | [P1](../test-plans/result-export-test-plan.md) |
+| P2 | [A-14](../specifications/requirements.md)、[GUI仕様](../specifications/gui.md)、[周辺取得契約](../specifications/boundary.md) | [`context.rs`](../../core/src/context.rs)、[`extract.rs`](../../core/src/extract.rs)、[`view.js`](../../frontend/view.js) | [P2](../test-plans/excel-context-test-plan.md)、[専用データ生成器](../../test-support/src/specialized.rs) |
+| P3 | [A-15](../specifications/requirements.md)、[検索規則](../specifications/backend.md)、[条件の境界契約](../specifications/boundary.md) | [`query.rs`](../../core/src/query.rs)、[`core/src/lib.rs`](../../core/src/lib.rs)、[`app.js`](../../frontend/app.js) | [P3](../test-plans/condition-search-test-plan.md)、[専用データ生成器](../../test-support/src/specialized.rs) |
 
 P0・P1は同じ`v2.0.6`コミットで公開した。P2・P3は同じ`v2.0.7`コミットで検証・公開した。計画の配置案にあった`group.rs`は作らず、P3の行単位の集約は`query.rs`に実装した。P3の索引経路は検索漏れを避けるため、まず対象ファイルの保存済み検索単位を全件読み込む。大きなファイルでの性能評価は未実施である。
 
@@ -61,7 +63,7 @@ P4a〜P4bは `extract.rs` / `index.rs` / `context.rs`、P5は `ranking.rs` と�
 ## 次の確認と実装
 
 1. 自動検証とWindows Releaseビルドは完了。実アプリのOS連携・見た目は [限定票M1〜M5](../test-plans/playwright-ui-test-plan.md#ユーザー確認票実アプリの最終5項目)に従う。アプリ起動・GUIは未実施で、自動確認と別に記録する。
-2. v3.0.0のcommit・push・tag・Releaseは完了。PowerShell版の回帰と配布は独立リポジトリのv1.0.0で完了している。性能測定・実Office互換性の追加評価・イシュー完了操作は未実施。再現コマンドと公開結果は [検証記録](../releases/validation-v3.0.0.md)を参照。
+2. v3.0.1 の再現コマンド・成果物・公開確認は [検証記録](../releases/validation-v3.0.1.md)を参照。PowerShell版の回帰と配布は独立リポジトリのv1.0.0で完了している。旧/新の性能比較・実Office互換性の追加評価・イシュー完了操作は未実施。
 
 この文書の状態は上記更新日時のチェックアウトに対応する。以後のコミットや公開によって変わるため、次回の作業では`git status`、`git log`、リリース記録と照合して更新する。
 

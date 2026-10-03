@@ -33,7 +33,7 @@ cargo xtask ci
 
 `build` は frontend の8資材だけを `target/frontend-dist/` へ内容が変わった場合にコピーし、`cargo build --release --locked -p docs-search-desktop` を実行します。成功した現在の EXE だけを実行別 `outputs/runs/<実行ID>/artifacts/docs-search-desktop.exe` に保存し、SHA256 とサイズを記録します。Node/npm はこのビルドに不要です。実行中の EXE を再ビルドするときは閉じてください。
 
-`ci` は独立したテスト群を失敗後も続け、必須テストがすべて成功した場合だけビルドします。全体の失敗を一つの終了コードで返します。GitHub Actions の作成、push、タグ、Release は今回の変更範囲に含めていません。
+`ci` は独立したテスト群を失敗後も続け、必須テストがすべて成功した場合だけビルドします。全体の失敗を一つの終了コードで返します。GitHub Actions はまだ作成していません。push、タグ、Release は検証入口に含めず、ユーザーの公開依頼を受けて別途行います。
 
 各実行は新規 `outputs/runs/<実行ID>/` に `report.json` / `report.md`、工程別 stdout/stderr、Git commit/dirty、Rust/Cargo/Node/npm、Playwright の前提と実測版、所要時間、順位 Top-5、UI JSON/テキスト失敗記録を残します。レポートは異なる実行の成功ログを混ぜません。
 
@@ -52,4 +52,4 @@ cargo xtask icons
 
 ## 静的確認と検証範囲
 
-実装依頼で行うのは `cargo metadata --no-deps --locked`、`cargo fmt --all -- --check`、`node --check`、文書/差分の静的確認までです。型検査・テスト・ビルド・起動は別の依頼で実施します。今回の変更の実行結果はまだありません。過去の [v3.0.0 検証](releases/validation-v3.0.0.md)と混同しないでください。
+実装依頼で行うのは `cargo metadata --no-deps --locked`、`cargo fmt --all -- --check`、`node --check`、文書/差分の静的確認までです。型検査・テスト・ビルド・起動は別の依頼で実施します。今回の移行は後続のテスト・ビルド依頼で自動一式と Windows Release ビルドが成功しました。[v3.0.1 検証記録](releases/validation-v3.0.1.md)にコマンド、ログ、成果物を記載しています。実アプリ起動・GUI と旧版との性能比較は未実施です。
