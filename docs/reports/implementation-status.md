@@ -10,7 +10,7 @@
 
 | 案件 | 状況・次の作業 |
 | --- | --- |
-| [文書管理・利用者向け案内](development/2026-10-04-documentation.md) | v3.0.5の全必須試験・ビルド・公開照合済み。検証MDの固定リンクを反映中 |
+| [文書管理・利用者向け案内](development/2026-10-04-documentation.md) | v3.0.5で試験・ビルド・公開完了。v3.0.4本文整理と両版の固定検証リンクも反映済み |
 | [検索処理の重複削減](development/2026-10-04-backend-optimization.md) | v3.0.4で公開。性能比較・数値基準は未実施・未決定 |
 
 過去の案件は[実装履歴](implementation-history.md)から参照する。公開検証の入口は[v3.0.5検証MD](validation/v3.0.5.md)と[Release一覧](https://github.com/kz-oshiro/docs-search/releases)。
