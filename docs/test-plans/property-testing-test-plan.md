@@ -1,6 +1,6 @@
 # proptest の確認方針
 
-現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
+現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
 作成日: 2026-10-03。対象は [Rust要求仕様](../specifications/rust-requirements.md) の検索コア。固定の具体例・Office fixture・CLI受け入れを保持し、入力の組合せを生成して検証する性質テストを追加する。GUI・Windows配布ビルド・公開は今回対象外。
 
@@ -53,6 +53,6 @@ cargo test --locked --manifest-path .\core\Cargo.toml --lib r3_
 
 初回に本文 `a_` / 検索語 `a!` で、あいまい最終評価がidentifier一致を返す一方、`could_match` が落とす不整合を検出した。固定回帰と保存seedを追加し、最終評価の意味を変えず候補判定へ単一token/前方一致を含める。索引もraw検索語のN-gramに含まれないtoken一致を候補へ加え、区切りだけの語が保存gramにないため落ちる問題を防ぐ。
 
-[索引CLI](../../core/tests/cli_index.rs)へ `a!` / `alpha!` / `__` を追加し、直接/索引初回/再利用の実際の結果が同じであることを確認する。通常検索や固定27ケースの期待値は変更しない。実施結果とログは [検証記録](../releases/README.md)に追記する。
+[索引CLI](../../core/tests/cli_index.rs)へ `a!` / `alpha!` / `__` を追加し、直接/索引初回/再利用の実際の結果が同じであることを確認する。通常検索や固定27ケースの期待値は変更しない。実施結果とログは[開発手順](../development.md#記録の自動生成と公開)に従って同じ実行の `outputs/runs/` に保存し、公開時はReleaseに検証記録を添付する。
 
 性質テストは定めた生成範囲・件数での検証であり、全Unicode/全ファイル形式の証明ではない。Excel/Officeの互換性は既存fixture、OS権限の網羅・性能・GUIは別の確認範囲とする。

@@ -1,8 +1,8 @@
 # P0 検索単位・索引基盤の確認方針
 
-現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
+現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
-対象: [実装計画 P0](../plans/implementation-plan.md)。実装時点では未実施だったが、後に[公開記録](../releases/README.md)に自動確認の成功を記録した。GUI 操作は未確認。新しい変更の検証では、以下の確認項目・手順・期待結果を把握してから実行する。現在の状態は[進捗レポート](../reports/implementation-status.md)を参照する。
+対象: [実装計画 P0](../plans/implementation-plan.md)。新しい変更の検証では、以下の確認項目・手順・期待結果を把握してから実行する。過去の実行結果は公開版の記録を参照し、今回の検証へ引き継がない。現在の状態は[進捗レポート](../reports/implementation-status.md)を参照する。
 
 ## 自動確認の順序
 

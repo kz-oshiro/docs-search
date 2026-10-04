@@ -1,5 +1,7 @@
 # v3.0.0 Playwright導入の実装報告
 
+この報告は初回実装時点の記録です。現在の状態は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)、後続の検証・公開結果は[v3.0.0 Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を参照してください。
+
 2026-10-03。実装と静的確認まで。ユーザーと確定した「実WASM画面の自動操作＋OS/見た目の限定手動確認」「画像なし・テキストのみ」「自動テストに常時追加」を実装した。確認項目・手順・期待結果は [UI試験方針](../test-plans/playwright-ui-test-plan.md) に集約する。
 
 ## 変更
@@ -17,7 +19,7 @@ JavaScriptの構文、PowerShellの構文/UTF-8 BOM、packageとlockの対応、
 
 未実施: npm ci、Chromium導入、Playwright試験、既存自動試験の再実行、WASM/Windows配布ビルド、アプリ起動、対話的GUI、M1〜M5、性能、コミット/push/公開。
 
-今回の既存作業ツリーには別機能の多数の未コミット変更がある。巻き戻し・一括コミット・リモート反映はしていない。UI試験の実行結果を [従来のv3.0.0検証記録](../releases/validation-v3.0.0.md)へ追加したことにもしていない。
+今回の既存作業ツリーには別機能の多数の未コミット変更がある。巻き戻し・一括コミット・リモート反映はしていない。UI試験の実行結果を [従来のv3.0.0検証記録](https://github.com/kz-oshiro/docs-search/releases/download/v3.0.0/validation.md)へ追加したことにもしていない。
 
 ## 次の検証担当
 

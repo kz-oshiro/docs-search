@@ -1,6 +1,6 @@
 # Rust 要求仕様
 
-本書は現行の機能基準を定める。文書の改訂履歴はGitで管理し、製品のリリース番号とは連動させない。実行手順は[開発手順](../development.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。
+本書は現行の機能基準を定める。文書の改訂履歴はGitで管理し、製品のリリース番号とは連動させない。実行手順は[開発手順](../development.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。
 
 対象は現在の `core/`・`src-tauri/`・`frontend/` の Rust コア、CLI、Tauri 境界、HTML/CSS/JavaScript 画面。PowerShell 版は独立した [docs-search-ps リポジトリ](https://github.com/kz-oshiro/docs-search-ps)で管理し、本書の機能基準には含めない。製品の版番号は配布設定、対象ソース・ビルド・公開結果は各リリースの記録で管理する。
 

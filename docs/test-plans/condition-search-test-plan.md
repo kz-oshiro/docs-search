@@ -1,6 +1,6 @@
 # 高度な検索 P3 の確認方針
 
-現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
+現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
 試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。以下のGUI手順・未実施・許可の記述は旧方針の参考記録として扱う。
 

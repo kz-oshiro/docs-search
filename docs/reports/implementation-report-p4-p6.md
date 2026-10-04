@@ -1,5 +1,7 @@
 # P4a〜P6の実装報告
 
+この報告は初回実装時点の記録です。現在の状態は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)、後続の検証・公開結果は[v3.0.0 Release](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を参照してください。
+
 作成日: 2026-10-03。対象: [追加機能計画](../plans/implementation-plan.md)の残り4段階すべて。
 コード・仕様・確認方針を作業ツリーに追加した。新しい機能の動作確認・公開完了を示す報告ではない。
 

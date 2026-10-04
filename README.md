@@ -2,7 +2,7 @@
 
 Rust の検索コアと Tauri を使う Windows 向け文書検索ツールです。画面は HTML/CSS/JavaScript の ES modules で動きます。検索と索引はネイティブ Rust で処理し、WASM は使用しません。
 
-配布ファイルは [最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)から取得できます。リリースごとの変更点・対象ソース・検証結果は[公開・検証記録](docs/releases/README.md)を参照してください。
+配布ファイルは [最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)から取得できます。リリースごとの変更点・対象ソース・検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照してください。
 
 ## 開発と検証
 
@@ -36,8 +36,8 @@ docs-search/
 ├─ test-support/     検索エンジンに依存しない開発用生成器
 ├─ tests/fixtures/   共通の要求・期待結果 JSON
 ├─ tests/ui/         ヘッドレス Playwright と境界モック
-├─ docs/             仕様・方針・報告・公開記録
-├─ outputs/          実行ごとのログ・JSON/Markdown・データ・EXE
+├─ docs/             仕様・手順・試験設計・開発報告
+├─ outputs/          Git管理外のデータ・成果物（試験原本は runs/）
 └─ Generate-Test-Data.cmd  cargo xtask fixtures の薄い入口
 ```
 

@@ -1,6 +1,6 @@
 # アプリケーション結合試験の設計（Playwright＋実Tauri）
 
-2026-10-04 方針更新。状態: **設計文書のみ整備済み。実EXE用ランナー・追加ケース・Cargo入口の変更は未実装で、追加試験は未実施**。既存のフロントエンド試験54件の成功記録は [検証記録](../releases/README.md)を参照する。
+2026-10-04 方針更新。状態: **設計文書のみ整備済み。実EXE用ランナー・追加ケース・Cargo入口の変更は未実装で、追加試験は未実施**。公開版の検証記録は [GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。
 
 入口とCI制御はRustの `cargo xtask` に維持し、アプリケーション結合試験をPlaywrightで自動化する。Rust製OS操作補助、UI Automation、FlaUI、Python、.NET、WebdriverIOは追加しない。OS連携の保証対象外項目は文書に残し、人による確認を通常の完了条件にしない。この方針は従来のM1〜M5とOS補助を使うN01〜N04案を置き換える。
 

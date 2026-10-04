@@ -1,6 +1,6 @@
 # 実装状況
 
-現行の実装状況を示す。機能の基準は[Rust要求仕様](../specifications/rust-requirements.md)、詳細手順は[開発手順](../development.md)、対象コミット・実行結果・公開成果物は[公開・検証記録](../releases/README.md)を参照する。過去の経緯は[実装履歴](implementation-history.md)へ分けて保存する。
+現行の実装状況を示す。機能の基準は[Rust要求仕様](../specifications/rust-requirements.md)、詳細手順は[開発手順](../development.md)、公開版の対象コミット・検証結果・成果物は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。過去の経緯は[実装履歴](implementation-history.md)へ分けて保存する。
 
 実装済みはコードと文書が存在すること、確認済みは実際に行った検証、公開済みは配布を指す。試験設計の存在だけを検証完了とは扱わない。
 

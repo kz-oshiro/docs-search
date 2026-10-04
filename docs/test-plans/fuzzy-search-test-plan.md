@@ -1,6 +1,6 @@
 # あいまい検索の確認方針
 
-現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
+現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
 実装後のテスト担当者はこの方針を読み、既存の共通ケースと追加ケースを実行する。検索用索引とあいまい検索は独立したチェックボックスで、初期状態は両方オフ。あいまい検索の各項目ではチェックをオンにする。索引オンの初回検索と2回目以降を分けて確認する。GUI テストを実施する場合はリポジトリの `AGENTS.md` に従う。
 

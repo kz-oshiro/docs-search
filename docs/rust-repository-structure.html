@@ -571,14 +571,13 @@
 ├─ docs/
 │  ├─ specifications/     要求仕様・GUI・バックエンド・境界契約
 │  ├─ test-plans/         試験方針
-│  ├─ plans/              実装計画・移行計画
-│  ├─ reports/            実装報告・実装状況
-│  ├─ releases/           リリースノート・検証記録
+│  ├─ plans/              実装計画
+│  ├─ reports/            開発状況・実装報告・変更理由
 │  ├─ development.md      開発・ビルド・試験手順
 │  └─ rust-repository-structure.html
-├─ outputs/               Git管理外のデータ・記録・成果物
+├─ outputs/               Git管理外のデータ・成果物（試験原本はruns/）
 └─ Generate-Test-Data.cmd 保存用テストデータ生成</code></pre>
-          <p class="tree-note"><code>target/</code> と <code>target/frontend-dist/</code> はビルド生成物です。<code>core/src/main.rs</code> はGUIを起動せず検索イベントをJSONで出すCLIエントリです。</p>
+          <p class="tree-note">公開記録はGitHub Releaseの本文・添付ファイル、自動試験・ビルドの原本はGit管理外の<code>outputs/runs/</code>に保存します。<code>target/</code> と <code>target/frontend-dist/</code> はビルド生成物です。<code>core/src/main.rs</code> はGUIを起動せず検索イベントをJSONで出すCLIエントリです。</p>
         </div>
       </section>
 
@@ -609,7 +608,7 @@
             </ol>
           </article>
         </div>
-        <p class="note" style="margin-top:12px">このページは現行のソース構造を案内します。テスト・ビルド・公開の実施結果は <a href="releases/README.md">公開・検証記録</a>を参照してください。</p>
+        <p class="note" style="margin-top:12px">このページは現行のソース構造を案内します。公開版の変更点・検証結果は <a href="https://github.com/kz-oshiro/docs-search/releases">GitHub Releases</a>を参照してください。</p>
       </section>
 
       <section id="start-here">
@@ -627,7 +626,7 @@
           <a href="specifications/rust-requirements.md">Rust要求仕様<span>機能と受け入れ条件</span></a>
           <a href="specifications/boundary.md">境界契約<span>画面と検索処理の責務</span></a>
           <a href="test-plans/playwright-ui-test-plan.md">UI試験方針<span>自動試験と手動確認の範囲</span></a>
-          <a href="releases/README.md">公開・検証記録<span>対象ソースと確認済み範囲</span></a>
+          <a href="https://github.com/kz-oshiro/docs-search/releases">GitHub Releases<span>公開版の変更点・対象ソース・検証結果</span></a>
         </div>
       </section>
     </main>
@@ -652,6 +651,6 @@
       empty.hidden = visible !== 0;
     });
   </script>
-<p style="padding:24px">開発・検証の手順は<a href="development.md">開発手順</a>、実施結果は<a href="releases/README.md">公開・検証記録</a>を参照してください。test-supportは開発専用、root Cargo.lockとtargetを共有します。</p>
+<p style="padding:24px">開発・検証の手順は<a href="development.md">開発手順</a>、公開版の検証結果は<a href="https://github.com/kz-oshiro/docs-search/releases">GitHub Releases</a>を参照してください。test-supportは開発専用、root Cargo.lockとtargetを共有します。</p>
 </body>
 </html>

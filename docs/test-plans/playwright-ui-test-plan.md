@@ -2,7 +2,7 @@
 
 実装済みのUケースと設計中のG01/G02を扱う。現在の実装状況は[実装状況](../reports/implementation-status.md#試験の実装と振り分け)を参照する。
 
-現行の実行手順は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)を参照する。
+現行の実行手順は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。
 
 導入時点の経緯と実施状況は[導入時の実装報告](../reports/implementation-report-playwright.md)に保存する。本書は現在の試験設計を管理し、過去の成功件数を新しいケースの成功として扱わない。
 

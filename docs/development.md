@@ -61,11 +61,13 @@ cargo xtask ci
 
 ## 記録の自動生成と公開
 
-`cargo xtask release-record` と `record-contracts` 工程、テスト・ビルドによる実行別レポートの保存は実装済みです。実行検証と公開照合の結果は、実行別レポートとReleaseに添付する検証記録で確認します。
+公開版の変更点・対象タグ/コミット・配布ファイル・検証記録は [GitHub Releases](https://github.com/kz-oshiro/docs-search/releases) に集約します。Release本文と添付ファイルを正本とし、リポジトリへ版別のリリースノート・検証記録を重複して置きません。開発状況・実装報告・変更理由は `docs/reports/` に保存します。
+
+`cargo xtask release-record` と `record-contracts` 工程、テスト・ビルドによる実行別レポートの保存は実装済みです。未公開の実行結果は `outputs/runs/<ID>/` の原本、公開版の実行検証と公開照合はReleaseの添付記録で確認します。
 
 テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。読む範囲と会話報告は[文書作成ガイド](documentation.md#検証結果の読み方と会話報告)に従います。正常ログ・件数・環境・ハッシュやUI JSONの全文を版別検証文書・実装状況・試験設計へ転記しません。
 
-公開時は下記の `release-record` でRelease本文と検証記録を生成・添付し、公開後に `--published` で照合します。毎回の索引行追加や公開確認だけの文書コミットは不要です。
+公開時は下記の `release-record` でRelease本文と検証記録を生成・添付し、公開後に `--published` で照合します。毎回の索引行追加や公開確認だけの文書コミットは不要です。v3.0.0〜v3.0.2の旧手書き検証記録は、各Releaseの `validation.md` に当時の結果として保存しています。旧形式の記録を新形式の証拠へ読み替えません。
 
 | 従来の記載 | 今後の出力・入力 |
 | --- | --- |

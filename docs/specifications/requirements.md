@@ -1,6 +1,6 @@
 # docs-search 全体要求仕様
 
-現行の全体要求を定める。Rust向けの要求ID・上限・テスト対応は[Rust要求仕様](rust-requirements.md)、実施結果は[公開・検証記録](../releases/README.md)、実装の方式と実行方法は[開発手順](../development.md)を参照する。文書の変更履歴はGitで管理する。
+現行の全体要求を定める。Rust向けの要求ID・上限・テスト対応は[Rust要求仕様](rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、実装の方式と実行方法は[開発手順](../development.md)を参照する。文書の変更履歴はGitで管理する。
 
 ## 目的と対象
 

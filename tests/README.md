@@ -38,6 +38,6 @@ worker数の計算・CPU差分・測定不能時のfallbackを `node --test test
 
 ## フロントエンド試験とアプリケーション結合試験
 
-ケースと判定方法は[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)、試験ランナーの実装済み・設計のみの区別は[実装状況](../docs/reports/implementation-status.md#試験の実装と振り分け)を参照してください。実施結果は[開発手順の実行記録](../docs/development.md#記録の自動生成と公開)と[公開・検証記録](../docs/releases/README.md)から確認します。
+ケースと判定方法は[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)、試験ランナーの実装済み・設計のみの区別は[実装状況](../docs/reports/implementation-status.md#試験の実装と振り分け)を参照してください。実施結果は[開発手順の実行記録](../docs/development.md#記録の自動生成と公開)と[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)から確認します。
 
 試験の担当と結果報告は[試験区分と振り分け](../docs/test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携の範囲は[保証対象外の定義](../docs/test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照してください。
