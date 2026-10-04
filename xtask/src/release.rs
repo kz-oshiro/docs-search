@@ -46,6 +46,7 @@ fn require_ci(report: &Value, tag: &str) -> Result<()> {
         .iter()
         .chain(records::FRONTEND)
         .chain(records::INFRASTRUCTURE)
+        .chain(records::INTEGRATION)
         .copied()
         .chain(["desktop-stage", "desktop-build", "desktop-artifact"]);
     if required.into_iter().any(|name| {
@@ -56,7 +57,12 @@ fn require_ci(report: &Value, tag: &str) -> Result<()> {
     {
         return Err("required CI phases are missing, skipped or failed".into());
     }
-    for key in ["backend", "frontend", "infrastructure"] {
+    for key in [
+        "backend",
+        "frontend",
+        "infrastructure",
+        "applicationIntegration",
+    ] {
         if report["summary"][key]["status"] != "passed" {
             return Err("test evidence is incomplete".into());
         }
@@ -96,6 +102,16 @@ fn require_ci(report: &Value, tag: &str) -> Result<()> {
             .any(|key| ui["stats"][key] != 0)
     {
         return Err("complete Playwright evidence is required".into());
+    }
+    let exe = &report["summary"]["applicationIntegration"];
+    if exe["playwright"]["stats"]["expected"] != records::EXE_CASES.len()
+        || exe["playwright"]["errors"] != 0
+        || ["skipped", "unexpected", "flaky"]
+            .iter()
+            .any(|key| exe["playwright"]["stats"][key] != 0)
+        || exe["cases"] != json!(records::EXE_CASES)
+    {
+        return Err("complete real EXE integration evidence is required".into());
     }
     let start = &report["metadata"];
     let end = &report["sourceAtFinish"];
@@ -372,12 +388,18 @@ pub fn execute(args: &[String]) -> Result<bool> {
     let mut evidence = json!({"logs":logs});
     for (key, path) in [
         ("playwright", "ui/results.json"),
+        ("applicationIntegration", "exe/results.json"),
+        ("webview2Prerequisites", "exe/preflight.json"),
         ("workers", "ui/workers.json"),
         ("rankingTop5", "ranking-top5.json"),
         ("fixtureManifest", "corpus/manifest.json"),
     ] {
         evidence[key] = read_json(&dir.join(path))?;
     }
+    evidence["applicationIntegrationSessions"] =
+        json!(records::EXE_CASES.iter().map(|id| {
+        Ok(json!({"case":id,"record":read_json(&dir.join(format!("exe/{id}/session.json")))?}))
+    }).collect::<Result<Vec<Value>>>()?);
     let publication = if published {
         match observe(root, repo, tag, tested, &target, artifact) {
             Ok(snapshot) => snapshot,
@@ -454,6 +476,7 @@ mod tests {
             .iter()
             .chain(records::FRONTEND)
             .chain(records::INFRASTRUCTURE)
+            .chain(records::INTEGRATION)
             .copied()
             .chain(["desktop-stage", "desktop-build", "desktop-artifact"])
             .map(|name| json!({"name":name,"status":"passed","exit_code":0}))
@@ -462,7 +485,8 @@ mod tests {
         let counts = json!({"passed":64,"failed":0,"ignored":0,"filtered_out":0});
         let mut valid = json!({"metadata":source,"sourceAtFinish":source,"success":true,"phases":phases,"frontendStaging":{"status":"passed","directories":2},
             "summary":{"backend":{"status":"passed","rustTestFunctions":counts,"nodeTestCases":{"tests":8,"pass":8,"fail":0,"cancelled":0,"skipped":0,"todo":0}},"infrastructure":{"status":"passed","rustTestFunctions":counts},
-                "frontend":{"status":"passed","playwright":{"errors":0,"stats":{"expected":54,"skipped":0,"unexpected":0,"flaky":0}}}}});
+                "frontend":{"status":"passed","playwright":{"errors":0,"stats":{"expected":54,"skipped":0,"unexpected":0,"flaky":0}}},
+                "applicationIntegration":{"status":"passed","cases":records::EXE_CASES,"playwright":{"errors":0,"stats":{"expected":9,"skipped":0,"unexpected":0,"flaky":0}}}}});
         valid["metadata"]["schemaVersion"] = json!(2);
         valid["metadata"]["command"] = json!("ci");
         valid["metadata"]["productVersion"] = json!("1.2.3");
@@ -477,6 +501,11 @@ mod tests {
             ("/sourceAtFinish/commit/stdout", json!("other")),
             ("/summary/backend/rustTestFunctions/ignored", json!(1)),
             ("/summary/frontend/playwright/stats/skipped", json!(1)),
+            (
+                "/summary/applicationIntegration/playwright/stats/skipped",
+                json!(1),
+            ),
+            ("/summary/applicationIntegration/cases/0", json!("E03")),
             ("/phases/0/status", json!("skipped")),
         ] {
             let mut invalid = valid.clone();

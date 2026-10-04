@@ -2,6 +2,8 @@
 
 全自動検証はルートの `cargo xtask test`、初回 UI 依存準備は `cargo xtask setup` です。保存データは `cargo xtask fixtures` / `Generate-Test-Data.cmd` で作ります。
 
+`test` / `ci`は個別試験の全必須成功後にReleaseを一度ビルドし、実EXEの結合9ケースを実行します。診断用`cargo xtask exe`は現在のソースをビルドして結合ケースだけを実行します。定義は[spec](ui/exe/application.spec.mjs)、隔離・実CDP接続は[fixture](ui/exe/fixtures.mjs)、観測と期待値は[結合試験設計](../docs/test-plans/playwright-exe-test-plan.md)を参照してください。各実行の`exe/results.json`・`preflight.json`・ケース別`session.json`に実結果を残します。
+
 実行順序・失敗時の扱いは[開発手順](../docs/development.md#テスト)、worker選択・並列実行・性能比較の確認は[CI性能検証方針](../docs/test-plans/ci-performance-test-plan.md)を参照してください。
 
 ## 原本と生成器

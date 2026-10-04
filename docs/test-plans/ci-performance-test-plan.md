@@ -37,13 +37,13 @@ workers = max(1, min(6, max(1, floor(n * 0.5)), floor(n * max(0, 0.8 - u))))
 
 | 確認項目 | 手順 | 期待結果 |
 | --- | --- | --- |
-| 負荷連動の選択と全件実行 | `cargo xtask ui`、続いて `cargo xtask test` のレポートと `ui/workers.json` / `ui/results.json` を照合 | 54件成功、skipped/unexpected/flaky 0。policyから求めたworkersとUIの `config.workers` が一致。複数workerでもテーマ/ストレージ/要求/遅延応答/起動失敗ケースの状態が混ざらない |
+| 負荷連動の選択と全件実行 | `cargo xtask ui`、続いて `cargo xtask test` のレポートと `ui/workers.json` / `ui/results.json` を照合 | 現行U/G全件成功、skipped/unexpected/flaky 0。policyから求めたworkersとUIの `config.workers` が一致。複数workerでもテーマ/ストレージ/要求/遅延応答/起動失敗ケースの状態が混ざらない |
 | 前提不足でもバックエンドを継続 | Playwright設定のみを専用検証checkoutで意図的な構文エラーにして `cargo xtask ci` | Playwright工程failed。バックエンド/検証基盤は終了まで続き、ログが残る。全体終了コード1、desktop-build skipped。前提不足も成功にしない |
 | 選択実行 | `cargo xtask ui --case "U23:"` | 選択ケースだけを実行し、同じCPU計測と計画読込みを使う。全体合格の証拠には使用しない |
 
 ## アプリケーション結合試験
 
-今回の変更で実EXE試験は導入しない。接続上の追加ケースはない。現行 `ci` の配布ビルドは、両方の試験枝が完了し全必須成功した後に1回だけ行う。結合試験ランナーとtest/ciのRelease追加は[別設計](playwright-exe-test-plan.md)の未実装範囲として区別する。
+CI最適化の公開時点では実EXE試験を導入していない。現行`test` / `ci`は両方の個別試験枝が完了し、その証跡が全必須成功した後にReleaseを1回だけビルドして結合試験を行う。接続の確認は[結合試験設計](playwright-exe-test-plan.md)とIssue #18で担当する。最適化時点の比較記録へ追加工程の成功や所要時間を読み込まない。
 
 ## 共通の検証基盤
 

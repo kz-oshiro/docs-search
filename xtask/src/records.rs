@@ -15,6 +15,16 @@ pub const BACKEND: &[&str] = &[
 ];
 pub const FRONTEND: &[&str] = &["ui-stage", "ui-node", "ui-preflight", "playwright"];
 pub const INFRASTRUCTURE: &[&str] = &["fixture-corpus", "generators", "record-contracts"];
+pub const INTEGRATION: &[&str] = &[
+    "exe-fixtures",
+    "exe-node",
+    "exe-preflight",
+    "exe-playwright",
+    "exe-artifact-identity",
+];
+pub const EXE_CASES: &[&str] = &[
+    "E01", "E02", "E04", "E06", "E07", "E08", "E09", "E10", "E11",
+];
 
 #[derive(Default, Serialize, Debug, PartialEq)]
 struct Counts {
@@ -101,6 +111,46 @@ fn playwright_stats(results: &Value) -> Option<Value> {
     Some(json!({"stats":stats,"errors":errors}))
 }
 
+fn integration_cases(results: &Value) -> Option<Vec<String>> {
+    fn collect(suites: &[Value], ids: &mut Vec<String>) -> Option<()> {
+        for suite in suites {
+            if let Some(specs) = suite["specs"].as_array() {
+                for spec in specs {
+                    let title = spec["title"].as_str()?;
+                    let id = title.split_once(':')?.0;
+                    let tests = spec["tests"].as_array()?;
+                    if tests.len() != 1
+                        || tests[0]["status"] != "expected"
+                        || tests[0]["expectedStatus"] != "passed"
+                    {
+                        return None;
+                    }
+                    let attempts = tests[0]["results"].as_array()?;
+                    if attempts.len() != 1
+                        || attempts[0]["status"] != "passed"
+                        || attempts[0]["retry"] != 0
+                    {
+                        return None;
+                    }
+                    ids.push(id.to_owned());
+                }
+            }
+            if let Some(children) = suite["suites"].as_array() {
+                collect(children, ids)?;
+            }
+        }
+        Some(())
+    }
+    let mut ids = vec![];
+    collect(results["suites"].as_array()?, &mut ids)?;
+    ids.sort();
+    (ids == EXE_CASES
+        .iter()
+        .map(|id| (*id).to_owned())
+        .collect::<Vec<_>>())
+    .then_some(ids)
+}
+
 pub fn staging_matches(stages: &[Value]) -> bool {
     !stages.is_empty()
         && stages.iter().all(|stage| {
@@ -126,6 +176,7 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
     let mut backend = group(&phases, BACKEND);
     let mut frontend = group(&phases, FRONTEND);
     let mut infrastructure = group(&phases, INFRASTRUCTURE);
+    let mut integration = group(&phases, INTEGRATION);
     for (summary, names) in [
         (&mut backend, BACKEND),
         (&mut infrastructure, INFRASTRUCTURE),
@@ -232,9 +283,73 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
             }
         }
     }
+    if phases.iter().any(|phase| phase["name"] == "exe-playwright") {
+        let results = fs::read(dir.join("exe/results.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let stats = results.as_ref().and_then(playwright_stats);
+        let cases = results.as_ref().and_then(integration_cases);
+        let executable = report["artifacts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|artifact| artifact["kind"] == "windows-exe")
+            .and_then(|artifact| artifact["path"].as_str())
+            .map(|path| root.join(path));
+        let sessions: Vec<_> = EXE_CASES.iter().map(|id| {
+            let path = dir.join(format!("exe/{id}/session.json"));
+            let value = fs::read(&path).ok().and_then(|bytes|serde_json::from_slice::<Value>(&bytes).ok());
+            json!({"case":id,"path":path.strip_prefix(root).unwrap_or(&path).to_string_lossy(),"record":value})
+        }).collect();
+        let sessions_complete = sessions.iter().all(|case| {
+            let record = &case["record"];
+            let id = case["case"].as_str().unwrap();
+            record["prerequisite"]["ready"] == true
+                && record["errors"].as_array().is_some_and(Vec::is_empty)
+                && record["sessions"].as_array().is_some_and(|launches| {
+                    launches.len() == if id == "E10" { 2 } else { 1 }
+                        && launches.iter().all(|launch| {
+                            launch["pid"].as_u64().is_some_and(|pid| pid > 0)
+                                && launch["webview2Version"]
+                                    .as_str()
+                                    .is_some_and(|version| !version.is_empty())
+                                && launch["portOwner"]["rootCreated"].is_string()
+                                && executable.as_ref().is_some_and(|exe| {
+                                    recorded_path_matches(&launch["executable"], exe)
+                                })
+                                && recorded_path_matches(
+                                    &launch["profile"],
+                                    &dir.join(format!("exe/{id}/webview2")),
+                                )
+                                && recorded_path_matches(
+                                    &launch["localAppData"],
+                                    &dir.join(format!("exe/{id}/local-app-data")),
+                                )
+                        })
+                })
+        });
+        let complete = stats.as_ref().is_some_and(|stats| {
+            stats["errors"] == 0
+                && stats["stats"]["expected"] == EXE_CASES.len()
+                && ["skipped", "unexpected", "flaky"]
+                    .iter()
+                    .all(|key| stats["stats"][key] == 0)
+        }) && cases.is_some()
+            && sessions_complete;
+        integration["playwright"] = json!(stats);
+        integration["cases"] = json!(cases);
+        integration["sessions"] = json!(sessions.iter().map(|case|json!({"case":case["case"],"path":case["path"],
+            "webview2Versions":case["record"]["sessions"].as_array().map(|launches|launches.iter().map(|launch|&launch["webview2Version"]).collect::<Vec<_>>())})).collect::<Vec<_>>());
+        if !complete {
+            if integration["status"] != "failed" {
+                integration["status"] = json!("incomplete");
+            }
+            integration["evidenceError"] = json!("all nine real EXE cases and isolated session records must pass once; missing, skipped, duplicate, retried or retired IDs cannot pass");
+        }
+    }
     report["summary"] = json!({
         "backend":backend,"frontend":frontend,
-        "applicationIntegration":{"status":"not-implemented","phases":[]},
+        "applicationIntegration":integration,
         "infrastructure":infrastructure,
     });
     report["durationMs"] = json!(report["finishedAtUnixMs"]
@@ -264,15 +379,22 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
         });
     report["frontendStaging"] = json!({"status":if stages.is_empty() {"not-run"} else if hashes_match {"passed"} else {"incomplete"},"directories":stages.len()});
     let expected_stages = match report["metadata"]["command"].as_str() {
-        Some("ci") => 2,
-        Some("test" | "ui" | "build") => 1,
+        Some("ci" | "test") => 2,
+        Some("ui" | "build" | "exe" | "individual-tests") => 1,
         _ => 0,
     };
     if expected_stages > 0 && (stages.len() != expected_stages || !hashes_match) {
         report["success"] = json!(false);
     }
     let required: &[&str] = match report["metadata"]["command"].as_str() {
-        Some("test" | "ci") => &["backend", "frontend", "infrastructure"],
+        Some("test" | "ci") => &[
+            "backend",
+            "frontend",
+            "infrastructure",
+            "applicationIntegration",
+        ],
+        Some("individual-tests") => &["backend", "frontend", "infrastructure"],
+        Some("exe") => &["applicationIntegration"],
         Some("ui") => &["frontend"],
         _ => &[],
     };
@@ -282,6 +404,34 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
     {
         report["success"] = json!(false);
     }
+    if matches!(
+        report["metadata"]["command"].as_str(),
+        Some("test" | "ci" | "exe")
+    ) {
+        let artifact = report["artifacts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|artifact| artifact["kind"] == "windows-exe");
+        if !artifact.is_some_and(|artifact| {
+            artifact["path"]
+                .as_str()
+                .zip(artifact["sha256"].as_str())
+                .is_some_and(|(path, expected)| {
+                    digest(&root.join(path)).is_ok_and(|actual| actual == expected)
+                })
+        }) {
+            report["success"] = json!(false);
+        }
+    }
+}
+
+fn recorded_path_matches(value: &Value, expected: &Path) -> bool {
+    // Node's path.join normalizes Windows separators; Rust's joins can retain
+    // forward slashes. Compare path components rather than JSON spelling.
+    value
+        .as_str()
+        .is_some_and(|actual| Path::new(actual) == expected)
 }
 
 pub fn text(value: &Value) -> String {
@@ -309,15 +459,19 @@ pub fn summary_table(report: &Value) -> String {
         text(&summary["backend"]["status"]), text(&rust["passed"]), text(&rust["failed"]), text(&rust["ignored"]), text(&rust["filtered_out"]), text(&node["pass"]), text(&node["fail"]), text(&node["skipped"]));
     md += &format!("| フロントエンド試験 | {} | Playwright: 成功 {} / skipped {} / unexpected {} / flaky {} |\n",
         text(&summary["frontend"]["status"]), text(&ui["expected"]), text(&ui["skipped"]), text(&ui["unexpected"]), text(&ui["flaky"]));
-    md += &format!(
-        "| アプリケーション結合試験 | {} | — |\n",
-        text(&summary["applicationIntegration"]["status"])
-    );
+    let exe = &summary["applicationIntegration"]["playwright"]["stats"];
+    md += &format!("| アプリケーション結合試験 | {} | Playwright: 成功 {} / skipped {} / unexpected {} / flaky {} |\n",
+        text(&summary["applicationIntegration"]["status"]), text(&exe["expected"]), text(&exe["skipped"]), text(&exe["unexpected"]), text(&exe["flaky"]));
     md += &format!(
         "\n共通の検証基盤（生成器・記録処理）: {}。件数は試験3区分に加算しません。\n",
         text(&summary["infrastructure"]["status"])
     );
-    for key in ["backend", "frontend", "infrastructure"] {
+    for key in [
+        "backend",
+        "frontend",
+        "infrastructure",
+        "applicationIntegration",
+    ] {
         if let Some(error) = summary[key]["evidenceError"].as_str() {
             md += &format!("\n{key}: {}\n", text(&json!(error)));
         }
@@ -382,6 +536,52 @@ pub fn overview(report: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recorded_paths_require_the_same_location() {
+        let expected = Path::new("exe/E10/webview2");
+        assert!(recorded_path_matches(&json!("exe/E10/webview2"), expected));
+        assert!(!recorded_path_matches(&Value::Null, expected));
+        assert!(!recorded_path_matches(&json!("exe/E01/webview2"), expected));
+        #[cfg(windows)]
+        assert!(recorded_path_matches(&json!(r"exe\E10\webview2"), expected));
+    }
+
+    #[test]
+    fn integration_requires_exact_ids_single_attempts_and_real_passes() {
+        let specs = EXE_CASES.iter().map(|id| json!({"title":format!("{id}: connection"),
+            "tests":[{"status":"expected","expectedStatus":"passed","results":[{"status":"passed","retry":0}]}]})).collect::<Vec<_>>();
+        let valid = json!({"suites":[{"suites":[{"specs":specs}]}]});
+        assert_eq!(integration_cases(&valid).unwrap(), EXE_CASES);
+        for (pointer, value) in [
+            ("/suites/0/suites/0/specs/0/title", json!("E03: retired")),
+            (
+                "/suites/0/suites/0/specs/0/tests/0/expectedStatus",
+                json!("failed"),
+            ),
+            (
+                "/suites/0/suites/0/specs/0/tests/0/results/0/retry",
+                json!(1),
+            ),
+            (
+                "/suites/0/suites/0/specs/0/tests/0/results/0/status",
+                json!("skipped"),
+            ),
+        ] {
+            let mut invalid = valid.clone();
+            *invalid.pointer_mut(pointer).unwrap() = value;
+            assert!(integration_cases(&invalid).is_none(), "{pointer}");
+        }
+        let mut missing = valid.clone();
+        missing["suites"][0]["suites"][0]["specs"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(integration_cases(&missing).is_none());
+        let mut duplicate = valid;
+        duplicate["suites"][0]["suites"][0]["specs"][1]["title"] = json!("E01: duplicate");
+        assert!(integration_cases(&duplicate).is_none());
+    }
 
     #[test]
     fn rust_counts_distinguish_suites_and_inner_assertions() {
@@ -451,7 +651,7 @@ mod tests {
         assert_eq!(report["summary"]["backend"]["status"], "incomplete");
         assert_eq!(
             report["summary"]["applicationIntegration"]["status"],
-            "not-implemented"
+            "not-run"
         );
         assert_eq!(report["durationMs"], 100);
     }

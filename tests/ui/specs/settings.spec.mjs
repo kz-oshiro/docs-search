@@ -1,7 +1,15 @@
-import { test, expect, hit, editableHit } from '../support/fixtures.mjs';
+import { test, expect, hit, editableHit, excelHit, contextResponse } from '../support/fixtures.mjs';
 
 const folderKey = 'docs-search.folders.v1';
 const folders = { roots: ['C:\\first', 'C:\\missing', 'C:\\last'], excluded: ['C:\\skip'] };
+const themeColors = {
+  sun: ['rgb(182, 83, 16)', 'rgb(255, 248, 240)'],
+  amber: ['rgb(147, 97, 18)', 'rgb(255, 250, 238)'],
+  sunset: ['rgb(185, 71, 36)', 'rgb(255, 245, 241)'],
+  teal: ['rgb(11, 116, 120)', 'rgb(243, 247, 246)'],
+  blue: ['rgb(43, 95, 168)', 'rgb(244, 246, 250)'],
+  forest: ['rgb(53, 105, 79)', 'rgb(244, 247, 243)'],
+};
 
 for (const theme of ['sun', 'amber', 'sunset', 'teal', 'blue', 'forest']) {
   test(`U32: ${theme}テーマは即時反映し再読込で復元`, async ({ ui, page }) => {
@@ -11,6 +19,32 @@ for (const theme of ['sun', 'amber', 'sunset', 'teal', 'blue', 'forest']) {
     await page.locator('#theme-color').selectOption(theme);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     expect(await page.evaluate(() => localStorage.getItem('docs-search.theme'))).toBe(theme);
+    // G02 extends this existing theme case; colors and semantic states belong
+    // to frontend tests rather than nine additional EXE/UI duplicate suites.
+    await expect(page.locator('html')).toHaveCSS('background-color', themeColors[theme][1]);
+    const search = await ui.search();
+    await ui.started(search);
+    await ui.emit(search, [{ type: 'progress', phase: 'processing', counts: { resultCount: 0, discoveredFiles: 2, processedFiles: 0, issueCount: 0 } }]);
+    await expect(page.locator('#status')).toHaveText('検索中…');
+    await expect(page.locator('#status')).toHaveCSS('color', themeColors[theme][0]);
+    const cellHit = excelHit();
+    await ui.finish(search, [cellHit, hit(2, { matchCategory: 'fuzzy' })], [
+      { type: 'issue', issue: { path: cellHit.filePath, stage: 'read', code: 'unreadable', reason: '一部の部品を読めません' } },
+    ]);
+    await expect(page.locator('#status')).toHaveText('完了（一部エラーあり）');
+    await expect(page.locator('#status')).toHaveCSS('color', 'rgb(136, 96, 22)');
+    await expect(page.locator('.error-badge')).toHaveText('エラーあり');
+    await expect(page.locator('.issue-reason')).toHaveText('一部の部品を読めません');
+    await expect(page.locator('.error-badge')).toHaveCSS('color', 'rgb(149, 37, 42)');
+    await expect(page.locator('.preview mark').first()).toHaveCSS('background-color', 'rgb(255, 233, 153)');
+    await expect(page.locator('.match-category[data-category="standard"]')).toHaveText('一致検索');
+    await expect(page.locator('.match-category[data-category="standard"]')).toHaveCSS('color', 'rgb(19, 91, 71)');
+    await expect(page.locator('.match-category[data-category="fuzzy"]')).toHaveText('あいまい検索');
+    await expect(page.locator('.match-category[data-category="fuzzy"]')).toHaveCSS('color', 'rgb(128, 80, 12)');
+    await ui.queue('get_result_context', { value: contextResponse() });
+    await page.locator('.excel-context-toggle').click();
+    await expect(page.locator('.excel-context-controls')).toContainText('一致セル');
+    await expect(page.locator('.excel-context-table td').first()).toHaveCSS('background-color', 'rgb(255, 238, 204)');
     await page.reload();
     await page.waitForFunction(() => window.__docsSearchTest?.ready);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -112,25 +146,38 @@ test('U38b: フォルダー検証拒否後にパスを入力できる', async ({
   await expect(page.locator('#root')).toHaveValue('C:\\typed');
 });
 
-test('U39: 最小幅で主要入力・設定・編集ダイアログが横にはみ出さない', async ({ ui, page }) => {
-  await page.setViewportSize({ width: 760, height: 900 });
+for (const width of [1100, 760]) {
+test(`U39: G01 幅${width}で構造・Tab/Esc・フォーカス復帰を確認`, async ({ ui, page }) => {
+  await page.setViewportSize({ width, height: 900 });
   await ui.open();
   const search = await ui.search();
   await ui.started(search);
   await ui.finish(search, [editableHit()]);
-  await page.locator('#appearance-settings summary').click();
-  for (const selector of ['#root', '#query', '#appearance-settings .appearance-panel', '#search', '#cancel']) {
+  await page.locator('#root').focus();
+  await page.locator('#root').press('Tab');
+  await expect(page.locator('#root-folders .folder-browse')).toBeFocused();
+  const settings = page.locator('#appearance-settings summary');
+  await settings.focus();
+  await settings.press('Enter');
+  await settings.press('Tab');
+  await expect(page.locator('#theme-color')).toBeFocused();
+  for (const selector of ['#root', '#query', '#appearance-settings .appearance-panel', '#search', '#cancel', '.result', '#result-filter-include']) {
     const element = page.locator(selector);
     await expect(element).toBeVisible();
     const box = await element.boundingBox();
     expect(box.x, selector).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width, selector).toBeLessThanOrEqual(760);
+    expect(box.x + box.width, selector).toBeLessThanOrEqual(width);
   }
   await page.locator('#theme-color').press('Escape');
-  await page.locator('.edit-result').click();
+  await expect(settings).toBeFocused();
+  await page.locator('.edit-result').focus();
+  await page.locator('.edit-result').press('Enter');
   const box = await page.getByRole('dialog').boundingBox();
   expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(760);
-  await page.locator('#edit-cancel').press('Enter');
+  expect(box.x + box.width).toBeLessThanOrEqual(width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  await page.locator('#edit-cancel').press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.locator('.edit-result')).toBeFocused();
 });
+}

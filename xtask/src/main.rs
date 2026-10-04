@@ -406,10 +406,9 @@ impl Run {
         };
         self.absorb(frontend);
         self.phases.sort_by_key(|phase| phase.started_at_unix_ms);
-        // Validate result files before CI starts the build. This snapshot covers
-        // tests only; the final CI report also covers the distribution EXE.
+        // Validate individual-test evidence before building and running the EXE.
         let mut metadata = self.metadata.clone();
-        metadata["command"] = json!("test");
+        metadata["command"] = json!("individual-tests");
         let mut evidence = json!({"metadata":metadata,"finishedAtUnixMs":unix_ms(),"success":backend_passed && frontend_passed,"phases":self.phases,"artifacts":self.artifacts});
         records::complete(&self.root, &self.dir, &mut evidence);
         if evidence["success"] != true {
@@ -418,6 +417,108 @@ impl Run {
             );
         }
         evidence["success"] == true
+    }
+    fn automatic_tests(&mut self) -> bool {
+        if !self.tests() {
+            self.skipped(
+                "desktop-build",
+                "required individual tests did not all pass",
+            );
+            self.skipped(
+                "exe-playwright",
+                "required individual tests did not all pass",
+            );
+            return false;
+        }
+        if !self.build() {
+            self.skipped("exe-playwright", "current Release EXE build failed");
+            return false;
+        }
+        self.exe()
+    }
+    fn exe(&mut self) -> bool {
+        let folder = self.root.join("tests/ui");
+        let artifacts = self.dir.join("exe");
+        let executable = self.dir.join("artifacts/docs-search-desktop.exe");
+        let prepared = self.local("exe-fixtures", |run| {
+            fs::create_dir(&artifacts)?;
+            let common = run.dir.join("corpus");
+            if !common.exists() {
+                common::generate(&common, "load")?;
+            }
+            let corpus = artifacts.join("corpus");
+            let context = corpus.join("context");
+            let office = corpus.join("office");
+            let issues = corpus.join("issues");
+            specialized::context(&context.join("row-window.xlsx"))?;
+            specialized::office(&office)?;
+            specialized::issues(&issues)?;
+            fs::write(
+                artifacts.join("corpus.json"),
+                serde_json::to_vec_pretty(&json!({
+                    "common":common,"context":context,"office":office,"issues":issues,
+                    "seed":docs_search_test_support::SEED,
+                }))?,
+            )?;
+            run.artifacts.push(
+                json!({"kind":"application-integration","path":run.relative(&artifacts),
+                "executable":run.relative(&executable),"sha256":digest(&executable)?,
+                "results":run.relative(&artifacts.join("results.json"))}),
+            );
+            Ok(())
+        });
+        let node = self.phase("exe-node", "node", &["check-node.mjs"], &folder, &[]);
+        let env = [
+            ("DOCS_SEARCH_EXE_ARTIFACTS", artifacts.as_path()),
+            ("DOCS_SEARCH_EXE", executable.as_path()),
+        ];
+        let preflight = if prepared && node {
+            self.phase(
+                "exe-preflight",
+                "node",
+                &["exe/preflight.mjs"],
+                &folder,
+                &env,
+            )
+        } else {
+            self.skipped("exe-preflight", "fixture or Node prerequisite failed");
+            false
+        };
+        if !preflight {
+            let reason = "Windows session, WebView2, Node/Playwright or fixture prerequisite failed; see exe-preflight/fixture logs";
+            self.skipped("exe-playwright", reason);
+            // Preserve all nine unexecuted IDs even when Node cannot start.
+            let _ = fs::create_dir_all(&artifacts);
+            let skipped = json!({"stats":{"expected":0,"skipped":9,"unexpected":0,"flaky":0},"errors":[],
+                "suites":[{"specs":records::EXE_CASES.iter().map(|id|json!({"title":format!("{id}: prerequisite unavailable"),
+                    "tests":[{"status":"skipped","expectedStatus":"passed","results":[{"status":"skipped","retry":0}]}],"reason":reason})).collect::<Vec<_>>() }]});
+            let _ = fs::write(artifacts.join("results.json"), skipped.to_string());
+            return false;
+        }
+        let passed = self.phase(
+            "exe-playwright",
+            "node",
+            &[
+                "node_modules/@playwright/test/cli.js",
+                "test",
+                "--config",
+                "playwright.exe.config.mjs",
+            ],
+            &folder,
+            &env,
+        );
+        let identity = self.local("exe-artifact-identity", |run| {
+            let artifact = run
+                .artifacts
+                .iter()
+                .find(|item| item["kind"] == "windows-exe")
+                .ok_or("missing current build artifact")?;
+            if digest(&executable)? != artifact["sha256"].as_str().ok_or("missing EXE hash")? {
+                return Err("tested EXE changed during application integration tests".into());
+            }
+            Ok(())
+        });
+        passed && identity
     }
     fn backend_tests(&mut self) -> bool {
         let root = self.root.clone();
@@ -631,7 +732,7 @@ impl Run {
 fn execute() -> Result<bool> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
-        println!("cargo xtask <test|build|ci|ui|setup|fixtures|icons|release-record>\n  ui [--case REGEX]\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  release-record --run RUN_DIRECTORY --tag vX.Y.Z --notes CHANGES.md [--repo OWNER/REPO] [--published]");
+        println!("cargo xtask <test|build|ci|ui|exe|setup|fixtures|icons|release-record>\n  ui [--case REGEX]\n  exe: build current Release EXE and run all nine integration cases\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  release-record --run RUN_DIRECTORY --tag vX.Y.Z --notes CHANGES.md [--repo OWNER/REPO] [--published]");
         return Ok(true);
     };
     if command == "release-record" {
@@ -664,13 +765,17 @@ fn execute() -> Result<bool> {
             _ => return Err(format!("unknown option for {command}: {option}").into()),
         }
     }
-    if !["test", "build", "ci", "ui", "setup", "fixtures", "icons"].contains(&command) {
+    if ![
+        "test", "build", "ci", "ui", "exe", "setup", "fixtures", "icons",
+    ]
+    .contains(&command)
+    {
         return Err(format!("unknown command: {command}").into());
     }
     let mut run = Run::new(command)?;
     let success=match command {
-        "test"=>run.tests(),"build"=>run.build(),"ui"=>run.ui(case),"setup"=>run.setup(),
-        "ci"=>{let passed=run.tests();if passed {run.build()} else {run.skipped("desktop-build","required automatic tests did not all pass");false}},
+        "test"|"ci"=>run.automatic_tests(),"build"=>run.build(),"ui"=>run.ui(case),"setup"=>run.setup(),
+        "exe"=>if run.build() {run.exe()} else {run.skipped("exe-playwright","current Release EXE build failed");false},
         "fixtures"=>run.local("fixtures",|run|{
             let output=output.unwrap_or_else(||run.root.join("outputs/test-data").join(format!("{kind}-{profile}-{}",run.dir.file_name().unwrap().to_string_lossy())));
             if output.exists() && fs::read_dir(&output)?.next().is_some() {return Err("fixture output directory must be new or empty".into());}

@@ -7,7 +7,7 @@ Rust 検索コア、Tauri の OS/IPC 境界、HTML/CSS/JavaScript の画面で�
 - 機能修正では設計・実装・変更に応じた確認項目/手順/期待結果を用意します。実装依頼は必要な差分・文書の静的確認と報告までとし、型検査・テスト・ビルド・アプリ起動・GUI操作・リモート反映へ進みません。
 - 要件・設計・実装・検証の各担当は、対象案件の[Issue](https://github.com/kz-oshiro/docs-search/issues?q=is%3Aissue+label%3Adevelopment)を取得し、[ひな型](documentation.md#案件issueのひな型)に従って更新し、成果物・対象コミット・未実施項目・次の作業と完了条件を残します。次の担当は記録されたソースと現在の差分を確認します。テスト・ビルド以降を別のモデルへ引き継ぎ、テスト全体をユーザーへ依頼しません。
 - テスト依頼では、対象Issueと対象の試験設計を読み、確認項目・手順・期待結果を把握してから実行します。テスト・ビルド・リモート反映は依頼された範囲を途中で止めず完了し、非対話的なテスト・ビルドの実行前に再確認を求めません。
-- 自動テストには実HTML/CSS/JavaScriptを操作するヘッドレスPlaywrightと必要な資材stagingを常時含めます。実EXE用ランナー導入後は、必要なビルド・起動・Playwright操作も自動テスト依頼の範囲に含め、GUI操作の再確認を求めません。現行ランナーと導入後の設計は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)で区別します。
+- 自動テストには実HTML/CSS/JavaScriptを操作するヘッドレスPlaywright、資材staging、Releaseビルド・実EXE起動・Playwright結合試験を常時含め、GUI操作の再確認を求めません。実装と検証の現在地は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)で区別します。
 - 対話的にAIが操作するGUIテストだけは実施前に確認します。今回の依頼で明示されていれば再確認は不要です。確認を待つ間も依頼済みの自動テストを進めます。
 - 試験設計と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)に従います。[フロントエンドの判定方法](test-plans/playwright-ui-test-plan.md#確認境界と実行依頼の意味)と[OS連携の保証対象外](test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を読み、必須の手動確認票や一律の「GUI未検証」を報告に追加しません。
 - 文書の作成・更新は[文書作成ガイド](documentation.md)、テスト・ビルド結果の扱いと公開は[記録の自動生成と公開](#記録の自動生成と公開)に従います。
@@ -28,9 +28,10 @@ cargo xtask setup
 cargo xtask test
 cargo xtask ui
 cargo xtask ui --case "U23:"
+cargo xtask exe
 ```
 
-`test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、ランナー内で別のビルドをしません。CLI の LOCALAPPDATA は子プロセスごとに独立しています。共通 load データは実行内で共有し、変更する文書と索引は別の一時領域に置きます。
+`test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。個別試験の証跡が全必須成功なら、Release EXEを1回ビルドして必須9ケースのアプリケーション結合試験へ進みます。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、CLIランナー内で別のビルドをしません。LOCALAPPDATAと変更用文書は子プロセス・ケースごとに独立し、共通loadは実行内で共有します。
 
 バックエンドのCargo試験とフロントエンド試験は別の実行枝で同時に開始し、両方の終了後に結果を合流します。Cargoの各工程は順次実行します。CPU使用率の計算・worker選択のNode単体試験もバックエンド側の必須工程です。いずれかが失敗しても他方と独立した残りの工程を続けます。
 
@@ -40,7 +41,7 @@ cargo xtask ui --case "U23:"
 
 試験の分類と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)を参照してください。
 
-上記コマンドは現行ランナーの説明です。実EXE用ランナー・test/ciの拡張は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)、導入後の実行契約は[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md#1-現行と導入後の実行契約)を参照してください。
+`exe`は現在のソースをReleaseビルドして結合9ケースだけを全件実行する診断入口です。Windowsの操作可能なセッションとWebView2が必要です。前提不足・接続不可・未実行は理由付きskippedと非ゼロ終了で残します。`ui --case` / `exe`だけの成功を全体合格へ読み替えません。実装と検証の状態は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)、実行契約と観測範囲は[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md#1-現行と導入後の実行契約)を参照してください。
 
 ## Windows ビルドと CI
 
@@ -51,7 +52,7 @@ cargo xtask ci
 
 `build` は frontend の8資材だけを `target/frontend-dist/` へ内容が変わった場合にコピーし、`cargo build --release --locked -p docs-search-desktop` を実行します。成功した現在の EXE だけを実行別 `outputs/runs/<実行ID>/artifacts/docs-search-desktop.exe` に保存し、SHA256 とサイズを記録します。Node/npm はこのビルドに不要です。実行中の EXE を再ビルドするときは閉じてください。
 
-`ci` は独立したテスト群を失敗後も続け、必須テストがすべて成功した場合だけビルドします。全体の失敗を一つの終了コードで返します。GitHub Actions はまだ作成していません。push、タグ、Release は検証入口に含めず、ユーザーの公開依頼を受けて別途行います。
+`ci` は`test`と同じ必須工程です。独立した個別テスト群を失敗後も続け、その証跡がすべて成功した場合だけReleaseをビルドし、結合試験で使用した同じEXEを成果物にします。結合ケースも独立した残りを続け、全体の失敗を一つの終了コードで返します。GitHub Actions はまだ作成していません。push、タグ、Release は検証入口に含めず、ユーザーの公開依頼を受けて別途行います。
 
 各実行は新規 `outputs/runs/<実行ID>/` に `report.json` / `report.md`、工程別 stdout/stderr、Git commit/dirty、Rust/Cargo/Node/npm、Playwright の前提と実測版、所要時間、順位 Top-5、UI JSON/テキスト失敗記録を残します。レポートは異なる実行の成功ログを混ぜません。
 
@@ -97,7 +98,7 @@ cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/
 | --- | --- | --- |
 | バックエンド試験 | 依頼範囲の `cargo xtask test` / `ci` | 既存Rust/CLI/worker試験が成功。Rust関数数とNodeケース数を別々に実測集計 |
 | フロントエンド試験 | 上記全自動入口の必須Playwright | 既存全件を実行。statsとerrorsから実測を集計し、JSON欠落・skipped/flakyを全体成功にしない |
-| アプリケーション結合試験 | 今回の記録処理では追加なし | 現行ランナーは未実装のまま `not-implemented`。EXEビルドを結合試験の成功に数えない |
+| アプリケーション結合試験 | 全自動入口、または診断用`cargo xtask exe` | 実EXEの9IDを各1回実行。`exe/results.json`の欠落・重複・skipped/flaky・再試行を成功にしない。EXEビルドだけを接続成功に数えない |
 | 共通の検証基盤 | `cargo test --locked -p xtask`（全自動入口にも `record-contracts` として組込み）と資材最終照合 | 集計・欠落・旧形式・dirty・版不一致・公開digest不一致の契約試験が成功。内部PASS行を加算せず、ソース/UI/配布の8資材が一致 |
 | 公開記録 | cleanな対象の成功ciに対して生成。公開依頼時だけ `--published` とEXEの照合 | 3ファイル生成、原ログをJSONに格納。同じEXE/タグを確認し、取得失敗を成功として書かない |
 
