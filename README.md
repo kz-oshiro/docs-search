@@ -62,7 +62,7 @@ WebView2はWindows 11や多くのWindows 10端末に入っていますが、端�
 
 ## 更新・困った場合
 
-更新するときはアプリを終了し、最新版のEXEに置き換えてください。変わった点や既知の制限は[Release一覧](https://github.com/kz-oshiro/docs-search/releases)で確認できます。
+更新するときはアプリを終了し、最新版のEXEに置き換えてください。版ごとの変更点と開発・検証レポートは[Release一覧](https://github.com/kz-oshiro/docs-search/releases)で確認できます。利用上の制限はこのREADMEの各項目を参照してください。
 
 起動できない場合はWebView2の有無と端末の実行制限を、検索できない場合は対象形式・フォルダーの権限・表示されたエラーを確認してください。不具合の報告先は[Issues](https://github.com/kz-oshiro/docs-search/issues)です。利用した版、操作、エラー文を記載し、機密文書の内容やパスは公開しないでください。
 
