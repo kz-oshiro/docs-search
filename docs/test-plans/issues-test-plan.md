@@ -2,11 +2,11 @@
 
 現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
-試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。以下のGUI手順・未実施・許可の記述は旧方針の参考記録として扱う。
+試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。旧GUI手順は参考記録であり、現行の実行範囲は上記の共通ルールを正本とする。
 
-自動テストは `cargo xtask test` を使う。要求対応は[Rust要求仕様](../specifications/rust-requirements.md)を参照する。実行結果は[開発手順](../development.md#記録の自動生成と公開)に従って `outputs/runs/` に保存し、公開版はReleaseで案内する。以下の未実施は初回実装時点の記録。
+自動テストは `cargo xtask test` を使う。要求対応は[Rust要求仕様](../specifications/rust-requirements.md)を参照する。実行結果は[開発手順](../development.md#記録の自動生成と公開)に従って `outputs/runs/` に保存し、公開版はReleaseで案内する。初回実装時点の未実施事項と後続結果は開発レポートに分ける。
 
-2026-10-03の #1〜#9 に適用する。実装報告は [こちら](../reports/implementation-report-issues.md)。今回の作業は実装・静的確認までで、下記の自動テスト・ビルド・データ生成・GUIは未実施。次の担当モデルは先にこの方針、[P4〜P6](office-ranking-batch-test-plan.md)、[テーマ設定](theme-settings-test-plan.md)、現在の `AGENTS.md` を読む。
+2026-10-03の #1〜#9 に対応する確認方針。経緯・結果・引き継ぎは[開発レポート](../reports/development/2026-10-03-issues.md)を参照する。実行前にこの方針、[P4〜P6](office-ranking-batch-test-plan.md)、[テーマ設定](theme-settings-test-plan.md)、対象案件のレポートを読む。
 
 ## 自動テスト・ビルド
 

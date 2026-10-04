@@ -28,7 +28,7 @@
 
 既存のUnicode・候補漏れ・直接/索引比較の[性質テスト](property-testing-test-plan.md)、[Office/順位/一括](office-ranking-batch-test-plan.md)、[条件](condition-search-test-plan.md)、[周辺](excel-context-test-plan.md)、[編集](issues-test-plan.md)も維持する。特にa_/a!、区切りだけの語、数字、Shift_JIS、NOT、抽出範囲の切替、壊れたsheets JSON、元バイトの変更、中断時の通知/終端集計を確認する。
 
-自動テストの依頼を受けた次の担当は、この方針と直近の実装報告を読んでルートで実行する。既存seedを残し、利用者のLOCALAPPDATAを試験に使わない。
+自動テストの依頼を受けた次の担当は、この方針と対象案件の開発レポートを読んでルートで実行する。既存seedを残し、利用者のLOCALAPPDATAを試験に使わない。
 
 ```powershell
 $env:PROPTEST_CASES = '1024'

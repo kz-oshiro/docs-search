@@ -5,13 +5,12 @@
 試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。以下のGUI手順・未実施・許可の記述は旧方針の参考記録として扱う。
 
 作成日: 2026-10-03。対象: [実装計画](../plans/implementation-plan.md)のP4a・P4b・P5・P6、要求A-16〜A-18。
-自動テストは `cargo xtask test` を使う。要求対応は[Rust要求仕様](../specifications/rust-requirements.md)、実行結果の保存・公開は[開発手順](../development.md#記録の自動生成と公開)を参照。下記の未実施は初回実装時点の記録。
-今回の実装では以下のテスト、ビルド、アプリ起動、GUI、コミット・リモート反映は**未実施**。
-実装内容と制限は[実装報告](../reports/implementation-report-p4-p6.md)を先に読む。
+自動テストは `cargo xtask test` を使う。要求対応は[Rust要求仕様](../specifications/rust-requirements.md)、実行結果の保存・公開は[開発手順](../development.md#記録の自動生成と公開)を参照。初回実装時点の状態は開発レポートへ分ける。
+実装内容と制限は[開発レポート](../reports/development/2026-10-03-office-ranking-batch.md)を先に読む。
 
 ## 次の担当モデルの実行順
 
-1. `AGENTS.md`、本方針、実装報告、既存P0〜P3の確認方針を読む。既存のチェックアウト差分を保存・確認する。
+1. `AGENTS.md`、本方針、開発レポート、既存P0〜P3の確認方針を読む。既存のチェックアウト差分を保存・確認する。
 2. 自動テストのみの依頼では、ルートから次を実行する。UI資材stagingとヘッドレスPlaywrightを含む。
 
 ```powershell

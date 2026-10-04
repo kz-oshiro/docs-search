@@ -1,6 +1,17 @@
 # 実装・設計の履歴
 
-過去の変更内容と設計判断を記録する。現在の状態と次の作業は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)を参照する。公開版の変更点・対象ソース・検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)に集約する。整理前の履歴全文は[保存版](https://github.com/kz-oshiro/docs-search/blob/8894cf81e653d8917895004f323925355b95fec1/docs/reports/implementation-history.md)で参照できる。
+過去の変更内容と設計判断を記録する。現在の状態と次の作業は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)を参照する。案件の詳細は開発レポート、公開版の案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、技術的な検証は[公開検証MD](validation/v3.0.4.md)へ分ける。整理前の履歴全文は[保存版](https://github.com/kz-oshiro/docs-search/blob/8894cf81e653d8917895004f323925355b95fec1/docs/reports/implementation-history.md)で参照できる。
+
+## 開発レポート一覧
+
+| 日付 | 案件 | 記録の扱い |
+| --- | --- | --- |
+| 2026-10-03 | [Office検索範囲・順位・一括検索](development/2026-10-03-office-ranking-batch.md) | 旧報告から移行。当時の判断と後続検証を分ける |
+| 2026-10-03 | [イシュー9件への対応](development/2026-10-03-issues.md) | 同上。イシュー開閉状態は再確認していない |
+| 2026-10-03 | [画面の自動テスト導入](development/2026-10-03-ui-tests.md) | 当時のWASM構成と現行の実行手順を区別する |
+| 2026-10-04 | [検索処理の重複削減](development/2026-10-04-backend-optimization.md) | v3.0.4の実装・検証参照と残る性能比較 |
+
+今後は完了した案件の概要とリンクをこの一覧へ追加し、工程別の詳細を下へ転記しない。進行中の案件は[実装状況](implementation-status.md#開発レポート)へ置く。
 
 ## 2026-10-01〜2026-10-03: 検索・出力・Office・一括検索
 
@@ -15,17 +26,17 @@
 
 計画の配置案にあった `group.rs` は作らず、P3の行単位集約は `query.rs` に実装した。当初の索引経路は検索漏れを避けるため、対象ファイルの保存済み検索単位を全件読み込む方式を選んだ。公開版の記録は[P0・P1のv2.0.6](https://github.com/kz-oshiro/docs-search/releases/tag/v2.0.6)、[P2・P3のv2.0.7](https://github.com/kz-oshiro/docs-search/releases/tag/v2.0.7)を参照する。
 
-P4a〜P4bはOfficeの数式・注記・追加部品を `extract.rs` / `index.rs` / `context.rs`、P5は順位と根拠を `ranking.rs` と通知経路、P6は最大256語の一括検索を `batch.rs` / `report.rs` と画面に追加した。注記・数式は初期オフとし、部分障害で条件成立や索引確定をしない。詳細は[実装報告](implementation-report-p4-p6.md)、確認項目は[P4〜P6の試験設計](../test-plans/office-ranking-batch-test-plan.md)を参照する。
+P4a〜P4bはOfficeの数式・注記・追加部品を `extract.rs` / `index.rs` / `context.rs`、P5は順位と根拠を `ranking.rs` と通知経路、P6は最大256語の一括検索を `batch.rs` / `report.rs` と画面に追加した。注記・数式は初期オフとし、部分障害で条件成立や索引確定をしない。詳細は[開発レポート](development/2026-10-03-office-ranking-batch.md)、確認項目は[P4〜P6の試験設計](../test-plans/office-ranking-batch-test-plan.md)を参照する。
 
 ## 2026-10-03: イシュー #1〜#9と性質テスト
 
-折りたたみ・本文フィルター・編集・Excel書式・更新日時・フォルダー復元・位置順・ふりがな除外を追加した。Excel書式は罫線・塗りつぶし・文字書式の近似表示とし、抽出仕様版を4へ更新した。P5のファイル評価を維持し、ファイル内の箇所を文書位置順へ変更した。詳細は[実装報告](implementation-report-issues.md)、確認項目は[イシュー試験設計](../test-plans/issues-test-plan.md)を参照する。
+折りたたみ・本文フィルター・編集・Excel書式・更新日時・フォルダー復元・位置順・ふりがな除外を追加した。Excel書式は罫線・塗りつぶし・文字書式の近似表示とし、抽出仕様版を4へ更新した。P5のファイル評価を維持し、ファイル内の箇所を文書位置順へ変更した。詳細は[開発レポート](development/2026-10-03-issues.md)、確認項目は[イシュー試験設計](../test-plans/issues-test-plan.md)を参照する。
 
 proptestをテスト専用依存へ追加した。生成で見つかったあいまい候補漏れを修正し、保存seed・固定例・直接/索引CLI比較を残した。[性質テストの確認方針](../test-plans/property-testing-test-plan.md)と[v3.0.0の公開記録](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を参照する。
 
 ## 2026-10-03: Playwright導入とCargo集約
 
-実WASM画面を操作し、Tauri/クリップボード境界だけをモック化するヘッドレスPlaywrightを自動入口へ接続した。画像・動画・トレースを保存せず、失敗時はテキストの状態・要求・応答を記録する方針とした。初回実装時点の内容は[Playwright導入報告](implementation-report-playwright.md)、公開版の結果は[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を参照する。
+実WASM画面を操作し、Tauri/クリップボード境界だけをモック化するヘッドレスPlaywrightを自動入口へ接続した。画像・動画・トレースを保存せず、失敗時はテキストの状態・要求・応答を記録する方針とした。初回実装時点の内容は[Playwright導入報告](development/2026-10-03-ui-tests.md)、公開版の結果は[v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)を参照する。
 
 U31で見つかった一括入力プレビューの過剰要求は120msで集約し、古い応答による上書きを防ぐ処理を追加した。
 

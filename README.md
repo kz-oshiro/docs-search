@@ -1,62 +1,79 @@
 # docs-search
 
-Rust の検索コアと Tauri を使う Windows 向け文書検索ツールです。画面は HTML/CSS/JavaScript の ES modules で動きます。検索と索引はネイティブ Rust で処理し、WASM は使用しません。
+パソコン内の文書から言葉を探し、**どのファイルの、どの場所に書かれているか**を確認するWindows向けのツールです。複数のフォルダーをまとめて検索し、結果を一覧で確認・コピー・保存できます。
 
-配布ファイルは [最新のGitHub Release](https://github.com/kz-oshiro/docs-search/releases/latest)から取得できます。リリースごとの変更点・対象ソース・検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照してください。
+**[最新版をダウンロードする](https://github.com/kz-oshiro/docs-search/releases/latest)** — 「Assets」にある `docs-search-desktop.exe` がアプリ本体です。「Source code」や検証用ファイルをダウンロードする必要はありません。
 
-## 開発と検証
+## できること・対象文書
 
-リポジトリのルートで実行します。
+- Excel（`.xlsx` / `.xlsm`）、Word（`.docx`）、PowerPoint（`.pptx`）、テキスト文書を検索できます。テキスト系を含めて93種類の拡張子に対応します。
+- 検索するフォルダーと除外するフォルダーを指定できます。複数の語句の条件検索や、語句をまとめて調べる一括検索もできます。
+- 結果から元ファイルを開き、一致した場所やExcelの周辺セルを確認できます。結果の絞り込み、コピー、CSV・TSV・調査記録の保存に対応します。
+- 必要に応じて、表記が近い言葉を探す「あいまい検索」や、端末に検索用データを保存する「索引」を使えます。どちらも初期状態ではオフです。
 
-```text
-cargo xtask setup       # 初回の Playwright / Chromium 準備
-cargo xtask test        # バックエンド試験 / 必須フロントエンド試験 / 生成器
-cargo xtask ui          # フロントエンド試験（実 HTML/CSS/JS）
-cargo xtask build       # Windows Release EXE
-cargo xtask ci          # 全必須テスト成功後に Windows ビルド
-cargo xtask fixtures    # 保存用 acceptance データ
-cargo xtask icons      # 承認済み SVG から ICO / PNG を生成
-```
+PDF、画像内の文字、古いOffice形式（`.xls` / `.doc` / `.ppt`）は対象外です。Excelは保存済みの値を読み、数式の再計算やマクロの実行はしません。パスワード保護などで読み取れない文書は検索できません。対応形式・検索範囲の詳細は[検索対象の仕様](docs/specifications/backend.md)を参照してください。
 
-Rust は `rust-toolchain.toml` の 1.91.1 に固定します。Node.js 20 以上と npm は開発時の Playwright 準備・試験だけに必要です。配布 EXE の利用者は Node/npm、Python、PowerShell、WASM ツールを用意する必要はありません。Windows ビルドには MSVC Build Tools、アプリ利用には WebView2 が必要です。
+## 利用に必要なもの
 
-[開発手順](docs/development.md)、[テストとデータ](tests/README.md)、[フロントエンド試験設計](docs/test-plans/playwright-ui-test-plan.md)、[構造ガイド](docs/rust-repository-structure.html)に詳しい手順があります。
+| 項目 | 条件 |
+| --- | --- |
+| パソコン | Windows 10 / 11向け。現在の配布は64ビット（x64）用です。32ビット版・Mac版・Linux版は配布していません |
+| 画面表示に使う部品 | **Microsoft Edge WebView2 Runtime** が必要です。EXEには同梱していません。不足している場合は[Microsoftの配布ページ](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)から導入してください |
+| Office | **検索のためのMicrosoft Office導入は不要**です。結果から元文書を開く場合は、その形式を開けるアプリが必要です |
+| その他 | 開発用のRust、Node.js、Pythonなどの導入や、アカウント・APIキーの登録は不要です |
+| ファイルへのアクセス | 検索先の読み取り権限が必要です。結果の保存・元ファイルの編集には保存先の書き込み権限も必要です |
 
-上記コマンドは現行の実行入口です。実EXE用ランナーなどの追加設計は[実装状況](docs/reports/implementation-status.md#試験の実装と振り分け)、試験の分類・保証範囲は[アプリケーション結合試験設計](docs/test-plans/playwright-exe-test-plan.md)を参照してください。
+WebView2はWindows 11や多くのWindows 10端末に入っていますが、端末の状態によっては別途導入が必要です。会社などの管理された端末では、ソフトの実行やWebView2の導入・更新が組織の設定で制限される場合があります。[WebView2の配布・更新について](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)
 
-## 構成
+対応OSの指定は、すべての端末での動作確認を意味しません。CPU・メモリ・文書量ごとの性能基準は未設定です。確認した環境と範囲は[公開版の検証記録](docs/reports/validation/v3.0.4.md)で案内しています。
 
-```text
-docs-search/
-├─ Cargo.toml / Cargo.lock / rust-toolchain.toml
-├─ core/             Rust 検索コア・CLI・単体/API/CLI テスト
-├─ frontend/         HTML・CSS・JS（app / view / tauri / theme）
-├─ src-tauri/        Windows アプリ・OS/IPC 境界・アイコン
-├─ xtask/            Cargo から呼ぶ検証・ビルド・生成の入口
-├─ test-support/     検索エンジンに依存しない開発用生成器
-├─ tests/fixtures/   共通の要求・期待結果 JSON
-├─ tests/ui/         ヘッドレス Playwright と境界モック
-├─ docs/             仕様・手順・試験設計・開発報告
-├─ outputs/          Git管理外のデータ・成果物（試験原本は runs/）
-└─ Generate-Test-Data.cmd  cargo xtask fixtures の薄い入口
-```
+## 使い始める
 
-workspace の通常対象は `core` と `test-support`。デスクトップは明示してビルドします。`target/debug` と `target/release`、`target/frontend-dist` を保持し、毎回の検証結果は再利用しません。既存の旧配置のキャッシュと保存データも残しています。
+1. [最新版のRelease](https://github.com/kz-oshiro/docs-search/releases/latest)を開き、「Assets」から `docs-search-desktop.exe` を保存します。
+2. 保存したEXEをダブルクリックします。アプリ本体のインストーラーはありません。WebView2が不足する場合は先に導入してください。
+3. 検索するフォルダーを指定し、探したい言葉を入力します。必要なら対象の拡張子や除外フォルダーを選びます。
+4. 検索を開始し、結果に表示されたファイル名・場所・抜粋を確認します。
 
-## 機能と仕様
+初めて使う場合は、索引とあいまい検索をオフのまま、小さなフォルダーで試すと対象を確認しやすくなります。読み取りエラーがある検索では、「見つからなかった」だけでなくエラーも確認してください。
 
-検索対象は Office 文書とテキスト系の 93 拡張子です。複数フォルダー・除外、独立して初期オフの索引/あいまい検索、条件検索、Office の注記/数式、順位、一括検索、結果の絞り込み/出力、対応テキストの一致箇所編集、テーマ・フォルダー復元に対応します。
+配布EXEには現在デジタル署名がありません。Windowsや組織のセキュリティ設定で警告・実行制限が出る場合があります。配布元・ファイル名を確認し、組織の利用ルールに従ってください。セキュリティ設定を無効にする手順は案内していません。
 
-- [Rust 要求仕様](docs/specifications/rust-requirements.md)
-- [全体仕様](docs/specifications/requirements.md)・[GUI](docs/specifications/gui.md)・[バックエンド](docs/specifications/backend.md)・[境界契約](docs/specifications/boundary.md)
-- [機能実装計画](docs/plans/implementation-plan.md)・[実装状況](docs/reports/implementation-status.md)
+## ネットワーク通信と文書の扱い
 
-## エージェントによる作業
+**検索と文書の読み取りは端末内で行います。** 検索語や文書を外部の検索サービス・AIサービスへ送る機能、利用状況の送信機能、アプリ自身の自動更新機能は実装していません。検索だけならインターネット接続を必要としません。
 
-[AGENTS.md](AGENTS.md)からタスク別の資料を参照してください。共通の作業ルールは[開発手順](docs/development.md#エージェントの作業ルール)、文書の役割・更新方法・実装報告のひな型は[文書作成ガイド](docs/documentation.md)にまとめています。
+次の場合は、検索処理とは別に通信が発生し得ます。
 
-## PowerShell 版と保存用データ
+- アプリをGitHubからダウンロードするとき、WebView2をダウンロード・更新するとき。WebView2のEvergreen版にはMicrosoftの自動更新があります。
+- 共有フォルダーやクラウド同期フォルダーを指定したとき。ファイルの取得・同期はWindowsや同期ソフトの動作に従います。クラウド上だけにある文書の検索は保証しません。
+- 結果から元ファイルを開いたとき。開いたアプリの通信や動作に従います。
 
-PowerShell 検索版は [docs-search-ps](https://github.com/kz-oshiro/docs-search-ps) に分離済みです。現在の Rust 版の使用・メンテ・CI に含めません。ローカル配置は削除済みで、既存の成果物記録は `outputs/ps-archive-*/` に保存しています。
+元文書は通常の検索では変更しません。対応するテキスト文書の編集機能で「元ファイルに保存」を選んだ場合は、選んだ一致箇所を書き換えます。Office文書の編集や、編集後のプログラム・JSON等の正しさの判定には対応しません。
 
-[Generate-Test-Data.cmd](Generate-Test-Data.cmd) をダブルクリックすると、Cargo の生成器が outputs/test-data に新しい保存先を作り、そのフォルダーを開きます。既存データを上書きしません。Cargo の fixtures コマンドだけでは開かず、--open を付けた場合に開きます。`cargo xtask fixtures --profile load` で負荷用データも生成できます。
+## 端末に保存するもの
+
+| データ | 保存・削除の扱い |
+| --- | --- |
+| フォルダー入力・テーマなど | 画面表示部品の端末内保存領域に保存し、次回起動時に復元します。検索は自動開始しません |
+| 検索用の索引 | オンにしたとき、文書の抽出内容やパスなどを `%LOCALAPPDATA%\docs-search\search-index.sqlite3` に保存します。画面の「索引を削除」で削除できます |
+| 検索結果の出力 | 保存操作で指定した場所へ保存します。文書の抜粋・パス等を含むため、共有先を確認してください |
+
+アプリを閉じてEXEを削除しても、設定や索引、保存した検索結果は残ります。索引には文書由来の情報が含まれるため、機密文書を扱う場合は端末内の保存も含めて判断してください。
+
+## 更新・困った場合
+
+更新するときはアプリを終了し、最新版のEXEに置き換えてください。変わった点や既知の制限は[Release一覧](https://github.com/kz-oshiro/docs-search/releases)で確認できます。
+
+起動できない場合はWebView2の有無と端末の実行制限を、検索できない場合は対象形式・フォルダーの権限・表示されたエラーを確認してください。不具合の報告先は[Issues](https://github.com/kz-oshiro/docs-search/issues)です。利用した版、操作、エラー文を記載し、機密文書の内容やパスは公開しないでください。
+
+このリポジトリには利用条件を定めるライセンス文書がまだありません。利用・改変・再配布の条件を明示する整備は未完了です。
+
+## 開発・検証に関する資料
+
+- [実装状況と開発レポート](docs/reports/implementation-status.md)：現在の作業と、案件ごとの要件・設計・実装・検証への入口
+- [実装履歴](docs/reports/implementation-history.md)：過去の案件と設計判断
+- [開発手順](docs/development.md)：環境準備、構成、テスト・ビルド・公開の手順
+- [現行仕様](docs/specifications/rust-requirements.md)、[試験・データの対応](tests/README.md)、[文書の管理方法](docs/documentation.md)
+- [AGENTS.md](AGENTS.md)：担当者・モデルが作業前に読む資料
+
+PowerShell版は別の[docs-search-ps](https://github.com/kz-oshiro/docs-search-ps)に分離しており、このアプリの利用・開発の対象に含みません。
