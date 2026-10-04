@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "docs-search-core"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "docs-search-test-support",
  "encoding_rs",
@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "docs-search-desktop"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "docs-search-core",
  "open",
@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "docs-search-test-support"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "crc32fast",
  "encoding_rs",
@@ -5157,7 +5157,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "docs-search-test-support",
  "serde",
