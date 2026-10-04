@@ -61,7 +61,7 @@ cargo xtask ci
 
 ## 記録の自動生成と公開
 
-`cargo xtask release-record` と `record-contracts` 工程は実装済みで、静的確認まで完了しています。記録生成・公開照合・契約試験の実行検証は未実施です。既存のテスト・ビルドによる実行別レポートの保存は実装済みです。
+`cargo xtask release-record` と `record-contracts` 工程、テスト・ビルドによる実行別レポートの保存は実装済みです。実行検証と公開照合の結果は、実行別レポートとReleaseに添付する検証記録で確認します。
 
 テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。読む範囲と会話報告は[文書作成ガイド](documentation.md#検証結果の読み方と会話報告)に従います。正常ログ・件数・環境・ハッシュやUI JSONの全文を版別検証文書・実装状況・試験設計へ転記しません。
 

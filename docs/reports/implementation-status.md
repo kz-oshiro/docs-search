@@ -17,7 +17,7 @@
 | Office注記・数式・順位・一括検索（P4〜P6） | 実装済み | [Office/順位/一括](../test-plans/office-ranking-batch-test-plan.md) |
 | 折りたたみ・編集・絞り込み・書式・日時・復元・位置順・ふりがな除外（#1〜#9） | 実装済み | [イシュー](../test-plans/issues-test-plan.md) |
 | テーマ・アイコン | 実装済み | [テーマ](../test-plans/theme-settings-test-plan.md) |
-| バックエンドの境界判定・正規化共有・テキスト読込み・索引SQLの重複削減 | 実装済み、静的確認まで | [バックエンド性能](../test-plans/backend-performance-test-plan.md) |
+| バックエンドの境界判定・正規化共有・テキスト読込み・索引SQLの重複削減 | 実装済み | [バックエンド性能](../test-plans/backend-performance-test-plan.md) |
 
 元の計画にある新旧設計書の意味的差分表示は対象外。PowerShell版は別リポジトリで管理する。画面はHTML/CSS/JavaScript、検索コアと検証入口はRust/Cargoで構成し、WASMは使用しない。
 
