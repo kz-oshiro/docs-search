@@ -6,7 +6,7 @@
 
 対象は AND・OR・除外語と、検索箇所 / Excelの同じ行 / ファイル全体の判定です。この実装段階ではテスト・ビルド・GUI起動を実施していません。次の検証では、以下の確認項目・手順・期待結果を先に把握してから進めます。
 
-対応する[開発レポート P3](../reports/development/2026-10-01-search-foundation-export-conditions.md)で計画・現在地・結果を確認してください。
+対応する[Issue P3](https://github.com/kz-oshiro/docs-search/issues/10)で計画・現在地・結果を確認してください。
 
 ## 準備
 

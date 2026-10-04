@@ -2,7 +2,7 @@
 
 現行の実行入口は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。試験設計は同じ文書を更新し、改訂履歴をGitで管理する。
 
-対象: [開発レポート P0](../reports/development/2026-10-01-search-foundation-export-conditions.md)。新しい変更の検証では、以下の確認項目・手順・期待結果を把握してから実行する。過去の実行結果は公開版の記録を参照し、今回の検証へ引き継がない。現在の状態は上記の開発レポートを参照する。
+対象: [Issue P0](https://github.com/kz-oshiro/docs-search/issues/10)。新しい変更の検証では、以下の確認項目・手順・期待結果を把握してから実行する。過去の実行結果は公開版の記録を参照し、今回の検証へ引き継がない。現在の状態は上記の案件Issueを参照する。
 
 ## 自動確認の順序
 

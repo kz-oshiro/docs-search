@@ -1,6 +1,6 @@
 # バックエンド性能改善の確認方針
 
-検索結果の意味を維持しながら、単語境界判定、語間の正規化、テキスト読込み、索引SQLの重複を削減する変更を確認する。機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実行範囲と入口は[開発手順](../development.md#テスト)、実装済み・設計のみの区別は[対象案件の開発レポート](../reports/development/2026-10-04-backend-optimization.md)を参照する。
+検索結果の意味を維持しながら、単語境界判定、語間の正規化、テキスト読込み、索引SQLの重複を削減する変更を確認する。機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実行範囲と入口は[開発手順](../development.md#テスト)、実装済み・設計のみの区別は[対象案件のIssue](https://github.com/kz-oshiro/docs-search/issues/19)を参照する。
 
 ## 変更と維持する契約
 
@@ -28,7 +28,7 @@
 
 既存のUnicode・候補漏れ・直接/索引比較の[性質テスト](property-testing-test-plan.md)、[Office/順位/一括](office-ranking-batch-test-plan.md)、[条件](condition-search-test-plan.md)、[周辺](excel-context-test-plan.md)、[編集](issues-test-plan.md)も維持する。特にa_/a!、区切りだけの語、数字、Shift_JIS、NOT、抽出範囲の切替、壊れたsheets JSON、元バイトの変更、中断時の通知/終端集計を確認する。
 
-自動テストの依頼を受けた次の担当は、この方針と対象案件の開発レポートを読んでルートで実行する。既存seedを残し、利用者のLOCALAPPDATAを試験に使わない。
+自動テストの依頼を受けた次の担当は、この方針と対象案件の案件Issueを読んでルートで実行する。既存seedを残し、利用者のLOCALAPPDATAを試験に使わない。
 
 ```powershell
 $env:PROPTEST_CASES = '1024'

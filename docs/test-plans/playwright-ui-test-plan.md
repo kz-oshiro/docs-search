@@ -1,10 +1,10 @@
 # フロントエンド試験の設計と保証範囲（Playwright）
 
-実装済みのUケースと設計中のG01/G02を扱う。現在の実装状況は[試験拡張の開発レポート](../reports/development/2026-10-04-application-integration.md)を参照する。
+実装済みのUケースと設計中のG01/G02を扱う。現在の実装状況は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)を参照する。
 
 現行の実行手順は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。
 
-導入時点の経緯と実施状況は[導入時の開発レポート](../reports/development/2026-10-03-ui-tests.md)に保存する。本書は現在の試験設計を管理し、過去の成功件数を新しいケースの成功として扱わない。
+導入時点の経緯と実施状況は[導入時のIssue](https://github.com/kz-oshiro/docs-search/issues/17)に保存する。本書は現在の試験設計を管理し、過去の成功件数を新しいケースの成功として扱わない。
 
 ## 確認境界と実行依頼の意味
 

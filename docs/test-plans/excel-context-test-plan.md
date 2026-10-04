@@ -6,7 +6,7 @@
 
 実装対象は `.xlsx` / `.xlsm` のセル一致と、アンカーを取得できた図形一致の「周辺を表示」です。検証は次の実装確認段階で行います。この文書は確認項目、手順、期待結果を固定します。
 
-対応する[開発レポート P2](../reports/development/2026-10-01-search-foundation-export-conditions.md)で計画・現在地・結果を確認してください。
+対応する[Issue P2](https://github.com/kz-oshiro/docs-search/issues/10)で計画・現在地・結果を確認してください。
 
 ## 準備
 

@@ -11,7 +11,7 @@ description: "docs-search の不具合修正や仕様変更に対する回帰試
 
 ## 試験を配置する
 
-1. [現行仕様](../../../docs/specifications/rust-requirements.md)と [開発レポート一覧](../../../docs/reports/development/README.md)から対象の要求・試験設計を読む。設計のみの項目と現在のランナーを区別する。
+1. [現行仕様](../../../docs/specifications/rust-requirements.md)と [案件Issue一覧](https://github.com/kz-oshiro/docs-search/issues?q=is%3Aissue+label%3Adevelopment)から対象の要求・試験設計を読む。設計のみの項目と現在のランナーを区別する。
 2. [試験区分と振り分け](../../../docs/test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)に従い、不具合を観測できる区分を選ぶ。処理・状態はバックエンド、入力・DOM・要求と応答表示はフロントエンド、両者で観測できない実接続だけをアプリケーション結合試験へ回す。個別試験が不足していれば、その区分を補う。
 3. [試験コードとデータの対応](../../../tests/README.md)から既存のケース原本・生成器・試験コードを選ぶ。似た試験を拡張し、同じ条件を別区分でも繰り返す場合は検出する不具合の違いを説明する。
 
@@ -34,4 +34,4 @@ description: "docs-search の不具合修正や仕様変更に対する回帰試
 
 ## 確認方針を残す
 
-対象の試験設計に、要求、不具合の再現入力、担当区分、手順、期待結果を反映する。実装・静的確認・実行結果を区別し、報告は [文書作成ガイド](../../../docs/documentation.md#開発レポートのひな型)に従う。
+対象の試験設計に、要求、不具合の再現入力、担当区分、手順、期待結果を反映する。実装・静的確認・実行結果を区別し、報告は [文書作成ガイド](../../../docs/documentation.md#案件issueのひな型)に従う。

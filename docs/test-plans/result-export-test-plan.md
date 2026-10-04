@@ -4,7 +4,7 @@
 
 試験の担当と保証範囲は[試験区分と振り分け](playwright-exe-test-plan.md#試験区分と振り分けの基本方針)と[OS連携の保証対象外](playwright-exe-test-plan.md#5-os連携の保証対象外)、実行依頼の範囲は[エージェントの作業ルール](../development.md#エージェントの作業ルール)に従う。以下のGUI手順・未実施・許可の記述は旧方針の参考記録として扱う。
 
-対象: [開発レポート P1](../reports/development/2026-10-01-search-foundation-export-conditions.md)。以下は新しい変更を検証するときの確認項目・手順・期待結果。過去の実行結果は公開版の記録を参照し、今回の検証へ引き継がない。現在の状態は上記の開発レポートを参照する。
+対象: [Issue P1](https://github.com/kz-oshiro/docs-search/issues/10)。以下は新しい変更を検証するときの確認項目・手順・期待結果。過去の実行結果は公開版の記録を参照し、今回の検証へ引き継がない。現在の状態は上記の案件Issueを参照する。
 
 ## 自動確認
 
