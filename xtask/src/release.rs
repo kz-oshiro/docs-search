@@ -390,7 +390,6 @@ pub fn execute(args: &[String]) -> Result<bool> {
     };
     let record = json!({"schemaVersion":1,"tag":tag,"repository":repo,"releaseTargetCommit":target,"documentationChangesSinceTest":changes,
         "ciReportSha256":digest(&report_path)?,"changesSha256":digest(&notes_path)?,"changes":note_text,"ci":report,"evidence":evidence,"publication":publication});
-    let base = format!("https://github.com/{repo}/releases/download/{tag}");
     // Public notes are written for users. Detailed evidence belongs in validation.md.
     // Add its pinned repository link after committing the published validation record.
     let body = format!("# docs-search {tag}\n\n{}\n", note_text.trim());
@@ -401,9 +400,7 @@ pub fn execute(args: &[String]) -> Result<bool> {
         records::text(&record["documentationChangesSinceTest"]),
         overview.split_once("\n\n").unwrap().1
     );
-    validation += &format!(
-        "\n原データ・工程コマンド・ログ・ケース結果: [validation.json]({base}/validation.json)。\n"
-    );
+    validation += &format!("\n原データ・工程コマンド・ログ・ケース結果は、同じ実行の `release/{tag}/validation.json` にローカル保存（Releaseには添付しません）。\n");
     if published {
         validation += &format!("\n公開照合: **{}**。確認時刻（Unix ms）: {}。\n\nRelease: {}。remote main/tag: `{}` / `{}`。Latest: `{}`。\n\n照合理由: `{}`。\n",
             if publication["verified"] == true { "passed" } else { "failed" }, records::text(&publication["checkedAtUnixMs"]), records::text(&publication["url"]),

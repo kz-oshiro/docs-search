@@ -16,7 +16,7 @@
 | [実装履歴](reports/implementation-history.md) | 完了した案件への索引と、既存の設計経緯。新しい案件は短い概要と開発レポートへのリンクを追加する |
 | 実装計画・試験設計 | 変更案・受入条件、確認項目・手順・期待結果。案件の状態と結果は開発レポートから参照する |
 | 公開検証MD（`docs/reports/validation/vX.Y.Z.md`） | 同じ実行から生成した公開版の技術的な検証記録。Releaseから固定コミットのファイル表示へリンクする |
-| Release添付の `validation.json` | 公開した原データ・工程ログ・ケース結果。公開検証MDから参照する |
+| ローカルの `release/vX.Y.Z/validation.json` | 同じ実行の原データ・工程ログ・ケース結果。`outputs/runs/<ID>/` 内に保存し、Releaseには添付しない |
 | `outputs/runs/<ID>/` | Git管理外の実行原本。`report.md` / `report.json`、ログ、試験結果、成果物。未公開の実行も含む |
 
 ## 更新ルール

@@ -61,7 +61,7 @@ cargo xtask ci
 
 ## 記録の自動生成と公開
 
-公開版の利用者向け案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、案件の要件・設計・実装・検証への対応は[開発レポート](reports/implementation-status.md#開発レポート)に置きます。詳細な公開検証は `docs/reports/validation/vX.Y.Z.md`、原データ・ログはRelease添付の `validation.json` です。版別のリリースノートをリポジトリへ複製しません。
+公開版の利用者向け案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、案件の要件・設計・実装・検証への対応は[開発レポート](reports/implementation-status.md#開発レポート)に置きます。詳細な公開検証は `docs/reports/validation/vX.Y.Z.md`、原データ・ログは同じ実行の `release/vX.Y.Z/validation.json` にローカル保存し、Releaseには添付しません。版別のリリースノートをリポジトリへ複製しません。
 
 テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。開発レポートには実行ID・対象コミット・原本の場所と検証MDへの参照を残し、件数・環境・ハッシュ・正常ログを転記しません。読む範囲と会話報告は[文書作成ガイド](documentation.md#検証結果の読み方と会話報告)に従います。
 
@@ -75,7 +75,7 @@ cargo xtask ci
 cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/release-changes.md
 ```
 
-同じ実行の `release/vX.Y.Z/` に `release-notes.md`、`validation.md`、`validation.json` を生成します。本文へ試験の技術表を自動挿入せず、表は検証MDだけに載せます。JSONにはCI原本、工程別stdout/stderr、Playwright全ケース、worker計測、順位Top-5、生成manifestを格納します。MDの原データリンクはRelease添付の絶対URLなので、MDをリポジトリへ保存しても参照できます。追加依存はありません。`--repo OWNER/REPO` の既定値は `kz-oshiro/docs-search` です。
+同じ実行の `release/vX.Y.Z/` に `release-notes.md`、`validation.md`、`validation.json` を生成します。本文へ試験の技術表を自動挿入せず、表は検証MDだけに載せます。JSONにはCI原本、工程別stdout/stderr、Playwright全ケース、worker計測、順位Top-5、生成manifestを格納します。MDには原データがローカル保存であることを明記し、非公開のJSONへのダウンロードリンクを載せません。追加依存はありません。`--repo OWNER/REPO` の既定値は `kz-oshiro/docs-search` です。
 
 成功した新形式（`metadata.schemaVersion=2`）のci、開始/終了とも同じcleanなコミット、全必須工程、件数、資材ハッシュ、保存EXEを照合します。対象は存在するローカルタグ、未作成なら現在のHEADです。試験後の差分は `docs/` のMarkdown/HTML・ルートREADME/AGENTSだけを許容し、製品・依存・試験・ビルドコードの変更時は新しいCIが必要です。旧レポートを新形式の証拠へ読み替えません。
 
@@ -83,11 +83,11 @@ cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/
 
 公開依頼の範囲で次の順に進めます。既存版の本文整理だけなら、既存の検証記録を使い、EXEを作り直したりタグを動かしたりしません。
 
-1. main/タグをpushし、`gh release create --verify-tag --notes-file <生成先>/release-notes.md` で同じ実行のEXEと `validation.json` を公開します。検証MDは後続手順でリポジトリから案内します。既存のMD添付は履歴として保持できますが、新しい公開記録の正本はリポジトリのMDとします。
-2. 同じ `release-record` に `--published` を付けて、公開状態をread-onlyの `gh api` と `git ls-remote` で照合します。生成JSONを `gh release upload --clobber` で添付更新します。不一致・取得失敗は理由を保存し、非ゼロで終了します。
+1. main/タグをpushし、`gh release create --verify-tag --notes-file <生成先>/release-notes.md` で同じ実行のEXEだけを添付して公開します。`validation.json` はローカルに保持します。検証MDは後続手順でリポジトリから案内します。既存のMD添付は履歴として保持できますが、新しい公開記録の正本はリポジトリのMDとします。
+2. 同じ `release-record` に `--published` を付けて、公開状態をread-onlyの `gh api` と `git ls-remote` で照合します。公開照合後の生成JSONもローカルに保持し、添付しません。不一致・取得失敗は理由を保存し、非ゼロで終了します。
 3. 公開照合後の生成 `validation.md` を `docs/reports/validation/vX.Y.Z.md` へ保存します。開発レポートに参照を追加し、この文書をコミット・pushします。記録内の照合時刻・remote mainは観測時点の値で、後続の文書コミットと一致する必要はありません。
 4. 文書を含む完全なコミットSHAを取得し、利用者向けRelease本文へ `[詳しい検証記録](https://github.com/OWNER/REPO/blob/<文書コミットSHA>/docs/reports/validation/vX.Y.Z.md)` を追加します。読者向け本文を確定したUTF-8ファイルに保存し、`gh release edit vX.Y.Z --notes-file <本文ファイル>` で反映します。本文確定のために `release-record` を再実行して観測時刻を更新する必要はありません。
-5. GitHubのMD表示ページ・添付JSON・EXEへ到達できること、本文の利用条件がその配布版に一致すること、EXEのID・サイズ・digestとタグが変わっていないことを確認します。固定リンクが未確定の状態で公開手順を完了にしません。
+5. GitHubのMD表示ページ・EXEへ到達できること、`validation.json` が添付されていないこと、本文の利用条件がその配布版に一致すること、EXEのID・サイズ・digestとタグが変わっていないことを確認します。固定リンクが未確定の状態で公開手順を完了にしません。
 
 試験・ビルドの件数は検証記録へ、引き継ぎの判断は開発レポートへ集約します。公開ごとの文書コミットは読みやすい検証MDを保存するために行い、実装状況や履歴に件数・ログを追記しません。
 
@@ -99,7 +99,7 @@ cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/
 | フロントエンド試験 | 上記全自動入口の必須Playwright | 既存全件を実行。statsとerrorsから実測を集計し、JSON欠落・skipped/flakyを全体成功にしない |
 | アプリケーション結合試験 | 今回の記録処理では追加なし | 現行ランナーは未実装のまま `not-implemented`。EXEビルドを結合試験の成功に数えない |
 | 共通の検証基盤 | `cargo test --locked -p xtask`（全自動入口にも `record-contracts` として組込み）と資材最終照合 | 集計・欠落・旧形式・dirty・版不一致・公開digest不一致の契約試験が成功。内部PASS行を加算せず、ソース/UI/配布の8資材が一致 |
-| 公開記録 | cleanな対象の成功ciに対して生成。公開依頼時だけ `--published` と添付更新 | 3ファイル生成、原ログをJSONに格納。同じEXE/タグを確認し、取得失敗を成功として書かない |
+| 公開記録 | cleanな対象の成功ciに対して生成。公開依頼時だけ `--published` とEXEの照合 | 3ファイル生成、原ログをJSONに格納。同じEXE/タグを確認し、取得失敗を成功として書かない |
 
 ## リポジトリの構成
 

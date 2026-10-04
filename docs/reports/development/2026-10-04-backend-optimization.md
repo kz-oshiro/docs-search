@@ -34,11 +34,11 @@
 
 | 条件ID | 条件・仕様参照 | 実装参照 | 試験設計・ケース | 結果への参照／未確認理由 |
 | --- | --- | --- | --- | --- |
-| AC-01 | Unicode一致範囲・一括語順を維持 | 実装差分の照合・一括処理 | [既存契約の維持](../../test-plans/backend-performance-test-plan.md#バックエンド試験) | [同一CIの概要](../validation/v3.0.4.md)。ケース詳細は添付JSON内のログ |
+| AC-01 | Unicode一致範囲・一括語順を維持 | 実装差分の照合・一括処理 | [既存契約の維持](../../test-plans/backend-performance-test-plan.md#バックエンド試験) | [同一CIの概要](../validation/v3.0.4.md)。ケース詳細はローカル原本のログ |
 | AC-02 | 索引結果・編集変更検出を維持 | 実装差分の索引・編集処理 | 同上、直接/索引比較・外部変更 | 同上。実EXEの接続成功は主張しない |
 | AC-03 | 時間・最大メモリを比較する | 同じ実装を比較用CLIで計測 | [性能比較](../../test-plans/backend-performance-test-plan.md#性能比較の手順期待結果) | 未実施。負荷と基準を決めてから比較する |
 
-実行ID: `1791072123814-10068-ci`。ローカル原本は `outputs/runs/1791072123814-10068-ci/report.md` / `report.json`（Git管理外）。[公開検証MD](../validation/v3.0.4.md)と[原データ・ログ](https://github.com/kz-oshiro/docs-search/releases/download/v3.0.4/validation.json)から同じ実行を参照する。件数・環境・ハッシュはここへ転記しない。
+実行ID: `1791072123814-10068-ci`。ローカル原本は `outputs/runs/1791072123814-10068-ci/report.md` / `report.json`（Git管理外）。[公開検証MD](../validation/v3.0.4.md)から同じ実行を参照する。原データ・ログは同じ実行の `release/v3.0.4/validation.json`（ローカルのみ）に保持する。件数・環境・ハッシュはここへ転記しない。
 
 ## 次の担当への引き継ぎ
 

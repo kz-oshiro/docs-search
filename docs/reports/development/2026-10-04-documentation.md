@@ -24,16 +24,16 @@
 - 開発レポート1枚を要件から検証まで更新し、工程別・モデル別の報告を増やさない。実装状況は現在の入口、実装履歴は過去案件の索引にする。
 - 古い報告も新形式へ移し、当時の判断・制約を保持する。推定できない承認・実装コミット・条件別結果は「記録なし」とする。
 - 件数・環境・時間・ハッシュ・ログは生成原本を参照する。受入条件と確認方法・実行ID・対象コミットをつなぐ。
-- 公開検証はリポジトリ内MD、原データ・ログはRelease添付。既存のv3.0.4記録を移し、結果を再生成しない。
+- 公開検証はリポジトリ内MD、原データ・ログはローカル保存。公開後のユーザー依頼によりJSON添付を廃止する。既存のv3.0.4記録を移し、結果を再生成しない。
 - READMEとReleaseは導入検討者向けにする。通信は検索機能、WebView2、共有先や開いたアプリの動作を区別する。署名・ライセンス・性能基準の未整備を補わない。
 
 ## 実装
 
 [文書ガイド](../../documentation.md)にひな型と状態判定を集約し、[実装状況](../implementation-status.md#開発レポート)・[履歴](../implementation-history.md#開発レポート一覧)・AGENTS・関連スキル・試験設計の参照を更新した。旧3報告は削除して移行先へリンクし、元の全文は固定コミットで参照できる。
 
-[README](../../../README.md)を利用者向けに更新した。Release本文のレビュー用下書きは `outputs/documentation-preview-20261004/release-notes-v3.0.4.md`（ローカルのみ）。公開前の下書きはローカル参照を使った。最終本文は文書コミット `8c4b759bb28ed02df3d9001f1bf5e450230ea775` の検証MD表示リンクに置換し、[v3.0.4](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.4)と[v3.0.5](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.5)へ反映済み。
+[README](../../../README.md)を利用者向けに更新した。Release本文のレビュー用下書きは `outputs/documentation-preview-20261004/release-notes-v3.0.4.md`（ローカルのみ）。公開前の下書きはローカル参照を使った。最終本文は当初は文書コミット `8c4b759bb28ed02df3d9001f1bf5e450230ea775` の検証MD表示リンクに置換し、[v3.0.4](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.4)と[v3.0.5](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.5)へ反映済み。
 
-`xtask/src/release.rs`はRelease本文へ技術表・添付MDのダウンロードリンクを自動挿入する処理を外し、`--notes` の利用者向け本文を使う。検証MDのJSONリンクはRelease添付の絶対URLにした。CLI引数・JSON形式・CI成功条件・公開照合は変更しない。
+`xtask/src/release.rs`はRelease本文へ技術表・添付MDのダウンロードリンクを自動挿入する処理を外し、`--notes` の利用者向け本文を使う。v3.0.5公開時は検証MDのJSONリンクをRelease添付の絶対URLにした。後続依頼で添付を廃止し、生成文面をローカル保存の説明へ変更した。CLI引数・JSON形式・CI成功条件・公開照合は変更しない。
 
 ## 受入条件・検証
 
@@ -41,21 +41,23 @@
 | --- | --- | --- | --- | --- |
 | AC-01 | 別の担当が同じ案件の次の作業へ到達できる | 文書ガイドと5件の開発レポート | 各工程、基準・対象、未決事項、受入表、引き継ぎを読む | 文書の静的確認。移行元と保存版を照合 |
 | AC-02 | 導入条件・通信・保存・制限が分かる | READMEとRelease下書き | 仕様、コード、配布物、MicrosoftのWebView2配布資料と照合 | 静的確認。全端末・通信の実測確認はしていない |
-| AC-03 | 公開検証MDから原データを読める | [検証MD](../validation/v3.0.4.md) | 既存公開MDと比較し、結果・時刻・コミット・ハッシュを保持する | 参照修復と保存説明以外の本文を照合。JSONの添付先は既存Release |
-| AC-04 | 生成本文と検証MDの読者・リンクを分ける | `xtask/src/release.rs` | 今回の `cargo xtask ci` の `record-contracts`、同じ実行の `release-record` と公開後の `--published`。本文は入力文、技術表は検証MD、JSONリンクは絶対URL、既存の失敗拒否は維持 | [同一実行の検証MD](../validation/v3.0.5.md)。生成文面の照合は `outputs/runs/1791081549438-16668-ci/release-format-check.json`（ローカルのみ） |
+| AC-03 | 公開検証MDとローカル原本を対応付ける | [検証MD](../validation/v3.0.4.md) | 既存公開MDと比較し、結果・時刻・コミット・ハッシュを保持する | 参照修復と保存説明以外の本文を照合。JSONは同じ実行のローカル保存へ変更 |
+| AC-04 | 生成本文と検証MDの読者・リンクを分ける | `xtask/src/release.rs` | 今回の `cargo xtask ci` の `record-contracts`、同じ実行の `release-record` と公開後の `--published`。本文は入力文、技術表は検証MD、公開時のJSONリンクは絶対URL、既存の失敗拒否は維持。後続の文面変更は静的確認のみ | [同一実行の検証MD](../validation/v3.0.5.md)。生成文面の照合は `outputs/runs/1791081549438-16668-ci/release-format-check.json`（ローカルのみ） |
 | AC-05 | 最新Releaseから固定MDと同じEXEへ到達できる | Release下書きと[公開手順](../../development.md#公開と読める検証記録) | 公開依頼時に文書コミットの固定リンクを確定し、タグ・EXE ID/size/digestの維持を照合 | 公開本文・固定MD表示・添付JSON・配布EXEを照合済み。v3.0.4のタグ・既存添付・本文以外の公開情報も保持 |
 
 静的確認の記録は `outputs/documentation-preview-20261004/documentation-check.json`（ローカルのみ）。文書リンク・保存版・添付先の照合、検証MDの結果保持、5件のレポート構成と導入説明の照合、`rustfmt --check --edition 2021 xtask/src/release.rs`、`git diff --check` が成功した。
 
-テスト・リリース依頼を受けて、cleanな対象コミットで `cargo xtask ci` を実行し、全必須試験と配布ビルドが成功した。実行IDは `1791081549438-16668-ci`。ローカル原本は `outputs/runs/1791081549438-16668-ci/report.md` / `report.json`、公開記録は[検証MD](../validation/v3.0.5.md)と[原データ・ログ](https://github.com/kz-oshiro/docs-search/releases/download/v3.0.5/validation.json)。
+テスト・リリース依頼を受けて、cleanな対象コミットで `cargo xtask ci` を実行し、全必須試験と配布ビルドが成功した。実行IDは `1791081549438-16668-ci`。ローカル原本は `outputs/runs/1791081549438-16668-ci/report.md` / `report.json`、公開記録は[検証MD](../validation/v3.0.5.md)。原データ・ログは同じ実行の `release/v3.0.5/validation.json`（ローカルのみ）に保持する。
 
 新しい成功CIから記録を生成し、本文がUTF-8の入力文章を保持すること、技術表は検証MDにだけ載ること、原データのリンクがRelease添付を指すことを照合した。`--published` の照合も成功した。元のv3.0.4記録は旧ソースの証拠として保持し、今回の結果と混ぜない。
 
 公開後の最終確認は `outputs/documentation-preview-20261004/publication-check.json`（ローカルのみ）。両Releaseの本文とMD表示ページ、固定コミットのMD本文、ダウンロードしたEXE・JSONのサイズとSHA256、Latest、両タグを照合した。v3.0.4は本文以外の公開情報と添付のID・サイズ・digestを変更前スナップショットと比較して保持を確認した。試験後のmain更新は文書だけで、配布タグは検証コミットのままとする。
+
+2026-10-04の後続依頼により、既存v3.0.3〜v3.0.5の `validation.json` をサイズ・SHA256を照合してローカルへ保存し、添付を廃止した。詳細MDの原データリンクと公開手順・生成文面を修正した。保存先は `outputs/release-json-removal-20261004/`（ローカルのみ）。この変更は静的確認と公開資材の照合で確認し、テスト・ビルドは再実行しない。全ReleaseのJSON添付がないこと、その他のアセットID・サイズ・digestと公開情報の保持を確認した。照合記録は保存先の `after-assets.json`。上記CI結果は変更前の検証対象の記録として保持する。
 
 ## 次の担当への引き継ぎ
 
 - 最初に読む資料: このレポート、[文書ガイド](../../documentation.md)、[開発手順](../../development.md)の共通ルールと公開手順。
 - 着手条件: 基準コミットからの差分・未コミット状態・依頼された範囲を確認する。公開タグと現在のmainを混同しない。
 - 次の作業: 本件の試験・ビルド・公開は完了。新しい変更は対象案件のレポートを更新し、変更後のソースに対して必要な検証を行う。
-- 完了条件: 文書・保存版のリンクが有効で、検証MDはGitHub表示、原データは添付に到達する。過去Release・タグ・配布EXEを変更せず、型検査・実行検証・公開照合の実施範囲を正しく記録する。
+- 完了条件: 文書・保存版のリンクが有効で、検証MDはGitHub表示、原データはローカルに保持し、JSONを添付しない。タグ・配布EXEを変更せず、型検査・実行検証・公開照合の実施範囲を正しく記録する。
