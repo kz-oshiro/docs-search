@@ -1,6 +1,6 @@
 # バックエンド性能改善の確認方針
 
-検索結果の意味を維持しながら、単語境界判定、語間の正規化、テキスト読込み、索引SQLの重複を削減する変更を確認する。機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実行範囲と入口は[開発手順](../development.md#テスト)、実装済み・設計のみの区別は[実装状況](../reports/implementation-status.md)を参照する。
+検索結果の意味を維持しながら、単語境界判定、語間の正規化、テキスト読込み、索引SQLの重複を削減する変更を確認する。機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、実行範囲と入口は[開発手順](../development.md#テスト)、実装済み・設計のみの区別は[対象案件の開発レポート](../reports/development/2026-10-04-backend-optimization.md)を参照する。
 
 ## 変更と維持する契約
 

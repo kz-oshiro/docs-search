@@ -5,9 +5,9 @@ Rust 検索コア、Tauri の OS/IPC 境界、HTML/CSS/JavaScript の画面で�
 ## エージェントの作業ルール
 
 - 機能修正では設計・実装・変更に応じた確認項目/手順/期待結果を用意します。実装依頼は必要な差分・文書の静的確認と報告までとし、型検査・テスト・ビルド・アプリ起動・GUI操作・リモート反映へ進みません。
-- 要件・設計・実装・検証の各担当は、[対象案件の開発レポート](reports/implementation-status.md#開発レポート)を[ひな型](documentation.md#開発レポートのひな型)に従って更新し、成果物・対象コミット・未実施項目・次の作業と完了条件を残します。次の担当は記録されたソースと現在の差分を確認します。テスト・ビルド以降を別のモデルへ引き継ぎ、テスト全体をユーザーへ依頼しません。
+- 要件・設計・実装・検証の各担当は、[一覧](reports/development/README.md)から対象案件の開発レポートを選び、[ひな型](documentation.md#開発レポートのひな型)に従って更新し、成果物・対象コミット・未実施項目・次の作業と完了条件を残します。次の担当は記録されたソースと現在の差分を確認します。テスト・ビルド以降を別のモデルへ引き継ぎ、テスト全体をユーザーへ依頼しません。
 - テスト依頼では、対象案件の開発レポートと対象の試験設計を読み、確認項目・手順・期待結果を把握してから実行します。テスト・ビルド・リモート反映は依頼された範囲を途中で止めず完了し、非対話的なテスト・ビルドの実行前に再確認を求めません。
-- 自動テストには実HTML/CSS/JavaScriptを操作するヘッドレスPlaywrightと必要な資材stagingを常時含めます。実EXE用ランナー導入後は、必要なビルド・起動・Playwright操作も自動テスト依頼の範囲に含め、GUI操作の再確認を求めません。現行ランナーと導入後の設計は[実装状況](reports/implementation-status.md#試験の実装と振り分け)で区別します。
+- 自動テストには実HTML/CSS/JavaScriptを操作するヘッドレスPlaywrightと必要な資材stagingを常時含めます。実EXE用ランナー導入後は、必要なビルド・起動・Playwright操作も自動テスト依頼の範囲に含め、GUI操作の再確認を求めません。現行ランナーと導入後の設計は[試験拡張の開発レポート](reports/development/2026-10-04-application-integration.md)で区別します。
 - 対話的にAIが操作するGUIテストだけは実施前に確認します。今回の依頼で明示されていれば再確認は不要です。確認を待つ間も依頼済みの自動テストを進めます。
 - 試験設計と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)に従います。[フロントエンドの判定方法](test-plans/playwright-ui-test-plan.md#確認境界と実行依頼の意味)と[OS連携の保証対象外](test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を読み、必須の手動確認票や一律の「GUI未検証」を報告に追加しません。
 - 文書の作成・更新は[文書作成ガイド](documentation.md)、テスト・ビルド結果の扱いと公開は[記録の自動生成と公開](#記録の自動生成と公開)に従います。
@@ -36,11 +36,11 @@ cargo xtask ui --case "U23:"
 
 フロントエンドのworker数は開始前に200ms間隔で3回CPU時間の差分を測って決めます。利用可能CPU数は `os.availableParallelism()`、負荷は `os.cpus()` の累積時間を使います。3区間の最大使用率から80%目標までの空きを計算し、利用可能CPUの半分・6 workersを上限、1 workerを下限にします。測定不能時は理由付きで1にします。各実行で再計測し、同じPlaywright実行中は決定値を共有します。ファイル内の試験順序は維持し、ファイル間だけを並列化します。[CI性能検証方針](test-plans/ci-performance-test-plan.md)に計算例と確認手順を記載しています。
 
-フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。判定方法・確認項目は[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)、対象機能の試験設計は[実装状況](reports/implementation-status.md)を参照してください。
+フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。判定方法・確認項目は[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)、対象機能の試験設計は[開発レポート一覧](reports/development/README.md)を参照してください。
 
 試験の分類と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)を参照してください。
 
-上記コマンドは現行ランナーの説明です。実EXE用ランナー・test/ciの拡張は[実装状況](reports/implementation-status.md#試験の実装と振り分け)、導入後の実行契約は[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md#1-現行と導入後の実行契約)を参照してください。
+上記コマンドは現行ランナーの説明です。実EXE用ランナー・test/ciの拡張は[試験拡張の開発レポート](reports/development/2026-10-04-application-integration.md)、導入後の実行契約は[アプリケーション結合試験設計](test-plans/playwright-exe-test-plan.md#1-現行と導入後の実行契約)を参照してください。
 
 ## Windows ビルドと CI
 
@@ -61,7 +61,7 @@ cargo xtask ci
 
 ## 記録の自動生成と公開
 
-公開版の利用者向け案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、案件の要件・設計・実装・検証への対応は[開発レポート](reports/implementation-status.md#開発レポート)に置きます。詳細な公開検証は `docs/reports/validation/vX.Y.Z.md`、原データ・ログは同じ実行の `release/vX.Y.Z/validation.json` にローカル保存し、Releaseには添付しません。版別のリリースノートをリポジトリへ複製しません。
+公開版の利用者向け案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、案件の要件・設計・実装・検証への対応は[開発レポート一覧](reports/development/README.md)に置きます。詳細な公開検証は `docs/reports/validation/vX.Y.Z.md`、原データ・ログは同じ実行の `release/vX.Y.Z/validation.json` にローカル保存し、Releaseには添付しません。版別のリリースノートをリポジトリへ複製しません。
 
 テスト・ビルド結果の原本は `outputs/runs/<ID>/report.md` / `report.json` です。開発レポートには実行ID・対象コミット・原本の場所と検証MDへの参照を残し、件数・環境・ハッシュ・正常ログを転記しません。読む範囲と会話報告は[文書作成ガイド](documentation.md#検証結果の読み方と会話報告)に従います。
 
@@ -89,7 +89,7 @@ cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/
 4. 文書を含む完全なコミットSHAを取得し、利用者向けRelease本文へ `[詳しい検証記録](https://github.com/OWNER/REPO/blob/<文書コミットSHA>/docs/reports/validation/vX.Y.Z.md)` を追加します。読者向け本文を確定したUTF-8ファイルに保存し、`gh release edit vX.Y.Z --notes-file <本文ファイル>` で反映します。本文確定のために `release-record` を再実行して観測時刻を更新する必要はありません。
 5. GitHubのMD表示ページ・EXEへ到達できること、`validation.json` が添付されていないこと、本文の利用条件がその配布版に一致すること、EXEのID・サイズ・digestとタグが変わっていないことを確認します。固定リンクが未確定の状態で公開手順を完了にしません。
 
-試験・ビルドの件数は検証記録へ、引き継ぎの判断は開発レポートへ集約します。公開ごとの文書コミットは読みやすい検証MDを保存するために行い、実装状況や履歴に件数・ログを追記しません。
+試験・ビルドの件数は検証記録へ、引き継ぎの判断は開発レポートへ集約します。公開ごとの文書コミットは読みやすい検証MDを保存するために行い、開発レポートや一覧に件数・ログを転記しません。
 
 ### 次の検証担当の確認方針
 

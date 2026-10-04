@@ -19,7 +19,7 @@ Officeの数式・注記まで探せる検索、根拠に基づく順位付け�
 
 ## 要件・設計判断
 
-[元計画](../../plans/implementation-plan.md)のP4a〜P6と、現行の[Rust要求仕様](../../specifications/rust-requirements.md) R3-13〜R3-15・R3-18を参照する。
+[元計画の保存版](https://github.com/kz-oshiro/docs-search/blob/d8db3a88eebfb3d92ede697543b469e1534d6597/docs/plans/implementation-plan.md)のP4a〜P6と、現行の[Rust要求仕様](../../specifications/rust-requirements.md) R3-13〜R3-15・R3-18を参照する。
 
 ### 当時の判断・制約
 
@@ -66,4 +66,8 @@ Rustはrustfmtによる構文解析と整形、インラインJavaScriptはNode�
 
 ## 次の担当への引き継ぎ
 
-本件の新規実装は終了している。変更・再検証を依頼された場合は[実装状況](../implementation-status.md)、[開発手順](../../development.md)、[現在の試験設計](../../test-plans/office-ranking-batch-test-plan.md)から対象コミットと確認範囲を決める。旧報告の実行コマンドや未実施事項を現在の残作業として引き継がない。過去の具体的な引き継ぎ指示は元報告の保存版に残している。
+本件の新規実装は終了している。変更・再検証を依頼された場合は[開発レポート一覧](README.md)、[開発手順](../../development.md)、[現在の試験設計](../../test-plans/office-ranking-batch-test-plan.md)から対象コミットと確認範囲を決める。旧報告の実行コマンドや未実施事項を現在の残作業として引き継がない。過去の具体的な引き継ぎ指示は元報告の保存版に残している。
+
+## リリース
+
+対象リリース: [v3.0.0](https://github.com/kz-oshiro/docs-search/releases/tag/v3.0.0)。

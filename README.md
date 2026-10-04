@@ -70,8 +70,7 @@ WebView2はWindows 11や多くのWindows 10端末に入っていますが、端�
 
 ## 開発・検証に関する資料
 
-- [実装状況と開発レポート](docs/reports/implementation-status.md)：現在の作業と、案件ごとの要件・設計・実装・検証への入口
-- [実装履歴](docs/reports/implementation-history.md)：過去の案件と設計判断
+- [開発レポート一覧](docs/reports/development/README.md)：案件ごとの計画・設計判断・実装・検証・残作業
 - [開発手順](docs/development.md)：環境準備、構成、テスト・ビルド・公開の手順
 - [現行仕様](docs/specifications/rust-requirements.md)、[試験・データの対応](tests/README.md)、[文書の管理方法](docs/documentation.md)
 - [AGENTS.md](AGENTS.md)：担当者・モデルが作業前に読む資料

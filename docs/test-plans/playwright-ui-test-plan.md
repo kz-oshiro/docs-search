@@ -1,6 +1,6 @@
 # フロントエンド試験の設計と保証範囲（Playwright）
 
-実装済みのUケースと設計中のG01/G02を扱う。現在の実装状況は[実装状況](../reports/implementation-status.md#試験の実装と振り分け)を参照する。
+実装済みのUケースと設計中のG01/G02を扱う。現在の実装状況は[試験拡張の開発レポート](../reports/development/2026-10-04-application-integration.md)を参照する。
 
 現行の実行手順は[開発手順](../development.md)、機能基準は[Rust要求仕様](../specifications/rust-requirements.md)、公開版の検証結果は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)を参照する。
 
