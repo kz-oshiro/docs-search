@@ -1,6 +1,6 @@
 # 実装・設計の履歴
 
-過去の変更内容と設計判断を記録する。現在の状態と次の作業は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)を参照する。案件の詳細は開発レポート、公開版の案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、技術的な検証は[公開検証MD](validation/v3.0.4.md)へ分ける。整理前の履歴全文は[保存版](https://github.com/kz-oshiro/docs-search/blob/8894cf81e653d8917895004f323925355b95fec1/docs/reports/implementation-history.md)で参照できる。
+過去の変更内容と設計判断を記録する。現在の状態と次の作業は[実装状況](implementation-status.md)、実行手順は[開発手順](../development.md)を参照する。案件の詳細は開発レポート、公開版の案内は[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)、技術的な検証は[公開検証MD](validation/v3.0.5.md)へ分ける。整理前の履歴全文は[保存版](https://github.com/kz-oshiro/docs-search/blob/8894cf81e653d8917895004f323925355b95fec1/docs/reports/implementation-history.md)で参照できる。
 
 ## 開発レポート一覧
 

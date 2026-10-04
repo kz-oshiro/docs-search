@@ -25,7 +25,7 @@ PDF、画像内の文字、古いOffice形式（`.xls` / `.doc` / `.ppt`）は�
 
 WebView2はWindows 11や多くのWindows 10端末に入っていますが、端末の状態によっては別途導入が必要です。会社などの管理された端末では、ソフトの実行やWebView2の導入・更新が組織の設定で制限される場合があります。[WebView2の配布・更新について](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)
 
-対応OSの指定は、すべての端末での動作確認を意味しません。CPU・メモリ・文書量ごとの性能基準は未設定です。確認した環境と範囲は[公開版の検証記録](docs/reports/validation/v3.0.4.md)で案内しています。
+対応OSの指定は、すべての端末での動作確認を意味しません。CPU・メモリ・文書量ごとの性能基準は未設定です。確認した環境と範囲は[公開版の検証記録](docs/reports/validation/v3.0.5.md)で案内しています。
 
 ## 使い始める
 
