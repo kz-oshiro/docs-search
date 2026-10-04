@@ -30,6 +30,6 @@
 - CI性能改善としてアイコンの属性事前計算/描画打切り、バックエンドとフロントエンドの同時実行、CPU負荷を計測したUI worker選択を実装した。コンパイル最適化設定は変更しない。[性能検証方針](../test-plans/ci-performance-test-plan.md)に新規8件のworker計算試験と検証基盤・並列実行の確認手順を記載した。
 - 性能の合格基準は未決定。
 
-試験の担当・結果報告の分類は[試験区分と振り分け](../test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携は[保証対象外の定義](../test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照する。配置・移行の確認方針は[ディレクトリ配置](../test-plans/directory-layout-test-plan.md)と[Cargo・ネイティブUI移行](../test-plans/cargo-native-ui-test-plan.md)に保存している。
+試験の担当・結果報告の分類は[試験区分と振り分け](../test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携は[保証対象外の定義](../test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照する。
 
 次の実装は、有効な結合ケースとCargoランナー、フロントエンドのG01/G02拡張を対象とする。実装後の検証依頼ではE01の実接続を確認し、全必須工程へ進む。

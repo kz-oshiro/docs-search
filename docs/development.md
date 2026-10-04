@@ -36,7 +36,7 @@ cargo xtask ui --case "U23:"
 
 フロントエンドのworker数は開始前に200ms間隔で3回CPU時間の差分を測って決めます。利用可能CPU数は `os.availableParallelism()`、負荷は `os.cpus()` の累積時間を使います。3区間の最大使用率から80%目標までの空きを計算し、利用可能CPUの半分・6 workersを上限、1 workerを下限にします。測定不能時は理由付きで1にします。各実行で再計測し、同じPlaywright実行中は決定値を共有します。ファイル内の試験順序は維持し、ファイル間だけを並列化します。[CI性能検証方針](test-plans/ci-performance-test-plan.md)に計算例と確認手順を記載しています。
 
-フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。判定方法・確認項目は[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)、対象機能の試験設計は[実装状況](reports/implementation-status.md)を参照してください。移行の検証時だけ[移行検証方針](test-plans/cargo-native-ui-test-plan.md)も読みます。
+フロントエンド試験の選択実行は絞った診断用です。全体合格の証拠には `cargo xtask test` / `ci` の全件実行を使います。判定方法・確認項目は[フロントエンド試験設計](test-plans/playwright-ui-test-plan.md)、対象機能の試験設計は[実装状況](reports/implementation-status.md)を参照してください。
 
 試験の分類と結果報告は[試験区分と振り分け](test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)を参照してください。
 
@@ -57,7 +57,7 @@ cargo xtask ci
 
 並列試験のログには `backend-` / `frontend-` を付け、工程の開始時刻と経過時間を記録します。工程時間は重なるため総時間として加算しません。総時間は `finishedAtUnixMs - metadata.startedAtUnixMs`、外側のCargo起動・xtaskコンパイル込みは別に計測します。`ui/workers.json` にCPU各区間・平均/最大使用率・利用可能CPU数・選択worker数・fallback理由を保存し、トップレポートから参照します。proptestの件数/seedの環境変数もmetadataに残します。
 
-`target/debug` / `target/release` / staged frontend を削除しません。旧配置の target・outputs・UI cache も自動削除しません。キャッシュの保持はコンパイルの再利用であり、テストは毎回実行します。
+`target/debug` / `target/release` / staged frontend を削除しません。キャッシュの保持はコンパイルの再利用であり、テストは毎回実行します。
 
 ## 記録の自動生成と公開
 

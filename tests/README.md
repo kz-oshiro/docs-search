@@ -1,6 +1,6 @@
 # テストと文書データ
 
-全自動検証はルートの `cargo xtask test`、初回 UI 依存準備は `cargo xtask setup` です。保存データは `cargo xtask fixtures` / `Generate-Test-Data.cmd` で作ります。Python/PowerShell のランナーは撤去しました。
+全自動検証はルートの `cargo xtask test`、初回 UI 依存準備は `cargo xtask setup` です。保存データは `cargo xtask fixtures` / `Generate-Test-Data.cmd` で作ります。
 
 実行順序・失敗時の扱いは[開発手順](../docs/development.md#テスト)、worker選択・並列実行・性能比較の確認は[CI性能検証方針](../docs/test-plans/ci-performance-test-plan.md)を参照してください。
 
@@ -23,14 +23,14 @@
 
 ## 実 CLI の受け入れ
 
-| 旧ランナー | Cargo の integration test |
+| 対象 | Cargo の integration test |
 |---|---|
-| run-backend-cases.py | `core/tests/cli_backend.rs`：共通27・93拡張子の初期選択 |
-| run-context-cases.py | `core/tests/cli_context.rs`：周辺5クエリ、直接/初回索引/再利用 |
-| run-condition-cases.py | `core/tests/cli_conditions.rs`：条件31、根拠・範囲・拒否 |
-| run-office-search-cases.py | `core/tests/cli_office.rs`：Office opt-in・部分失敗・一括・順位20組 |
-| run-issue-cases.py | `core/tests/cli_issues.rs`：可視文字・位置順・更新日時・索引旧版 |
-| run-index-cases.py | `core/tests/cli_index.rs`：off・鮮度・削除・破損・利用不能 |
+| 共通検索 | `core/tests/cli_backend.rs`：共通27・93拡張子の初期選択 |
+| Excel周辺 | `core/tests/cli_context.rs`：周辺5クエリ、直接/初回索引/再利用 |
+| 条件検索 | `core/tests/cli_conditions.rs`：条件31、根拠・範囲・拒否 |
+| Office・一括・順位 | `core/tests/cli_office.rs`：Office opt-in・部分失敗・一括・順位20組 |
+| イシュー対応 | `core/tests/cli_issues.rs`：可視文字・位置順・更新日時・索引旧版 |
+| 索引 | `core/tests/cli_index.rs`：off・鮮度・削除・破損・利用不能 |
 
 個別診断は `cargo test --locked -p docs-search-core --test cli_index -- --nocapture` のように実行できます。全件の結果には mandatory UI を含む `cargo xtask test` を使います。各子 CLI はそのテストの LOCALAPPDATA だけを使用し、プロセス全体の環境を変更しません。core の既存単体/API/proptest は継続します。
 
@@ -39,7 +39,5 @@ worker数の計算・CPU差分・測定不能時のfallbackを `node --test test
 ## フロントエンド試験とアプリケーション結合試験
 
 ケースと判定方法は[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)、試験ランナーの実装済み・設計のみの区別は[実装状況](../docs/reports/implementation-status.md#試験の実装と振り分け)を参照してください。実施結果は[開発手順の実行記録](../docs/development.md#記録の自動生成と公開)と[公開・検証記録](../docs/releases/README.md)から確認します。
-
-[移行検証方針](../docs/test-plans/cargo-native-ui-test-plan.md)には、旧生成器との一度の比較、ZIP 内容/順序/日時/圧縮方式、再生成の SHA256、cold/warm の性能計測手順を履歴として保存しています。通常の実行手順は[開発手順](../docs/development.md)、移行時の結果は[公開・検証記録](../docs/releases/README.md)を参照します。
 
 試験の担当と結果報告は[試験区分と振り分け](../docs/test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携の範囲は[保証対象外の定義](../docs/test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照してください。

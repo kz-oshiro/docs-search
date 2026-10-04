@@ -1,12 +1,8 @@
 /outputs/
-# 旧配置のローカル生成物は保持
-/tests/generated/
+# ローカルのキャッシュ・生成物
 **/__pycache__/
 *.pyc
 **/node_modules/
 **/target/
-/tauri/.frontend-build/
-/tauri/docs-search-desktop.exe
-/tauri/src-tauri/gen/
 # 現行Tauri生成物
 /src-tauri/gen/

@@ -1,6 +1,5 @@
 //! Development-only deterministic corpora. No dependency on the search engine.
 pub mod common;
-pub mod compare;
 pub mod icons;
 mod random;
 pub mod specialized;

@@ -631,7 +631,7 @@ impl Run {
 fn execute() -> Result<bool> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let Some(command) = args.first().map(String::as_str) else {
-        println!("cargo xtask <test|build|ci|ui|setup|fixtures|icons|compare-fixtures|release-record>\n  ui [--case REGEX]\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  compare-fixtures --old OLD_DIRECTORY --new NEW_DIRECTORY\n  release-record --run RUN_DIRECTORY --tag vX.Y.Z --notes CHANGES.md [--repo OWNER/REPO] [--published]");
+        println!("cargo xtask <test|build|ci|ui|setup|fixtures|icons|release-record>\n  ui [--case REGEX]\n  fixtures [--profile acceptance|load] [--kind common|context|conditions|office|issues] [--output NEW_DIRECTORY]\n  release-record --run RUN_DIRECTORY --tag vX.Y.Z --notes CHANGES.md [--repo OWNER/REPO] [--published]");
         return Ok(true);
     };
     if command == "release-record" {
@@ -642,8 +642,6 @@ fn execute() -> Result<bool> {
     let mut output = None;
     let mut case = None;
     let mut open_folder = false;
-    let mut old = None;
-    let mut new = None;
     let mut options = args[1..].iter();
     while let Some(option) = options.next() {
         match option.as_str() {
@@ -658,12 +656,6 @@ fn execute() -> Result<bool> {
             "--kind" if command == "fixtures" => {
                 kind = options.next().ok_or("fixture kind required")?
             }
-            "--old" if command == "compare-fixtures" => {
-                old = Some(PathBuf::from(options.next().ok_or("old corpus required")?))
-            }
-            "--new" if command == "compare-fixtures" => {
-                new = Some(PathBuf::from(options.next().ok_or("new corpus required")?))
-            }
             "--case" if command == "ui" => {
                 case = Some(options.next().ok_or("case regex required")?.as_str())
             }
@@ -672,18 +664,7 @@ fn execute() -> Result<bool> {
             _ => return Err(format!("unknown option for {command}: {option}").into()),
         }
     }
-    if ![
-        "test",
-        "build",
-        "ci",
-        "ui",
-        "setup",
-        "fixtures",
-        "icons",
-        "compare-fixtures",
-    ]
-    .contains(&command)
-    {
+    if !["test", "build", "ci", "ui", "setup", "fixtures", "icons"].contains(&command) {
         return Err(format!("unknown command: {command}").into());
     }
     let mut run = Run::new(command)?;
@@ -698,11 +679,6 @@ fn execute() -> Result<bool> {
             run.artifacts.push(json!({"kind":"fixtures","corpus":kind,"profile":profile,"path":run.relative(&output),"seed":docs_search_test_support::SEED,"documentCount":documents,"inventoryFiles":docs_search_test_support::files(&output)?.len()}));println!("Fixtures: {}",output.display());
             if open_folder {let program=if cfg!(windows) {"explorer.exe"} else if cfg!(target_os="macos") {"open"} else {"xdg-open"};let absolute=if output.is_absolute() {output} else {std::env::current_dir()?.join(output)};Command::new(program).arg(absolute).spawn()?;}Ok(())}),
         "icons"=>run.local("icons",|run|icons::generate(&run.root.join("src-tauri/icons"))),
-        "compare-fixtures"=>run.local("fixture-comparison",|run|{
-            let comparison=docs_search_test_support::compare::fixtures(&old.ok_or("--old is required")?,&new.ok_or("--new is required")?)?;
-            let path=run.dir.join("fixture-comparison.json");fs::write(&path,serde_json::to_string_pretty(&comparison)?+"\n")?;run.artifacts.push(json!({"kind":"fixture-comparison","path":run.relative(&path)}));
-            if comparison["sameContract"]==true {Ok(())} else {Err("fixture contracts differ; inspect fixture-comparison.json".into())}
-        }),
         _=>unreachable!()
     };
     run.report(success)

@@ -12,7 +12,7 @@
 
 2026-10-03追記（Playwright導入時点）: [Playwright導入報告](implementation-report-playwright.md)と [自動/手動境界](../test-plans/playwright-ui-test-plan.md)を追加した。この時点ではヘッドレスUI試験コードの実行は未実施。従来の自動検証結果をUI成功へ読み替えない。
 
-2026-10-03追記（ローカル移行時点）: PowerShell 版を [docs-search-ps](https://github.com/kz-oshiro/docs-search-ps) へ分離するローカル移行を実装・静的確認した。コピーした本体・共有テストデータはハッシュで照合した。この時点は自動テスト、Rust ビルド、GUI 確認、リモート反映が未実施だった。移行手順は [PowerShell 移行計画](../plans/powershell-repository-migration-plan.md)、移行記録は同リポジトリの `docs/migration-record.md` に記載した。その後、PowerShell版のテスト・配布ZIP作成と [v1.0.0公開](https://github.com/kz-oshiro/docs-search-ps/releases/tag/v1.0.0)を完了した。
+2026-10-03追記（ローカル移行時点）: PowerShell 版を [docs-search-ps](https://github.com/kz-oshiro/docs-search-ps) へ分離するローカル移行を実装・静的確認した。コピーした本体・共有テストデータはハッシュで照合した。この時点は自動テスト、Rust ビルド、GUI 確認、リモート反映が未実施だった。移行手順は [PowerShell 移行計画の保存版](https://github.com/kz-oshiro/docs-search/blob/059ba7540fbdc762feb5010245b1d6e31a71c716/docs/plans/powershell-repository-migration-plan.md)、移行記録は同リポジトリの `docs/migration-record.md` に記載した。その後、PowerShell版のテスト・配布ZIP作成と [v1.0.0公開](https://github.com/kz-oshiro/docs-search-ps/releases/tag/v1.0.0)を完了した。
 
 2026-10-03追記（移行文書レビュー時点）: PowerShell の確認範囲・保存用出力・再開段階と、Rust の独立したケース原本・確認コマンドの作業ディレクトリ・自動テスト/配布ビルドの入口を修正した。P0 の予約入力拒否と P2 の書式未対応という古い確認条件も、現在の P3 / イシュー対応に合わせた。ソース・設定・生成器・ケース原本は変更せず、文書の静的確認だけを実施した。この時点は移行後の自動テスト・ビルド・GUI・リモート反映が未実施だった。
 
