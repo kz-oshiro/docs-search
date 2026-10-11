@@ -315,7 +315,13 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
                                     .is_some_and(|version| !version.is_empty())
                                 && launch["portOwner"]["rootCreated"].is_string()
                                 && executable.as_ref().is_some_and(|exe| {
-                                    recorded_path_matches(&launch["executable"], exe)
+                                    launched_executable_matches(
+                                        launch,
+                                        exe,
+                                        dir,
+                                        id,
+                                        report["metadata"]["productVersion"].as_str().unwrap_or(""),
+                                    )
                                 })
                                 && recorded_path_matches(
                                     &launch["profile"],
@@ -424,6 +430,26 @@ pub fn complete(root: &Path, dir: &Path, report: &mut Value) {
             report["success"] = json!(false);
         }
     }
+}
+
+fn launched_executable_matches(
+    launch: &Value,
+    executable: &Path,
+    dir: &Path,
+    id: &str,
+    version: &str,
+) -> bool {
+    if id != "E01" {
+        return recorded_path_matches(&launch["executable"], executable);
+    }
+    let renamed = dir.join("exe/E01/renamed-application.exe");
+    recorded_path_matches(&launch["executable"], &renamed)
+        && digest(&renamed)
+            .ok()
+            .zip(digest(executable).ok())
+            .is_some_and(|(copy, original)| copy == original)
+        && launch["nativeWindow"]["pid"] == launch["pid"]
+        && launch["nativeWindow"]["title"] == format!("docs-search v{version}")
 }
 
 fn recorded_path_matches(value: &Value, expected: &Path) -> bool {
@@ -536,6 +562,49 @@ pub fn overview(report: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renamed_launch_requires_identical_bytes_and_the_owned_native_title() {
+        let dir = docs_search_test_support::TempDir::new("renamed-title");
+        let executable = dir.path().join("docs-search-desktop-v1.2.3.exe");
+        let renamed = dir.path().join("exe/E01/renamed-application.exe");
+        fs::create_dir_all(renamed.parent().unwrap()).unwrap();
+        fs::write(&executable, b"tested executable").unwrap();
+        fs::copy(&executable, &renamed).unwrap();
+        let valid = json!({"pid":42,"executable":renamed,
+            "nativeWindow":{"pid":42,"title":"docs-search v1.2.3"}});
+        assert!(launched_executable_matches(
+            &valid,
+            &executable,
+            dir.path(),
+            "E01",
+            "1.2.3"
+        ));
+        for (pointer, value) in [
+            ("/nativeWindow/title", json!("docs-search v1.2.4")),
+            ("/nativeWindow/pid", json!(43)),
+            ("/nativeWindow", Value::Null),
+            ("/executable", json!(executable)),
+        ] {
+            let mut invalid = valid.clone();
+            *invalid.pointer_mut(pointer).unwrap() = value;
+            assert!(!launched_executable_matches(
+                &invalid,
+                &executable,
+                dir.path(),
+                "E01",
+                "1.2.3"
+            ));
+        }
+        fs::write(&renamed, b"different executable").unwrap();
+        assert!(!launched_executable_matches(
+            &valid,
+            &executable,
+            dir.path(),
+            "E01",
+            "1.2.3"
+        ));
+    }
 
     #[test]
     fn recorded_paths_require_the_same_location() {

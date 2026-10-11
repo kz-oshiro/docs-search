@@ -187,6 +187,10 @@ fn read_json(path: &Path) -> Result<Value> {
 
 fn publication_issues(snapshot: &Value, target: &str, artifact: &Value) -> Vec<String> {
     let mut issues = vec![];
+    let expected_name = snapshot["requestedTag"]
+        .as_str()
+        .and_then(|tag| tag.strip_prefix('v'))
+        .map(crate::executable_name);
     for (valid, reason) in [
         (
             snapshot["remoteTag"] == target,
@@ -203,6 +207,12 @@ fn publication_issues(snapshot: &Value, target: &str, artifact: &Value) -> Vec<S
         (
             snapshot["asset"]["state"] == "uploaded",
             "EXE asset is not uploaded",
+        ),
+        (
+            expected_name
+                .as_deref()
+                .is_some_and(|name| snapshot["asset"]["name"] == name),
+            "uploaded EXE name differs from the release version",
         ),
         (
             snapshot["asset"]["size"] == artifact["bytes"],
@@ -266,11 +276,11 @@ fn observe(
         })
     };
     let main = sha("refs/heads/main").unwrap_or_default();
-    let asset = release["assets"].as_array().and_then(|assets| {
-        assets
-            .iter()
-            .find(|asset| asset["name"] == "docs-search-desktop.exe")
-    });
+    let expected_name =
+        crate::executable_name(tag.strip_prefix('v').ok_or("tag must start with v")?);
+    let asset = release["assets"]
+        .as_array()
+        .and_then(|assets| assets.iter().find(|asset| asset["name"] == expected_name));
     let mut snapshot = json!({"checkedAtUnixMs":crate::unix_ms(),"requestedTag":tag,"url":release["html_url"],"tagName":release["tag_name"],
         "draft":release["draft"],"prerelease":release["prerelease"],"publishedAt":release["published_at"],
         "latestTag":latest_tag,"isLatest":latest_tag == tag,
@@ -357,6 +367,11 @@ pub fn execute(args: &[String]) -> Result<bool> {
         &dir,
         artifact["path"].as_str().ok_or("missing EXE path")?,
     )?;
+    if exe.file_name().and_then(|name| name.to_str())
+        != Some(crate::executable_name(tag.strip_prefix('v').unwrap()).as_str())
+    {
+        return Err("EXE filename differs from the tested product version".into());
+    }
     if fs::metadata(&exe)?.len() != artifact["bytes"].as_u64().ok_or("missing EXE size")?
         || digest(&exe)? != artifact["sha256"].as_str().ok_or("missing EXE SHA256")?
     {
@@ -516,13 +531,15 @@ mod tests {
     #[test]
     fn publication_requires_uploaded_bytes_and_the_exact_tag() {
         let artifact = json!({"sha256":"abc","bytes":100});
-        let valid = json!({"remoteTag":"commit","requestedTag":"v1","tagName":"v1","draft":false,"prerelease":false,
-            "asset":{"state":"uploaded","size":100,"digest":"sha256:abc"}});
+        let valid = json!({"remoteTag":"commit","requestedTag":"v1.2.3","tagName":"v1.2.3","draft":false,"prerelease":false,
+            "asset":{"name":"docs-search-desktop-v1.2.3.exe","state":"uploaded","size":100,"digest":"sha256:abc"}});
         assert!(publication_issues(&valid, "commit", &artifact).is_empty());
         for (pointer, value) in [
             ("/remoteTag", json!("old")),
             ("/asset/digest", Value::Null),
             ("/asset/size", json!(99)),
+            ("/asset/name", json!("docs-search-desktop.exe")),
+            ("/asset/name", json!("docs-search-desktop-v1.2.4.exe")),
             ("/draft", json!(true)),
         ] {
             let mut invalid = valid.clone();
@@ -532,5 +549,10 @@ mod tests {
                 "{pointer}"
             );
         }
+        let mut next = valid;
+        next["requestedTag"] = json!("v4.5.6");
+        next["tagName"] = json!("v4.5.6");
+        next["asset"]["name"] = json!("docs-search-desktop-v4.5.6.exe");
+        assert!(publication_issues(&next, "commit", &artifact).is_empty());
     }
 }

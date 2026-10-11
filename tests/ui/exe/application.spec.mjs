@@ -3,6 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 test('E01: 配布Release資材と実Tauri購読が起動する', async ({ app }) => {
+  expect(path.basename(process.env.DOCS_SEARCH_EXE)).toBe(`docs-search-desktop-v${app.productVersion}.exe`);
+  expect(path.basename(app.executable)).toBe('renamed-application.exe');
+  expect((await app.nativeWindow()).title).toBe(`docs-search v${app.productVersion}`);
   await expect(app.page.locator('#root')).toBeEditable();
   await expect(app.page.locator('#query')).toBeEditable();
   await expect(app.page.locator('#status')).toHaveText('待機中');

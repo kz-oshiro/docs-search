@@ -52,7 +52,7 @@ cargo xtask build
 cargo xtask ci
 ```
 
-`build` は frontend の8資材だけを `target/frontend-dist/` へ内容が変わった場合にコピーし、`cargo build --release --locked -p docs-search-desktop` を実行します。成功した現在の EXE だけを実行別 `outputs/runs/<実行ID>/artifacts/docs-search-desktop.exe` に保存し、SHA256 とサイズを記録します。Node/npm はこのビルドに不要です。実行中の EXE を再ビルドするときは閉じてください。
+`build` は frontend の8資材だけを `target/frontend-dist/` へ内容が変わった場合にコピーし、`cargo build --release --locked -p docs-search-desktop` を実行します。成功した現在の EXE だけを実行別 `outputs/runs/<実行ID>/artifacts/docs-search-desktop-vX.Y.Z.exe` に保存し、SHA256 とサイズを記録します。`X.Y.Z` はデスクトップのCargo製品版から生成し、内部のCargo出力名は変えません。タイトルバーもビルドした製品版から `docs-search vX.Y.Z` に設定します。Node/npm はこのビルドに不要です。実行中の EXE を再ビルドするときは閉じてください。
 
 `ci` は`test`と同じ必須工程です。独立した個別テスト群を失敗後も続け、その証跡がすべて成功した場合だけReleaseをビルドし、結合試験で使用した同じEXEを成果物にします。結合ケースも独立した残りを続け、全体の失敗を一つの終了コードで返します。GitHub Actions はまだ作成していません。push、タグ、Release は検証入口に含めず、ユーザーの公開依頼を受けて別途行います。
 
@@ -87,7 +87,7 @@ cargo xtask release-record --run outputs/runs/<ID> --tag vX.Y.Z --notes outputs/
 公開依頼の範囲で次の順に進めます。既存版の本文整理だけなら、既存の検証記録を使い、EXEを作り直したりタグを動かしたりしません。
 
 1. main/タグをpushし、`gh release create --verify-tag --notes-file <生成先>/release-notes.md` で同じ実行のEXEだけを添付して公開します。`validation.json` はローカルに保持します。検証MDは後続手順でリポジトリから案内します。既存のMD添付は履歴として保持できますが、新しい公開記録の正本はリポジトリのMDとします。
-2. 同じ `release-record` に `--published` を付けて、公開状態をread-onlyの `gh api` と `git ls-remote` で照合します。公開照合後の生成JSONもローカルに保持し、添付しません。不一致・取得失敗は理由を保存し、非ゼロで終了します。
+2. 同じ `release-record` に `--published` を付けて、公開状態をread-onlyの `gh api` と `git ls-remote` で照合します。添付名はタグと同じ製品版の `docs-search-desktop-vX.Y.Z.exe` を必須とし、サイズ・digestも照合します。公開照合後の生成JSONもローカルに保持し、添付しません。不一致・取得失敗は理由を保存し、非ゼロで終了します。
 3. 公開照合後の生成 `validation.md` を `docs/reports/validation/vX.Y.Z.md` へ保存し、コミット・pushします。対象Issueへ検証MD・コミット・Releaseの参照を追加します。記録内の照合時刻・remote mainは観測時点の値で、後続の文書コミットと一致する必要はありません。
 4. 文書を含む完全なコミットSHAを取得し、利用者向けRelease本文の「変更点」末尾へ `[詳細はこちら](https://github.com/OWNER/REPO/blob/<文書コミットSHA>/docs/reports/validation/vX.Y.Z.md)` だけを追加します。「確認した範囲」セクションや説明文は追加しません。読者向け本文を確定したUTF-8ファイルに保存し、`gh release edit vX.Y.Z --notes-file <本文ファイル>` で反映します。本文確定のために `release-record` を再実行して観測時刻を更新する必要はありません。
 5. GitHubのMD表示ページ・EXEへ到達できること、`validation.json` が添付されていないこと、本文が「変更点」と末尾の「詳細はこちら」リンクで構成されていること、EXEのID・サイズ・digestとタグが変わっていないことを確認します。固定リンクが未確定の状態で公開手順を完了にしません。

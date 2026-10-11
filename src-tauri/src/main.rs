@@ -404,6 +404,13 @@ async fn save_report(report: Report, format: Format) -> Result<bool, String> {
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            let title = format!("docs-search v{}", app.package_info().version);
+            app.get_webview_window("main")
+                .ok_or("main window is missing")?
+                .set_title(&title)?;
+            Ok(())
+        })
         .manage(SearchState(Mutex::new(SearchSessions::default())))
         .invoke_handler(tauri::generate_handler![
             pick_folder,

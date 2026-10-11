@@ -2,7 +2,7 @@
 
 パソコン内の文書から言葉を探し、**どのファイルの、どの場所に書かれているか**を確認するWindows向けのツールです。複数のフォルダをまとめて検索し、結果を一覧で確認・コピー・保存できます。
 
-**[最新版をダウンロードする](https://github.com/kz-oshiro/docs-search/releases/latest)** — 「Assets」にある `docs-search-desktop.exe` がアプリ本体です。「Source code」や検証用ファイルをダウンロードする必要はありません。
+**[最新版をダウンロードする](https://github.com/kz-oshiro/docs-search/releases/latest)** — 「Assets」にある `docs-search-desktop-vX.Y.Z.exe` がアプリ本体です。`X.Y.Z` にはその版のバージョンが入ります。「Source code」や検証用ファイルをダウンロードする必要はありません。
 
 ## できること・対象文書
 
@@ -30,8 +30,9 @@ WebView2はWindows 11や多くのWindows 10端末に入っていますが、端�
 
 ## 使い始める
 
-1. [最新版のRelease](https://github.com/kz-oshiro/docs-search/releases/latest)を開き、「Assets」から `docs-search-desktop.exe` を保存します。
+1. [最新版のRelease](https://github.com/kz-oshiro/docs-search/releases/latest)を開き、「Assets」から `docs-search-desktop-vX.Y.Z.exe` を保存します。
 2. 保存したEXEをダブルクリックします。アプリ本体のインストーラーはありません。WebView2が不足する場合は先に導入してください。
+   起動した版はウィンドウ上部のタイトルバーに `docs-search vX.Y.Z` と表示されます。
 3. 検索するフォルダを指定し、探したい言葉を入力します。必要なら対象の拡張子や除外フォルダを選びます。
 4. 検索を開始し、結果に表示されたファイル名・場所・抜粋を確認します。
 

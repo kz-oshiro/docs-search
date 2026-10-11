@@ -1,9 +1,17 @@
-param([ValidateSet('owner', 'snapshot', 'close', 'cleanup')][string]$Action)
+param([ValidateSet('owner', 'snapshot', 'window', 'close', 'cleanup')][string]$Action)
 $ErrorActionPreference = 'Stop'
 $processes = @(Get-CimInstance Win32_Process)
 $rootId = [int]$env:DOCS_SEARCH_CHILD_PID
 $root = $processes | Where-Object { $_.ProcessId -eq $rootId }
 if ($root -and $env:DOCS_SEARCH_CHILD_CREATED -and $root.CreationDate.ToString('o') -ne $env:DOCS_SEARCH_CHILD_CREATED) { throw 'EXE PID was reused; refusing process operations' }
+if ($Action -eq 'window') {
+    if (-not $root) { throw 'The launched EXE is no longer running' }
+    $native = Get-Process -Id $rootId
+    $native.Refresh()
+    if (-not $native.MainWindowHandle) { throw 'The launched EXE has no native window' }
+    @{ pid = $rootId; title = $native.MainWindowTitle } | ConvertTo-Json -Compress
+    exit 0
+}
 if ($Action -in @('cleanup', 'close')) {
     # Windows PowerShell 5.1 emits a JSON array as one pipeline object. Wrapping
     # ConvertFrom-Json in @() would nest it and prevent per-PID identity matching.
@@ -14,8 +22,9 @@ if ($Action -in @('cleanup', 'close')) {
             if ($Action -eq 'close') {
                 if ($entry.id -eq $rootId) {
                     $native = Get-Process -Id $entry.id
-                    if ($native.MainWindowTitle -ne 'docs-search' -or -not $native.CloseMainWindow()) { throw 'The launched EXE has no closeable product window' }
-                    @{ pid = $rootId; title = $native.MainWindowTitle } | ConvertTo-Json -Compress
+                    $title = $native.MainWindowTitle
+                    if (-not $env:DOCS_SEARCH_EXPECTED_TITLE -or $title -cne $env:DOCS_SEARCH_EXPECTED_TITLE -or -not $native.CloseMainWindow()) { throw 'The launched EXE has no closeable product window with the expected version' }
+                    @{ pid = $rootId; title = $title } | ConvertTo-Json -Compress
                 }
             } else {
                 Stop-Process -Id $entry.id -Force -ErrorAction SilentlyContinue

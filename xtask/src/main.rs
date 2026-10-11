@@ -71,6 +71,9 @@ fn npm() -> &'static str {
         "npm"
     }
 }
+fn executable_name(version: &str) -> String {
+    format!("docs-search-desktop-v{version}.exe")
+}
 impl Run {
     fn new(command: &str) -> Result<Self> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -146,6 +149,13 @@ impl Run {
             .unwrap_or(path)
             .to_string_lossy()
             .replace('\\', "/")
+    }
+    fn executable(&self) -> PathBuf {
+        self.dir.join("artifacts").join(executable_name(
+            self.metadata["productVersion"]
+                .as_str()
+                .expect("Cargo desktop version is a string"),
+        ))
     }
     fn skipped(&mut self, name: &str, reason: &str) {
         println!("SKIP {name}: {reason}");
@@ -439,7 +449,7 @@ impl Run {
     fn exe(&mut self) -> bool {
         let folder = self.root.join("tests/ui");
         let artifacts = self.dir.join("exe");
-        let executable = self.dir.join("artifacts/docs-search-desktop.exe");
+        let executable = self.executable();
         let prepared = self.local("exe-fixtures", |run| {
             fs::create_dir(&artifacts)?;
             let common = run.dir.join("corpus");
@@ -458,6 +468,7 @@ impl Run {
                 serde_json::to_vec_pretty(&json!({
                     "common":common,"context":context,"office":office,"issues":issues,
                     "seed":docs_search_test_support::SEED,
+                    "productVersion":run.metadata["productVersion"],
                 }))?,
             )?;
             run.artifacts.push(
@@ -641,7 +652,18 @@ impl Run {
         ) {
             return false;
         }
-        self.local("desktop-artifact",|run|{let source=run.target.join("release/docs-search-desktop.exe");let folder=run.dir.join("artifacts");fs::create_dir(&folder)?;let destination=folder.join("docs-search-desktop.exe");fs::copy(&source,&destination)?;let sha256=digest(&destination)?;run.artifacts.push(json!({"kind":"windows-exe","path":run.relative(&destination),"sha256":sha256,"bytes":fs::metadata(&destination)?.len()}));Ok(())})
+        self.local("desktop-artifact", |run| {
+            let source = run.target.join("release/docs-search-desktop.exe");
+            let destination = run.executable();
+            fs::create_dir(destination.parent().unwrap())?;
+            fs::copy(&source, &destination)?;
+            let sha256 = digest(&destination)?;
+            run.artifacts.push(
+                json!({"kind":"windows-exe","path":run.relative(&destination),
+                "sha256":sha256,"bytes":fs::metadata(&destination)?.len()}),
+            );
+            Ok(())
+        })
     }
     fn setup(&mut self) -> bool {
         let folder = self.root.join("tests/ui");

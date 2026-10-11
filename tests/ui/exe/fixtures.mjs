@@ -31,13 +31,24 @@ export const test = base.extend({
     const profile = path.join(directory, 'webview2');
     await Promise.all([documents, localAppData, profile].map(folder => fs.mkdir(folder)));
     const corpus = JSON.parse(await fs.readFile(path.join(artifacts, 'corpus.json'), 'utf8'));
+    const expectedTitle = `docs-search v${corpus.productVersion}`;
+    const executable = id === 'E01' ? path.join(directory, 'renamed-application.exe') : process.env.DOCS_SEARCH_EXE;
+    // E01 proves the native title comes from the build, even after renaming.
+    if (id === 'E01') await fs.copyFile(process.env.DOCS_SEARCH_EXE, executable);
     const errors = [];
     const sessions = [];
     let child, browser, page;
     let stopping = false;
     const app = {
-      documents, localAppData, profile, directory,
+      documents, localAppData, profile, directory, executable, productVersion: corpus.productVersion,
       get page() { return page; },
+      async nativeWindow() {
+        const { stdout } = await execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', processScript, 'window'], {
+          env: { ...process.env, DOCS_SEARCH_CHILD_PID: String(child.pid), DOCS_SEARCH_CHILD_CREATED: sessions.at(-1).portOwner.rootCreated },
+          windowsHide: true, timeout: 10_000,
+        });
+        return sessions.at(-1).nativeWindow = JSON.parse(stdout);
+      },
       async copy(kind, relative, destination = '') {
         const target = path.join(documents, destination);
         await fs.cp(path.join(corpus[kind], relative), target, { recursive: true, force: false, errorOnExist: true });
@@ -72,6 +83,7 @@ export const test = base.extend({
         if (!child) return;
         stopping = true;
         const env = { ...process.env, DOCS_SEARCH_CHILD_PID: String(child.pid),
+          DOCS_SEARCH_EXPECTED_TITLE: expectedTitle,
           DOCS_SEARCH_CHILD_CREATED: sessions.at(-1).portOwner?.rootCreated ?? '' };
         const snapshotPath = path.join(directory, `processes-${sessions.length}.json`);
         // Snapshot identities before closing so orphaned WebView2 children can be
@@ -100,10 +112,10 @@ export const test = base.extend({
       async launch() {
         stopping = false;
         const port = await freePort();
-        const session = { pid: null, port, profile, localAppData, executable: process.env.DOCS_SEARCH_EXE, stdout: '', stderr: '' };
+        const session = { pid: null, port, profile, localAppData, executable, stdout: '', stderr: '' };
         sessions.push(session);
-        child = spawn(process.env.DOCS_SEARCH_EXE, [], {
-          cwd: path.dirname(process.env.DOCS_SEARCH_EXE), windowsHide: true,
+        child = spawn(executable, [], {
+          cwd: path.dirname(executable), windowsHide: true,
           env: { ...process.env, LOCALAPPDATA: localAppData,
             WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port} --remote-debugging-address=127.0.0.1`,
             WEBVIEW2_USER_DATA_FOLDER: profile },

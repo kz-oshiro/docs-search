@@ -46,6 +46,8 @@ worker数の計算・CPU差分・測定不能時のfallbackを `node --test test
 
 ## フロントエンド試験とアプリケーション結合試験
 
+版表示（#35）は既存E01で配布名と改名後のネイティブタイトルを確認し、改名コピーのバイト一致を生成レポートの必須条件にします。公開名とタグの不一致は `xtask/src/release.rs` の契約試験で拒否します。タイトルは所有PIDからプログラムで読み取り、OS外枠の見た目の確認とは区別します。
+
 ケースと判定方法は[フロントエンド試験設計](../docs/test-plans/playwright-ui-test-plan.md)、試験ランナーの実装済み・設計のみの区別は[試験拡張のIssue](https://github.com/kz-oshiro/docs-search/issues/18)を参照してください。実施結果は[開発手順の実行記録](../docs/development.md#記録の自動生成と公開)と[GitHub Releases](https://github.com/kz-oshiro/docs-search/releases)から確認します。
 
 試験の担当と結果報告は[試験区分と振り分け](../docs/test-plans/playwright-exe-test-plan.md#試験区分と振り分けの基本方針)、OS連携の範囲は[保証対象外の定義](../docs/test-plans/playwright-exe-test-plan.md#5-os連携の保証対象外)を参照してください。
