@@ -15,6 +15,10 @@ for (const theme of ['sun', 'amber', 'sunset', 'teal', 'blue', 'forest']) {
   test(`U32: ${theme}テーマは即時反映し再読込で復元`, async ({ ui, page }) => {
     await ui.open();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'sun');
+    if (theme === 'sun') {
+      await expect(page.locator('#theme-color option[value="sun"]')).toHaveText('サンオレンジ（デフォルト）');
+      expect(await page.locator('#theme-color option').evaluateAll(nodes => nodes.map(node => node.value))).toEqual(Object.keys(themeColors));
+    }
     await page.locator('#appearance-settings summary').click();
     await page.locator('#theme-color').selectOption(theme);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -150,6 +154,73 @@ for (const width of [1100, 760]) {
 test(`U39: G01 幅${width}で構造・Tab/Esc・フォーカス復帰を確認`, async ({ ui, page }) => {
   await page.setViewportSize({ width, height: 900 });
   await ui.open();
+  const mode = page.locator('#search-mode');
+  const query = page.locator('#query');
+  await mode.focus();
+  await mode.press('Tab');
+  await expect(query).toBeFocused();
+  await query.press('Tab');
+  await expect(page.locator('#root')).toBeFocused();
+  const modeBox = await mode.boundingBox();
+  const queryBox = await query.boundingBox();
+  const dimensions = await mode.evaluate(node => {
+    const style = getComputedStyle(node);
+    const measure = document.createElement('span');
+    measure.style.font = style.font;
+    measure.style.letterSpacing = style.letterSpacing;
+    measure.style.whiteSpace = 'pre';
+    document.body.append(measure);
+    const longest = Math.max(...Array.from(node.options, option => {
+      measure.textContent = option.text;
+      return measure.getBoundingClientRect().width;
+    }));
+    measure.remove();
+    return { longest, paddingLeft: parseFloat(style.paddingLeft), paddingRight: parseFloat(style.paddingRight),
+      borders: parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth), height: node.getBoundingClientRect().height };
+  });
+  expect(dimensions.paddingRight).toBeGreaterThanOrEqual(32);
+  expect(dimensions.height).toBe(44);
+  const required = dimensions.longest + dimensions.paddingLeft + dimensions.paddingRight + dimensions.borders;
+  expect(modeBox.width).toBeGreaterThanOrEqual(required - 1);
+  expect(modeBox.width).toBeLessThanOrEqual(required + 24);
+  for (const value of ['conditions', 'batch', 'standard']) {
+    await mode.selectOption(value);
+    const box = await mode.boundingBox();
+    expect(box).toEqual(modeBox);
+  }
+  expect(await query.boundingBox()).toEqual(queryBox);
+  if (width === 1100) {
+    expect(queryBox.y).toBeCloseTo(modeBox.y, 0);
+    expect(queryBox.x).toBeGreaterThan(modeBox.x + modeBox.width);
+    expect(queryBox.width).toBeGreaterThan(modeBox.width);
+  } else {
+    expect(queryBox.y).toBeGreaterThanOrEqual(modeBox.y + modeBox.height);
+    expect(queryBox.x).toBeCloseTo(modeBox.x, 0);
+  }
+  async function checkFolderLayout() {
+    const form = await page.locator('#search-form').evaluate(node => {
+      const box = node.getBoundingClientRect(), style = getComputedStyle(node);
+      return { left: box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft),
+        right: box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight) };
+    });
+    let previousBottom = queryBox.y + queryBox.height;
+    for (const row of await page.locator('#root-folders .folder-row').all()) {
+      const box = await row.boundingBox();
+      expect(box.y).toBeGreaterThanOrEqual(previousBottom);
+      expect(box.x).toBeCloseTo(form.left, 0);
+      expect(box.x + box.width).toBeCloseTo(form.right, 0);
+      previousBottom = box.y + box.height;
+      const input = await row.locator('input').boundingBox();
+      const browse = await row.locator('.folder-browse').boundingBox();
+      expect(input.x + input.width).toBeLessThanOrEqual(browse.x);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await checkFolderLayout();
+  await page.locator('#add-root').click();
+  await checkFolderLayout();
+  expect(await query.boundingBox()).toEqual(queryBox);
+  await page.locator('#root-folders input').nth(1).fill('C:\\other');
   const search = await ui.search();
   await ui.started(search);
   await ui.finish(search, [editableHit()]);

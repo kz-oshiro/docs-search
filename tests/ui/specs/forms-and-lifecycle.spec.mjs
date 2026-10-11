@@ -25,14 +25,24 @@ test('U02: 必須入力と拡張子0件では要求を送らない', async ({ ui
   await expect(page.locator('#root-error')).not.toBeEmpty();
   await page.locator('#root').fill('C:\\fixtures');
   await page.locator('#query').fill('');
-  await page.locator('#search').click();
+  await expect(page.locator('label[for="query"]')).toHaveText('検索語');
+  await expect(page.locator('#query')).toHaveAttribute('aria-describedby', 'query-error');
+  await page.locator('#query').press('Enter');
   await expect(page.locator('#query-error')).not.toBeEmpty();
+  expect(await ui.calls('start_search')).toEqual([]);
   await page.locator('#query').fill('beacon');
   await page.locator('.extension-picker > summary').click();
   await page.locator('#clear-all-extensions').click();
   await page.locator('#search').click();
   await expect(page.locator('#extensions-error')).not.toBeEmpty();
   expect(await ui.calls('start_search')).toEqual([]);
+  await page.locator('#select-all-extensions').click();
+  await page.locator('#query').press('Enter');
+  const search = await ui.lastCall('start_search');
+  expect(search.request).toMatchObject({ query: 'beacon', querySpec: null });
+  await ui.started(search);
+  await ui.finish(search);
+  expect(await ui.calls('start_search')).toHaveLength(1);
 });
 
 test('U03: 複数ルート・除外・独立オプションを境界へ渡す', async ({ ui, page }) => {
@@ -59,9 +69,28 @@ test('U03: 複数ルート・除外・独立オプションを境界へ渡す', 
 
 test('U04: 高度な条件の行と判定範囲を保持する', async ({ ui, page }) => {
   await ui.open();
+  await page.locator('#query').fill('保持する検索語');
   await page.locator('#search-mode').selectOption('conditions');
   await expect(page.locator('#normal-query-field')).toBeHidden();
+  await expect(page.locator('#query')).toBeDisabled();
   await expect(page.locator('#advanced-conditions')).toBeVisible();
+  await expect(page.locator('#batch-input')).toBeHidden();
+  await page.locator('#search-mode').selectOption('batch');
+  await expect(page.locator('#normal-query-field')).toBeHidden();
+  await expect(page.locator('#query')).toBeDisabled();
+  await expect(page.locator('#advanced-conditions')).toBeHidden();
+  await expect(page.locator('#batch-input')).toBeVisible();
+  await page.locator('#search-mode').selectOption('standard');
+  await expect(page.locator('#normal-query-field')).toBeVisible();
+  await expect(page.locator('#query')).toBeEnabled();
+  await expect(page.locator('#query')).toHaveValue('保持する検索語');
+  await expect(page.locator('#advanced-conditions')).toBeHidden();
+  await expect(page.locator('#batch-input')).toBeHidden();
+  await page.locator('#search-mode').selectOption('conditions');
+  const scopeWidth = await page.locator('#condition-scope').evaluate(node => ({
+    select: node.getBoundingClientRect().width, field: node.parentElement.getBoundingClientRect().width,
+  }));
+  expect(scopeWidth.select).toBeCloseTo(scopeWidth.field, 0);
   await page.locator('#all-terms').fill('alpha\nbeta');
   await page.locator('#any-terms').fill('keep');
   await page.locator('#not-terms').fill('skip');

@@ -20,7 +20,7 @@
           <div class="appearance-panel">
             <label for="theme-color"><span class="theme-color-dot" aria-hidden="true"></span>テーマカラー</label>
             <select id="theme-color" aria-describedby="theme-save-status">
-              <option value="sun">サンオレンジ（公式）</option>
+              <option value="sun">サンオレンジ（デフォルト）</option>
               <option value="amber">アンバー</option>
               <option value="sunset">夕焼け</option>
               <option value="teal">青緑</option>
@@ -33,7 +33,10 @@
       </div>
     </header>
     <form id="search-form">
-      <div class="field search-mode-field"><label for="search-mode">検索方法</label><select id="search-mode"><option value="standard">通常検索</option><option value="conditions">高度な検索</option><option value="batch">一括検索</option></select></div>
+      <div class="search-fields">
+        <div class="field search-mode-field"><label for="search-mode">検索方法</label><select id="search-mode"><option value="standard">通常検索</option><option value="conditions">高度な検索</option><option value="batch">一括検索</option></select></div>
+        <div id="normal-query-field" class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
+      </div>
       <fieldset id="batch-input" class="field" hidden>
         <legend>複数ID・語句の一括検索</legend>
         <label for="batch-terms">検索語（1行に1語、重複を除いて256語まで）</label><textarea id="batch-terms" rows="5" aria-describedby="batch-count batch-error"></textarea>
@@ -42,10 +45,7 @@
         <small>識別子は英字・数字・アンダースコア（先頭は英字またはアンダースコア）。TAB_01 と TAB_010 を区別します。日本語・空白・記号を含む行は通常の文字列検索を選んでください。</small>
         <small id="batch-error" class="error" role="alert"></small>
       </fieldset>
-      <div class="search-fields">
-        <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
-        <div id="normal-query-field" class="field"><label for="query">検索語</label><input id="query" type="text" autocomplete="off" placeholder="探したい言葉を入力" aria-describedby="query-error"><small id="query-error" class="error" role="alert"></small></div>
-      </div>
+      <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
       <fieldset id="advanced-conditions" class="field advanced-conditions" hidden aria-describedby="advanced-error">
         <legend>高度な検索条件</legend>
         <p class="advanced-help">1行を1語句として扱います。空白や AND / OR の文字も語句の一部です。</p>
