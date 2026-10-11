@@ -226,7 +226,7 @@ test(`U39: G01 幅${width}で構造・Tab/Esc・フォーカス復帰を確認`,
   await ui.finish(search, [editableHit()]);
   await page.locator('#root').focus();
   await page.locator('#root').press('Tab');
-  await expect(page.locator('#root-folders .folder-browse')).toBeFocused();
+  await expect(page.locator('#root-folders .folder-browse').first()).toBeFocused();
   const settings = page.locator('#appearance-settings summary');
   await settings.focus();
   await settings.press('Enter');
