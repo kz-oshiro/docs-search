@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
+mod folder_dialog;
+
 struct ActiveSearch {
     id: String,
     cancel: Arc<AtomicBool>,
@@ -36,13 +38,14 @@ fn context_error(code: &'static str, message: &str) -> ContextError {
 }
 
 #[tauri::command]
-async fn pick_folder() -> Option<String> {
-    tauri::async_runtime::spawn_blocking(|| {
+async fn pick_folder(initial_directory: Option<String>) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
         let mut dialog = rfd::FileDialog::new();
-        if let Ok(executable) = std::env::current_exe() {
-            if let Some(directory) = executable.parent() {
-                dialog = dialog.set_directory(directory);
-            }
+        let executable = std::env::current_exe().ok();
+        if let Some(directory) =
+            folder_dialog::initial_directory(initial_directory.as_deref(), executable.as_deref())
+        {
+            dialog = dialog.set_directory(directory);
         }
         dialog
             .pick_folder()

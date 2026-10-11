@@ -98,11 +98,11 @@ for (const failure of ['storageReadError', 'storageWriteError']) {
   });
 }
 
-test('U36: フォルダーの欄数・順序を復元、無効欄だけ空にして検索しない', async ({ ui, page }) => {
+test('U36: フォルダの欄数・順序を復元、無効欄だけ空にして検索しない', async ({ ui, page }) => {
   await ui.open({ storage: { [folderKey]: JSON.stringify(folders) }, responses: { validate_folder_paths: [{ value: ['C:\\first', '', 'C:\\last', 'C:\\skip'] }] } });
   expect(await page.locator('#root-folders input').evaluateAll(nodes => nodes.map(node => node.value))).toEqual(['C:\\first', '', 'C:\\last']);
   await expect(page.locator('#excluded-folders input')).toHaveValue('C:\\skip');
-  await expect(page.locator('#folder-save-status')).toContainText('無効になったフォルダー欄を空欄');
+  await expect(page.locator('#folder-save-status')).toContainText('無効になったフォルダ欄を空欄');
   expect(await ui.calls('start_search')).toEqual([]);
   expect(await ui.lastCall('validate_folder_paths')).toEqual({ paths: [...folders.roots, ...folders.excluded] });
   await page.locator('#root-folders input').nth(1).fill('C:\\new');
@@ -135,14 +135,14 @@ test('U37: 復元中に入力したパスを遅延検証で上書きしない', 
   await expect(page.locator('#root-folders input')).toHaveCount(1);
 });
 
-test('U38: 壊れたフォルダー保存値は入力継続を妨げない', async ({ ui, page }) => {
+test('U38: 壊れたフォルダ保存値は入力継続を妨げない', async ({ ui, page }) => {
   await ui.open({ storage: { [folderKey]: '{broken' } });
   await expect(page.locator('#folder-save-status')).toContainText('読み取れません');
   await page.locator('#root').fill('C:\\typed');
   await expect(page.locator('#root')).toHaveValue('C:\\typed');
 });
 
-test('U38b: フォルダー検証拒否後にパスを入力できる', async ({ ui, page }) => {
+test('U38b: フォルダ検証拒否後にパスを入力できる', async ({ ui, page }) => {
   await ui.open({ storage: { [folderKey]: JSON.stringify(folders) }, responses: { validate_folder_paths: [{ error: { message: 'denied' } }] } });
   await expect(page.locator('#search')).toBeEnabled();
   await expect(page.locator('#folder-save-status')).toContainText('確認できません');

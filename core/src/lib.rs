@@ -311,12 +311,12 @@ fn canonical_directory(raw: &str, field: &'static str) -> Result<PathBuf, InputE
     if raw.trim().is_empty() || !path.is_dir() {
         return Err(InputError {
             field,
-            message: "存在するフォルダーを指定してください。",
+            message: "存在するフォルダを指定してください。",
         });
     }
     fs::canonicalize(path).map_err(|_| InputError {
         field,
-        message: "フォルダーを読み取れません。",
+        message: "フォルダを読み取れません。",
     })
 }
 
@@ -370,7 +370,7 @@ fn validate_paths(request: &SearchRequest) -> Result<SearchPaths, InputError> {
     if !request.recursive {
         return Err(InputError {
             field: "rootDirectory",
-            message: "この版はサブフォルダーを含む検索のみ対応します。",
+            message: "この版はサブフォルダを含む検索のみ対応します。",
         });
     }
     if request.extensions.is_empty() {

@@ -14,16 +14,18 @@
 
 | 生成コマンド | 内容 |
 |---|---|
-| `cargo xtask fixtures` | acceptance、outputs/test-data の新しい保存フォルダー |
+| `cargo xtask fixtures` | acceptance、outputs/test-data の新しい保存フォルダ |
 | `cargo xtask fixtures --profile load` | acceptance と負荷用データ |
 | `cargo xtask fixtures --kind context` | 境界セル・結合・非表示・アンカーの周辺用 Excel |
 | `cargo xtask fixtures --kind conditions` | 条件検索の独立文書 |
 | `cargo xtask fixtures --kind office` | 注記/数式/部分エラー/20順位ペア |
 | `cargo xtask fixtures --kind issues` | 可視文字・書式・205ファイル・編集用 CP932/長文 |
 
-`--output <新規または空のフォルダー>` で保存先を指定できます。cmd のダブルクリックは保存先を開きます。通常の fixtures は開かず、--open 指定時だけ開きます。存在するデータを上書きしません。自動試験では OS の一時領域に変更可能な文書・索引を置き、共通 load は実行内で共有します。保存用データ・実行の証跡は outputs に残します。
+`--output <新規または空のフォルダ>` で保存先を指定できます。cmd のダブルクリックは保存先を開きます。通常の fixtures は開かず、--open 指定時だけ開きます。存在するデータを上書きしません。自動試験では OS の一時領域に変更可能な文書・索引を置き、共通 load は実行内で共有します。保存用データ・実行の証跡は outputs に残します。
 
 ## 実 CLI の受け入れ
+
+デスクトップ層の参照開始位置の判定は `test-support/tests/folder_dialog.rs` が製品の純粋処理 `src-tauri/src/folder_dialog.rs` を直接コンパイルして確認します。日本語・空白を含む既存フォルダ自体、空欄・存在しないパス・ファイルからのフォールバック、実行ファイル取得不可をOSダイアログなしで検証し、`test` / `ci` の `generators` 工程に含めます。
 
 | 対象 | Cargo の integration test |
 |---|---|

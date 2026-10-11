@@ -14,7 +14,7 @@
     <header>
       <div><p class="eyebrow">DOCUMENT SEARCH</p><h1>docs-search</h1></div>
       <div class="header-tools">
-        <p class="header-description">フォルダー内の文書を、まとめて検索。</p>
+        <p class="header-description">フォルダ内の文書を、まとめて検索。</p>
         <details id="appearance-settings" class="appearance-settings">
           <summary>設定</summary>
           <div class="appearance-panel">
@@ -45,7 +45,7 @@
         <small>識別子は英字・数字・アンダースコア（先頭は英字またはアンダースコア）。TAB_01 と TAB_010 を区別します。日本語・空白・記号を含む行は通常の文字列検索を選んでください。</small>
         <small id="batch-error" class="error" role="alert"></small>
       </fieldset>
-      <div class="field"><label for="root">検索フォルダー</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダーを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダーを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
+      <div class="field"><label for="root">検索フォルダ</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
       <fieldset id="advanced-conditions" class="field advanced-conditions" hidden aria-describedby="advanced-error">
         <legend>高度な検索条件</legend>
         <p class="advanced-help">1行を1語句として扱います。空白や AND / OR の文字も語句の一部です。</p>
@@ -57,8 +57,8 @@
         <div class="field"><label for="condition-scope">判定範囲</label><select id="condition-scope"><option value="excelRow">同じ行（Excel）</option><option value="unit">同じ検索箇所</option><option value="file">同じファイル</option></select><small>「同じ行」では Excel のセルと選択範囲内の数式を行にまとめます。他の形式と図形は検索箇所ごとに判定します。除外語は表記の正規化と大文字・小文字を無視した部分一致で判定します。</small></div>
         <small id="advanced-error" class="error" role="alert"></small>
       </fieldset>
-      <div class="field"><span class="field-label">対象外フォルダー</span><div id="excluded-folders" class="folder-list"></div><button id="add-excluded" class="folder-add" type="button" aria-label="対象外フォルダーを追加">追加</button><small id="excluded-error" class="error" role="alert"></small></div>
-      <p id="folder-save-status" class="folder-save-status" role="status">フォルダー入力は次回起動時にも使います。</p>
+      <div class="field"><span class="field-label">対象外フォルダ</span><div id="excluded-folders" class="folder-list"></div><button id="add-excluded" class="folder-add" type="button" aria-label="対象外フォルダを追加">追加</button><small id="excluded-error" class="error" role="alert"></small></div>
+      <p id="folder-save-status" class="folder-save-status" role="status">フォルダ入力は次回起動時にも使います。</p>
       <fieldset class="field" aria-describedby="extensions-error">
         <legend>対象ファイル</legend>
         <details class="extension-picker">
@@ -218,7 +218,7 @@
         <button id="save-matrix-csv" type="button" disabled hidden>語×ファイルCSV</button><button id="save-matrix-tsv" type="button" disabled hidden>語×ファイルTSV</button>
       </div>
       <p class="match-legend">一致検索：通常検索でも見つかる結果　／　あいまい検索：オンにしたときだけ見つかる結果</p>
-      <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダーと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
+      <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
     </section>
   </main>
   <dialog id="result-editor" aria-labelledby="edit-title" aria-describedby="edit-location">

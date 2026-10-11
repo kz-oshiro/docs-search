@@ -41,7 +41,7 @@ export function location(kind, data = {}) {
 
 async function onSearch() {
   if (!state.ready || state.running) return;
-  const roots = view.selected_folders('root-folders');
+  const roots = view.normalize_root_folders();
   const excluded = view.selected_folders('excluded-folders');
   const root = roots[0] || '';
   const additional = roots.slice(1);
@@ -53,11 +53,11 @@ async function onSearch() {
       any: lines(view.input('any-terms')), not: lines(view.input('not-terms')) } : null;
   const extensions = view.selected_extensions();
   for (const id of ['root-error', 'excluded-error', 'query-error', 'advanced-error', 'batch-error', 'extensions-error', 'general-error', 'copy-status']) view.set_text(id, '');
+  if (!root) return view.set_text('root-error', '検索フォルダを指定してください。');
   if (!advanced && !batch && !trim(query)) return view.set_text('query-error', '検索語を入力してください。');
   if (advanced && !trim(view.input('all-terms')) && !trim(view.input('any-terms')))
     return view.set_text('advanced-error', '「すべて含む」か「いずれか含む」に語句を入力してください。');
-  if (!root || additional.some(directory => !directory)) return view.set_text('root-error', '検索フォルダーの空欄を入力するか削除してください。');
-  if (excluded.some(directory => !directory)) return view.set_text('excluded-error', '対象外フォルダーの空欄を入力するか削除してください。');
+  if (excluded.some(directory => !directory)) return view.set_text('excluded-error', '対象外フォルダの空欄を入力するか削除してください。');
   if (!extensions.length) {
     view.show_extension_picker();
     return view.set_text('extensions-error', '検索する拡張子を1つ以上選んでください。');

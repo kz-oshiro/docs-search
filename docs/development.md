@@ -31,7 +31,7 @@ cargo xtask ui --case "U23:"
 cargo xtask exe
 ```
 
-`test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。個別試験の証跡が全必須成功なら、Release EXEを1回ビルドして必須9ケースのアプリケーション結合試験へ進みます。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、CLIランナー内で別のビルドをしません。LOCALAPPDATAと変更用文書は子プロセス・ケースごとに独立し、共通loadは実行内で共有します。
+`test` は core の単体・公開 API・proptest、生成器の再現性/在庫/Office 検証、デスクトップ参照開始位置の判定、実 CLI の共通27・周辺5・条件31・Office/一括/順位20組・イシュー・索引、必須ヘッドレス Playwright を実行します。個別試験の証跡が全必須成功なら、Release EXEを1回ビルドして必須9ケースのアプリケーション結合試験へ進みます。実 CLI は Cargo の `CARGO_BIN_EXE_docs-search-cli` を使い、CLIランナー内で別のビルドをしません。LOCALAPPDATAと変更用文書は子プロセス・ケースごとに独立し、共通loadは実行内で共有します。
 
 バックエンドのCargo試験とフロントエンド試験は別の実行枝で同時に開始し、両方の終了後に結果を合流します。Cargoの各工程は順次実行します。CPU使用率の計算・worker選択のNode単体試験もバックエンド側の必須工程です。いずれかが失敗しても他方と独立した残りの工程を続けます。
 
@@ -125,7 +125,7 @@ cargo xtask fixtures --kind issues --output outputs/manual/new-issues
 cargo xtask icons
 ```
 
-生成先は新規または空のフォルダーに限ります。省略時は outputs/test-data の新しい実行別フォルダーです。`--kind common|context|conditions|office|issues` を指定できます。[在庫と役割](../tests/README.md)を参照してください。`Generate-Test-Data.cmd` は Cargo を呼ぶだけの入口で、ダブルクリックでは保存先を開き、従来の `-Profile` / `-NoOpen` も受け付けます。通常の cargo xtask fixtures は開かず、--open 指定時だけ開きます。アイコン生成は承認済み SVG の限定した図形のみを Rust でラスタライズし、通常の test / build では書き換えません。
+生成先は新規または空のフォルダに限ります。省略時は outputs/test-data の新しい実行別フォルダです。`--kind common|context|conditions|office|issues` を指定できます。[在庫と役割](../tests/README.md)を参照してください。`Generate-Test-Data.cmd` は Cargo を呼ぶだけの入口で、ダブルクリックでは保存先を開き、従来の `-Profile` / `-NoOpen` も受け付けます。通常の cargo xtask fixtures は開かず、--open 指定時だけ開きます。アイコン生成は承認済み SVG の限定した図形のみを Rust でラスタライズし、通常の test / build では書き換えません。
 
 アイコンはSVGの解析結果を8サイズで共有し、属性と図形固有の計算をサンプル処理の外へ移しています。各サンプルでは後ろに定義された可視図形から評価します。4×4サンプリング・画素の丸め・ICO/PNG形式を維持し、承認済み画素と2回生成の再現性を毎回検証します。Cargoのコンパイル最適化設定は変更していません。
 

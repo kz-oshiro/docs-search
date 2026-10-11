@@ -26,7 +26,7 @@ Windows配布ビルドまで依頼された場合は、上の入口に代えて 
 cargo xtask fixtures --kind context --output .\outputs\context-p2-new\row-window.xlsx
 ```
 
-GUI 確認はデスクトップアプリを起動して実施します。GUI テストの実施が依頼文に明示されていなければ、実施前に確認を取ります。検索フォルダーに `outputs\context-p2-new`、拡張子に `.xlsx` を指定します。
+GUI 確認はデスクトップアプリを起動して実施します。GUI テストの実施が依頼文に明示されていなければ、実施前に確認を取ります。検索フォルダに `outputs\context-p2-new`、拡張子に `.xlsx` を指定します。
 
 ## 確認項目・手順・期待結果
 

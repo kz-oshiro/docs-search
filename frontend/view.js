@@ -29,6 +29,7 @@ let fileRankings = new Map();
 let rankedPaths = [];
 let batchSummary = [];
 let executionSummary = null;
+let persistFolderInputs;
 function clearCopyStatus() {
   if (copyStatusTimer !== null) clearTimeout(copyStatusTimer);
   copyStatusTimer = null;
@@ -114,7 +115,7 @@ function refreshFolderLabels(container, label) {
 function addFolderRow(container, label, errorId, focus = true) {
   const row = document.createElement('div'); row.className = 'folder-row';
   const entry = document.createElement('input'); entry.className = 'folder-input'; entry.type = 'text'; entry.autocomplete = 'off';
-  entry.placeholder = 'フォルダーのパス'; entry.setAttribute('aria-describedby', errorId);
+  entry.placeholder = 'フォルダのパス'; entry.setAttribute('aria-describedby', errorId);
   const browse = document.createElement('button'); browse.className = 'folder-browse'; browse.type = 'button'; browse.textContent = '参照…';
   const remove = document.createElement('button'); remove.className = 'folder-remove'; remove.type = 'button'; remove.textContent = '削除';
   row.append(entry, browse, remove);
@@ -128,12 +129,13 @@ export function init_folder_lists() {
   let folderRevision = 0;
   function persist() {
     folderRevision++;
-    try { localStorage.setItem(storageKey, JSON.stringify({roots:selected_folders('root-folders'),excluded:selected_folders('excluded-folders')})); set_text('folder-save-status','フォルダー入力は次回起動時にも使います。'); }
-    catch { set_text('folder-save-status','フォルダー入力を保存できません。この起動中だけ使用します。'); }
+    try { localStorage.setItem(storageKey, JSON.stringify({roots:selected_folders('root-folders'),excluded:selected_folders('excluded-folders')})); set_text('folder-save-status','フォルダ入力は次回起動時にも使います。'); }
+    catch { set_text('folder-save-status','フォルダ入力を保存できません。この起動中だけ使用します。'); }
   }
+  persistFolderInputs = persist;
   for (const [containerId, addId, label, errorId] of [
-    ['root-folders', 'add-root', '検索フォルダー', 'root-error'],
-    ['excluded-folders', 'add-excluded', '対象外フォルダー', 'excluded-error']
+    ['root-folders', 'add-root', '検索フォルダ', 'root-error'],
+    ['excluded-folders', 'add-excluded', '対象外フォルダ', 'excluded-error']
   ]) {
     const container = document.getElementById(containerId);
     refreshFolderLabels(container, label);
@@ -148,16 +150,17 @@ export function init_folder_lists() {
         set_text(errorId, '');
         persist();
       } else if (button.classList.contains('folder-browse')) {
+        const entry = button.closest('.folder-row').querySelector('.folder-input');
         try {
-          const path = await invoke('pick_folder');
-          if (path) {
-            button.closest('.folder-row').querySelector('.folder-input').value = path;
+          const path = await invoke('pick_folder', { initialDirectory: entry.value });
+          if (path && entry.isConnected) {
+            entry.value = path;
             set_text(errorId, '');
             set_text('general-error', '');
             persist();
           }
         } catch {
-          set_text('general-error', 'フォルダーを選択できませんでした。パスを入力してください。');
+          set_text('general-error', 'フォルダを選択できませんでした。パスを入力してください。');
         }
       }
     });
@@ -165,28 +168,42 @@ export function init_folder_lists() {
   async function restore() {
     let saved;
     try { saved=JSON.parse(localStorage.getItem(storageKey) ?? 'null'); }
-    catch { set_text('folder-save-status','保存したフォルダー入力を読み取れません。パスを入力してください。'); return; }
+    catch { set_text('folder-save-status','保存したフォルダ入力を読み取れません。パスを入力してください。'); return; }
     if (!saved || !Array.isArray(saved.roots) || !Array.isArray(saved.excluded) || saved.roots.length < 1 || [...saved.roots,...saved.excluded].some(value=>typeof value!=='string')) return;
     const version=folderRevision;
     document.getElementById('search').disabled=true;
     try {
       const validated=await invoke('validate_folder_paths',{paths:[...saved.roots,...saved.excluded]});
       if (version!==folderRevision) return;
-      for (const [id,label,errorId,values] of [['root-folders','検索フォルダー','root-error',validated.slice(0,saved.roots.length)],['excluded-folders','対象外フォルダー','excluded-error',validated.slice(saved.roots.length)]]) {
+      for (const [id,label,errorId,values] of [['root-folders','検索フォルダ','root-error',validated.slice(0,saved.roots.length)],['excluded-folders','対象外フォルダ','excluded-error',validated.slice(saved.roots.length)]]) {
         const container=document.getElementById(id);
         if (id==='root-folders') { const first=container.firstElementChild; container.replaceChildren(first); first.querySelector('.folder-input').value=values[0]; for (const value of values.slice(1)) addFolderRow(container,label,errorId,false).value=value; }
         else { container.replaceChildren(); for (const value of values) addFolderRow(container,label,errorId,false).value=value; }
         refreshFolderLabels(container,label);
       }
       persist();
-      if (validated.some((value,index)=>!value && [...saved.roots,...saved.excluded][index].trim())) set_text('folder-save-status','無効になったフォルダー欄を空欄にしました。有効な入力と欄の順序は復元しています。');
-    } catch { set_text('folder-save-status','保存したフォルダーを確認できません。パスを入力してください。'); }
+      if (validated.some((value,index)=>!value && [...saved.roots,...saved.excluded][index].trim())) set_text('folder-save-status','無効になったフォルダ欄を空欄にしました。有効な入力と欄の順序は復元しています。');
+    } catch { set_text('folder-save-status','保存したフォルダを確認できません。パスを入力してください。'); }
     finally { document.getElementById('search').disabled=false; }
   }
   return restore();
 }
 export function selected_folders(id) {
   return Array.from(document.querySelectorAll(`#${id} .folder-input`), entry => entry.value.trim());
+}
+export function normalize_root_folders() {
+  const container = document.getElementById('root-folders');
+  const rows = Array.from(container.querySelectorAll('.folder-row'));
+  const filled = rows.filter(row => row.querySelector('.folder-input').value.trim());
+  const first = rows[0];
+  if (filled[0] !== first) {
+    first.querySelector('.folder-input').value = filled[0]?.querySelector('.folder-input').value ?? '';
+  }
+  const retained = new Set([first, ...filled.slice(1)]);
+  for (const row of rows) if (!retained.has(row)) row.remove();
+  refreshFolderLabels(container, '検索フォルダ');
+  persistFolderInputs();
+  return selected_folders('root-folders');
 }
 function renderPreview(target, hit) {
   const characters = Array.from(hit.previewText);

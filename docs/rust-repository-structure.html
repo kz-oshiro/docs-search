@@ -354,7 +354,7 @@
             </div>
             <div class="layer-body">
               <p>Tauriコマンドが入力・状態・OS操作を扱います。検索をワーカースレッドで実行し、結果イベントを <code>search-events</code> として画面へ返します。</p>
-              <p>ここからRust検索コアを呼び出します。フォルダー選択、ファイルを開く、保存ダイアログもこの境界にあります。</p>
+              <p>ここからRust検索コアを呼び出します。フォルダ選択、ファイルを開く、保存ダイアログもこの境界にあります。</p>
               <span class="direction">イベント → <code>searchId</code> と順序番号付きの検索結果</span>
             </div>
           </div>
@@ -365,7 +365,7 @@
               <h3><code>core/</code></h3>
             </div>
             <div class="layer-body">
-              <p><code>docs-search-core</code> は入力検証、フォルダー走査、文書抽出、照合、順位付けを行います。Tauriに依存せず、同じコアをCLIからも実行できます。</p>
+              <p><code>docs-search-core</code> は入力検証、フォルダ走査、文書抽出、照合、順位付けを行います。Tauriに依存せず、同じコアをCLIからも実行できます。</p>
               <p><code>SearchRequest</code> を受け取り、開始・進捗・結果・Issue・完了のイベントをコールバックへ渡します。</p>
               <span class="direction">ファイル読み取り・必要に応じて索引参照</span>
             </div>
@@ -377,7 +377,7 @@
               <h3>文書と任意の索引</h3>
             </div>
             <div class="layer-body">
-              <p>ユーザーが指定したフォルダー内のテキスト文書・Office文書を読みます。Office形式はZIP内のOOXMLを解析します。</p>
+              <p>ユーザーが指定したフォルダ内のテキスト文書・Office文書を読みます。Office形式はZIP内のOOXMLを解析します。</p>
               <p>SQLite索引は設定で有効にした場合に使います。通常は索引なしでファイルを抽出して検索します。</p>
             </div>
           </div>
@@ -429,7 +429,7 @@
         <div class="flow-list">
           <article class="flow-step">
             <h3>画面が要求を作る</h3>
-            <p>検索フォルダー、語句、拡張子、検索設定から <code>SearchRequest</code> を作成します。</p>
+            <p>検索フォルダ、語句、拡張子、検索設定から <code>SearchRequest</code> を作成します。</p>
           </article>
           <article class="flow-step">
             <h3>Tauriが検証して開始</h3>
@@ -437,7 +437,7 @@
           </article>
           <article class="flow-step">
             <h3>コアが文書を調べる</h3>
-            <p>対象フォルダーを走査し、選択形式を抽出して、通常・高度・一括の検索条件を評価します。</p>
+            <p>対象フォルダを走査し、選択形式を抽出して、通常・高度・一括の検索条件を評価します。</p>
           </article>
           <article class="flow-step">
             <h3>イベントを順に発行</h3>
@@ -479,7 +479,7 @@
           <details class="module" data-search="lib orchestrator API request paths traversal event search main">
             <summary><span class="module-title"><code>core/src/lib.rs</code></span><span class="module-role">検索コアの公開APIと全体進行</span></summary>
             <div class="module-detail">
-              <p><code>validate</code> と <code>run_search</code> を公開します。要求・フォルダーの検証、走査、検索結果の組み立て、進捗と完了イベントをまとめる中心です。</p>
+              <p><code>validate</code> と <code>run_search</code> を公開します。要求・フォルダの検証、走査、検索結果の組み立て、進捗と完了イベントをまとめる中心です。</p>
               <div class="source-links"><a href="../core/src/lib.rs">ソースを開く</a><span>SearchRequest / SearchEvent</span><span>run_search</span></div>
             </div>
           </details>

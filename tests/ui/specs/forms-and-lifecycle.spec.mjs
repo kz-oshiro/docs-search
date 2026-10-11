@@ -101,9 +101,9 @@ test('U04: 高度な条件の行と判定範囲を保持する', async ({ ui, pa
 
 test('U05: 境界の入力拒否を適切な欄へ返し再検索可能にする', async ({ ui, page }) => {
   await ui.open();
-  await ui.queue('start_search', { error: { field: 'rootDirectory', message: '存在しないフォルダーです' } });
+  await ui.queue('start_search', { error: { field: 'rootDirectory', message: '存在しないフォルダです' } });
   await ui.search();
-  await expect(page.locator('#root-error')).toHaveText('存在しないフォルダーです');
+  await expect(page.locator('#root-error')).toHaveText('存在しないフォルダです');
   await expect(page.locator('#status')).toHaveText('入力を確認してください。');
   await expect(page.locator('#search')).toBeEnabled();
   await expect(page.locator('#cancel')).toBeDisabled();
@@ -163,19 +163,133 @@ test('U08: 中断要求は現在IDで1回、終端後の古い通知は次の検
   await expect(page.locator('.preview')).toHaveText('fresh');
 });
 
-test('U09: フォルダー選択の取消・失敗と索引削除', async ({ ui, page }) => {
-  await ui.open();
-  await ui.queue('pick_folder', { value: 'C:\\picked' });
-  await page.locator('#root-folders .folder-browse').click();
-  await expect(page.locator('#root')).toHaveValue('C:\\picked');
+test('U09: 操作した行の現在パスで参照し選択・取消・失敗を扱う', async ({ ui, page }) => {
+  const folderKey = 'docs-search.folders.v1';
+  await ui.open({ storage: { [folderKey]: JSON.stringify({ roots: ['C:\\復元 空白', 'C:\\other'], excluded: ['C:\\skip'] }) } });
   await ui.queue('pick_folder', { value: null });
-  await page.locator('#root-folders .folder-browse').click();
-  await ui.lastCall('pick_folder', 2);
-  await expect(page.locator('#root')).toHaveValue('C:\\picked');
+  await page.locator('#root-folders .folder-browse').first().click();
+  expect(await ui.lastCall('pick_folder')).toEqual({ initialDirectory: 'C:\\復元 空白' });
+  await expect(page.locator('#root')).toHaveValue('C:\\復元 空白');
+  await page.locator('#root-folders input').nth(1).fill('C:\\手入力 空白');
+  await ui.queue('pick_folder', { value: 'C:\\picked' });
+  await page.locator('#root-folders .folder-browse').nth(1).click();
+  expect(await ui.lastCall('pick_folder', 2)).toEqual({ initialDirectory: 'C:\\手入力 空白' });
+  await expect(page.locator('#root-folders input').nth(1)).toHaveValue('C:\\picked');
+  await expect(page.locator('#root')).toHaveValue('C:\\復元 空白');
+  await expect(page.locator('#excluded-folders input')).toHaveValue('C:\\skip');
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), folderKey)).toEqual({ roots: ['C:\\復元 空白', 'C:\\picked'], excluded: ['C:\\skip'] });
+  await ui.queue('pick_folder', { value: null });
+  await page.locator('#root-folders .folder-browse').nth(1).click();
+  await ui.lastCall('pick_folder', 3);
+  await expect(page.locator('#root-folders input').nth(1)).toHaveValue('C:\\picked');
   await ui.queue('pick_folder', { error: 'picker denied' });
-  await page.locator('#root-folders .folder-browse').click();
-  await expect(page.locator('#general-error')).toContainText('フォルダーを選択できません');
+  await page.locator('#root-folders .folder-browse').first().click();
+  await expect(page.locator('#general-error')).toContainText('フォルダを選択できません');
+  await expect(page.locator('#root')).toHaveValue('C:\\復元 空白');
+  await ui.queue('pick_folder', { value: 'C:\\excluded' });
+  await page.locator('#excluded-folders .folder-browse').click();
+  expect(await ui.lastCall('pick_folder', 5)).toEqual({ initialDirectory: 'C:\\skip' });
+  await expect(page.locator('#excluded-folders input')).toHaveValue('C:\\excluded');
+  await page.locator('#add-root').click();
+  await ui.queue('pick_folder', { value: null });
+  await page.locator('#root-folders .folder-browse').last().click();
+  expect(await ui.lastCall('pick_folder', 6)).toEqual({ initialDirectory: '' });
+  await expect(page.locator('#root-folders input').last()).toHaveValue('');
   await page.locator('#clear-index').click();
   await ui.lastCall('clear_search_index');
   await expect(page.locator('#copy-status')).toContainText('索引');
+});
+
+for (const mode of ['standard', 'conditions', 'batch']) {
+  test(`U40: ${mode}の検索で空欄を整理し入力順・操作・保存復元を保つ`, async ({ ui, page }) => {
+    await ui.open();
+    const roots = page.locator('#root-folders input');
+    for (const value of ['C:\\日本語 空白', '', ' \t ', 'C:\\last', '']) {
+      await page.locator('#add-root').click();
+      await roots.last().fill(value);
+    }
+    await page.locator('#search-mode').selectOption(mode);
+    if (mode === 'standard') await page.locator('#query').fill('beacon');
+    if (mode === 'conditions') await page.locator('#all-terms').fill('beacon');
+    if (mode === 'batch') await page.locator('#batch-terms').fill('beacon');
+    // Enter and the Search button share the same cleanup path.
+    if (mode === 'standard') await page.locator('#query').press('Enter');
+    else await page.locator('#search').click();
+    const search = await ui.lastCall('start_search');
+    expect(search.request).toMatchObject({ rootDirectory: 'C:\\日本語 空白', additionalDirectories: ['C:\\last'] });
+    expect(await roots.evaluateAll(nodes => nodes.map(node => node.value))).toEqual(['C:\\日本語 空白', 'C:\\last']);
+    await expect(page.locator('#root')).toHaveValue('C:\\日本語 空白');
+    await expect(roots.nth(1)).toHaveAttribute('aria-label', '検索フォルダ 2');
+    await expect(page.locator('#root-folders .folder-browse').nth(1)).toHaveAttribute('aria-label', '検索フォルダ 2 を参照');
+    await expect(page.locator('#root-folders .folder-remove')).toHaveAttribute('aria-label', '検索フォルダ 2 を削除');
+    await ui.started(search);
+    await ui.finish(search);
+    await page.locator('#root').focus();
+    await page.locator('#root').press('Tab');
+    await expect(page.locator('#root-folders .folder-browse').first()).toBeFocused();
+    await page.locator('#root-folders .folder-browse').first().press('Tab');
+    await expect(roots.nth(1)).toBeFocused();
+    await page.locator('#add-root').click();
+    await expect(roots).toHaveCount(3);
+    await expect(roots.last()).toBeFocused();
+    await ui.queue('pick_folder', { value: 'C:\\new' });
+    await page.locator('#root-folders .folder-browse').last().click();
+    expect(await ui.lastCall('pick_folder')).toEqual({ initialDirectory: '' });
+    await expect(roots.last()).toHaveValue('C:\\new');
+    await page.locator('#root-folders .folder-remove').last().click();
+    await page.locator('#add-root').click();
+    await page.locator('#search').click();
+    const repeated = await ui.lastCall('start_search', 2);
+    expect(repeated.request).toMatchObject({ rootDirectory: 'C:\\日本語 空白', additionalDirectories: ['C:\\last'] });
+    await ui.started(repeated);
+    await ui.finish(repeated);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('docs-search.folders.v1')))).toEqual({ roots: ['C:\\日本語 空白', 'C:\\last'], excluded: [] });
+    await page.reload();
+    await page.waitForFunction(() => window.__docsSearchTest?.ready);
+    await expect(page.locator('#search')).toBeEnabled();
+    expect(await roots.evaluateAll(nodes => nodes.map(node => node.value))).toEqual(['C:\\日本語 空白', 'C:\\last']);
+    expect(await ui.calls('start_search')).toEqual([]);
+  });
+}
+
+test('U41: 全空欄は1欄で指定を促し、他の入力拒否より先に空欄を整理する', async ({ ui, page }) => {
+  await ui.open();
+  const roots = page.locator('#root-folders input');
+  await page.locator('#search').click();
+  await expect(page.locator('#root-error')).toHaveText('検索フォルダを指定してください。');
+  for (const value of ['', ' \t ']) {
+    await page.locator('#add-root').click();
+    await roots.last().fill(value);
+  }
+  await page.locator('#root').fill(' \t ');
+  await page.locator('#search').click();
+  await expect(roots).toHaveCount(1);
+  await expect(page.locator('#root')).toHaveValue('');
+  await expect(page.locator('#root-error')).toHaveText('検索フォルダを指定してください。');
+  expect(await ui.calls('start_search')).toEqual([]);
+  // A nonempty invalid path must remain available for correction.
+  await page.locator('#root').fill('C:\\missing');
+  await page.locator('#add-root').click();
+  await page.locator('#query').press('Enter');
+  await expect(roots).toHaveCount(1);
+  await expect(page.locator('#root')).toHaveValue('C:\\missing');
+  await expect(page.locator('#query-error')).not.toBeEmpty();
+  await page.locator('#query').fill('beacon');
+  await page.locator('#add-excluded').click();
+  await page.locator('#search').click();
+  await expect(page.locator('#excluded-error')).not.toBeEmpty();
+  await expect(page.locator('#excluded-folders input')).toHaveCount(1);
+  expect(await ui.calls('start_search')).toEqual([]);
+  await page.locator('#excluded-folders .folder-remove').click();
+  await ui.queue('start_search', { error: { field: 'rootDirectory', message: '存在するフォルダを指定してください。' } });
+  await page.locator('#search').click();
+  expect((await ui.lastCall('start_search')).request.rootDirectory).toBe('C:\\missing');
+  await expect(page.locator('#root-error')).toHaveText('存在するフォルダを指定してください。');
+  await expect(page.locator('#root')).toHaveValue('C:\\missing');
+  await page.locator('#root').fill('C:\\valid');
+  await page.locator('#search').click();
+  const accepted = await ui.lastCall('start_search', 2);
+  expect(accepted.request.rootDirectory).toBe('C:\\valid');
+  await ui.started(accepted);
+  await ui.finish(accepted);
 });
