@@ -25,7 +25,7 @@
 
 ## 実 CLI の受け入れ
 
-デスクトップ層の参照開始位置の判定は `test-support/tests/folder_dialog.rs` が製品の純粋処理 `src-tauri/src/folder_dialog.rs` を直接コンパイルして確認します。日本語・空白を含む既存フォルダ自体、空欄・存在しないパス・ファイルからのフォールバック、実行ファイル取得不可をOSダイアログなしで検証し、`test` / `ci` の `generators` 工程に含めます。
+デスクトップ層の参照開始位置の判定は `core/tests/folder_dialog.rs` が製品の純粋処理 `src-tauri/src/folder_dialog.rs` を直接コンパイルして確認します。日本語・空白を含む既存フォルダ自体、空欄・存在しないパス・ファイルからのフォールバック、実行ファイル取得不可をOSダイアログなしで検証し、`test` / `ci` の バックエンドの `core-api-properties` 工程に含めます。
 
 | 対象 | Cargo の integration test |
 |---|---|

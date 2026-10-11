@@ -541,6 +541,8 @@ impl Run {
                 "--lib",
                 "--test",
                 "requirements_v3",
+                "--test",
+                "folder_dialog",
                 "--",
                 "--nocapture",
             ],
