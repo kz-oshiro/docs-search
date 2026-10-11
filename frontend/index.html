@@ -201,12 +201,13 @@
       <div class="result-filters" role="group" aria-label="検索結果の絞り込み">
         <div class="filter-field"><label for="result-filter-text">ファイル名・パス</label><input id="result-filter-text" type="search" autocomplete="off" placeholder="結果内のファイルを絞り込む"></div>
         <div class="filter-field"><label for="result-filter-extension">拡張子</label><select id="result-filter-extension"><option value="">すべての拡張子</option></select></div>
+        <div class="filter-field"><label for="result-filter-sheet">Excelのシート名</label><input id="result-filter-sheet" type="search" autocomplete="off" placeholder="シート名の一部"></div>
         <div class="filter-field"><label for="result-filter-include">本文に含む語句</label><input id="result-filter-include" type="search" autocomplete="off" placeholder="1つの語句・部分一致"></div>
         <div class="filter-field"><label for="result-filter-exclude">本文に含まない語句</label><input id="result-filter-exclude" type="search" autocomplete="off" placeholder="1つの語句・部分一致"></div>
         <button id="result-filter-clear" type="button" disabled>絞り込みを解除</button>
       </div>
       <p id="result-filter-summary" class="result-filter-summary">絞り込み後 0 / 0 ファイル · 0 / 0 件</p>
-      <p class="filter-help">本文は表示された抜粋・根拠で判定します。大文字・小文字を区別せず、両条件を満たす一致箇所を表示します。</p>
+      <p class="filter-help">各条件をすべて満たす一致箇所を表示します。シート名はExcelの結果・根拠、本文は表示された抜粋・根拠で判定します。大文字・小文字は区別しません。</p>
       <div class="export-actions" role="group" aria-label="検索結果の一括出力">
         <label for="export-scope">出力対象</label>
         <select id="export-scope"><option value="filtered">現在の絞り込み結果</option><option value="all">全結果</option></select>

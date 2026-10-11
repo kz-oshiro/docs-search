@@ -10,6 +10,7 @@ let filterQuery = '';
 let filterExtension = '';
 let filterInclude = '';
 let filterExclude = '';
+let filterSheet = '';
 let directoryStates = new Map();
 let directoryRows = new Map();
 let nextResultElement = 0;
@@ -242,6 +243,9 @@ function matchesFilter(group) {
     && (!filterQuery || normalizeFilterText(group.path).includes(filterQuery));
 }
 function matchesBody(hit) {
+  if (filterSheet && (!['xlsx', 'xlsm'].includes(hit.fileType.toLowerCase())
+    || ![hit, ...(hit.evidence ?? [])].some(source => typeof source.location?.sheetName === 'string'
+      && normalizeFilterText(source.location.sheetName).includes(filterSheet)))) return false;
   const texts = hit.evidence?.length ? hit.evidence.map(evidence => evidence.previewText) : [hit.previewText];
   const body = texts.map(text => normalizeFilterText(text ?? '')).join('\n');
   return (!filterInclude || body.includes(filterInclude)) && (!filterExclude || !body.includes(filterExclude));
@@ -277,7 +281,7 @@ function updateDirectoryCounts() {
 }
 function updateFilterSummary() {
   set_text('result-filter-summary', `絞り込み後 ${filteredGroups.length} / ${fileGroups.length} ファイル · ${filteredHitCount} / ${totalHitCount} 件`);
-  document.getElementById('result-filter-clear').disabled = !filterQuery && !filterExtension && !filterInclude && !filterExclude;
+  document.getElementById('result-filter-clear').disabled = !filterQuery && !filterExtension && !filterInclude && !filterExclude && !filterSheet;
   updateReportSummary();
 }
 function updateReportSummary() {
@@ -301,6 +305,7 @@ function makeReport() {
     filterExtension: scope === 'filtered' ? filterExtension : '',
     filterInclude: scope === 'filtered' ? document.getElementById('result-filter-include').value.trim() : '',
     filterExclude: scope === 'filtered' ? document.getElementById('result-filter-exclude').value.trim() : '',
+    filterSheet: scope === 'filtered' ? document.getElementById('result-filter-sheet').value.trim() : '',
     selectedFileCount: groups.length,
     rows: groups.flatMap(group => (scope === 'filtered' ? group.visibleHits : group.hits).map(({ hit, location }) => ({
       resultId: hit.resultId,
@@ -375,6 +380,7 @@ function applyResultFilter() {
   filterExtension = document.getElementById('result-filter-extension').value;
   filterInclude = normalizeFilterText(document.getElementById('result-filter-include').value.trim());
   filterExclude = normalizeFilterText(document.getElementById('result-filter-exclude').value.trim());
+  filterSheet = normalizeFilterText(document.getElementById('result-filter-sheet').value.trim());
   if (renderFrame !== null) cancelAnimationFrame(renderFrame);
   renderFrame = null;
   document.getElementById('results').replaceChildren();
@@ -397,6 +403,7 @@ function applyResultFilter() {
   if (filteredGroups.length > 0) scheduleRender();
 }
 export function init_result_filter() {
+  document.getElementById('result-filter-sheet').addEventListener('input', applyResultFilter);
   document.getElementById('result-filter-include').addEventListener('input', applyResultFilter);
   document.getElementById('result-filter-exclude').addEventListener('input', applyResultFilter);
   document.getElementById('result-filter-text').addEventListener('input', applyResultFilter);
@@ -406,6 +413,7 @@ export function init_result_filter() {
     document.getElementById('result-filter-extension').value = '';
     document.getElementById('result-filter-include').value = '';
     document.getElementById('result-filter-exclude').value = '';
+    document.getElementById('result-filter-sheet').value = '';
     applyResultFilter();
   });
 }
@@ -682,6 +690,34 @@ export function init_edit_actions() {
     finally { edit.busy=false; document.getElementById('edit-load').disabled=false; document.getElementById('edit-evidence').disabled=document.getElementById('edit-evidence').options.length===1; }
   });
 }
+function addExcelOpen(parent, hit, source, evidenceIndex = null) {
+  if (!['xlsx', 'xlsm'].includes(hit.fileType.toLowerCase())) return;
+  const sheet = source.location?.sheetName;
+  const address = ['cell', 'formula', 'excelComment'].includes(source.sourceKind) ? source.location?.cellAddress
+    : source.sourceKind === 'shape' ? source.location?.anchor : null;
+  const label = `${sheet || 'シート不明'}${address ? `!${address}` : ''}`;
+  if (!sheet || !address) {
+    const note = document.createElement('span'); note.className = 'excel-open-unavailable';
+    note.textContent = `${label}：セル位置を特定できません。ファイル名から開けます。`;
+    parent.append(note); return;
+  }
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'excel-open';
+  button.textContent = source.sourceKind === 'shape' ? 'Excelでアンカーを開く' : 'Excelでセルを開く';
+  button.setAttribute('aria-label', `${hit.filePath.split(/[\\/]/).pop()}、${label}をExcelで開く`);
+  const status = document.createElement('span'); status.className = 'excel-open-status'; status.setAttribute('role', 'status');
+  const searchId = reportSearchId;
+  button.addEventListener('click', async () => {
+    if (searchId !== reportSearchId) return;
+    button.disabled = true; status.textContent = `${label}へ移動中…`;
+    try {
+      await invoke('open_excel_result', { searchId, resultId: hit.resultId, evidenceIndex });
+      if (searchId === reportSearchId) status.textContent = `${label}をExcelで開きました。`;
+    } catch (error) {
+      if (searchId === reportSearchId) status.textContent = `${label}：${error?.message ?? String(error)} ファイル名から通常の方法で開けます。`;
+    } finally { button.disabled = false; }
+  });
+  parent.append(button, status);
+}
 function createMatch(group, { hit, location }) {
   const item = document.createElement('div'); item.className = 'match'; item.setAttribute('role', 'listitem');
   const heading = document.createElement('div'); heading.className = 'match-heading';
@@ -699,18 +735,19 @@ function createMatch(group, { hit, location }) {
   item.append(heading);
   if (hit.evidence?.length) {
     const list = document.createElement('ul'); list.className = 'evidence-list';
-    for (const evidence of hit.evidence) {
+    for (const [index, evidence] of hit.evidence.entries()) {
       const row = document.createElement('li');
       const label = document.createElement('strong'); label.className = 'evidence-heading';
       label.textContent = `${evidence.term} · ${evidence.locationText || '場所不明'}`;
       const excerpt = document.createElement('span'); excerpt.className = 'evidence-preview';
       renderPreview(excerpt, evidence);
-      row.append(label, excerpt); list.append(row);
+      row.append(label, excerpt); addExcelOpen(row, hit, evidence, index); list.append(row);
     }
     item.append(list);
   } else {
     const preview = document.createElement('span'); preview.className = 'preview'; renderPreview(preview, hit);
     item.append(preview);
+    addExcelOpen(item, hit, hit);
   }
   addExcelContext(item, hit);
   addEditAction(item, group, hit);
@@ -792,7 +829,8 @@ export function clear_results() {
   document.getElementById('batch-matrix').ontoggle = null;
   document.getElementById('batch-matrix').open = false;
   setReportEnabled(false);
-  filterQuery = ''; filterExtension = ''; filterInclude=''; filterExclude=''; totalHitCount = 0; filteredHitCount = 0;
+  filterQuery = ''; filterExtension = ''; filterInclude=''; filterExclude=''; filterSheet=''; totalHitCount = 0; filteredHitCount = 0;
+  document.getElementById('result-filter-sheet').value = '';
   document.getElementById('result-filter-include').value = ''; document.getElementById('result-filter-exclude').value = '';
   document.getElementById('result-filter-text').value = '';
   document.getElementById('export-scope').value = 'filtered';

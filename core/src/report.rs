@@ -38,6 +38,8 @@ pub struct Report {
     pub filter_include: String,
     #[serde(default)]
     pub filter_exclude: String,
+    #[serde(default)]
+    pub filter_sheet: String,
     pub selected_file_count: usize,
     pub rows: Vec<ReportRow>,
     pub issues: Vec<ReportIssue>,
@@ -411,6 +413,7 @@ mod tests {
             filter_extension: String::new(),
             filter_include: String::new(),
             filter_exclude: String::new(),
+            filter_sheet: String::new(),
             selected_file_count: 1,
             rows: vec![ReportRow {
                 modified_at: None,
@@ -476,6 +479,29 @@ mod tests {
         let mut report = sample("顧客");
         report.counts.result_count = 2;
         assert!(table_text(&report, Format::Csv).is_err());
+    }
+
+    #[test]
+    fn sheet_filter_round_trips_and_old_reports_default_to_unrestricted() {
+        let mut report = sample("顧客");
+        report.scope = "filtered".into();
+        report.filter_sheet = "集計'表".into();
+        let bytes = file_bytes(&report, Format::Json).unwrap();
+        let mut saved: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(saved["filterSheet"], "集計'表");
+        assert_eq!(
+            serde_json::from_value::<Report>(saved.clone())
+                .unwrap()
+                .filter_sheet,
+            "集計'表"
+        );
+        saved.as_object_mut().unwrap().remove("filterSheet");
+        assert_eq!(
+            serde_json::from_value::<Report>(saved)
+                .unwrap()
+                .filter_sheet,
+            ""
+        );
     }
 
     #[test]

@@ -543,6 +543,8 @@ impl Run {
                 "requirements_v3",
                 "--test",
                 "folder_dialog",
+                "--test",
+                "excel_target",
                 "--",
                 "--nocapture",
             ],

@@ -23,6 +23,8 @@
 
 `--output <新規または空のフォルダ>` で保存先を指定できます。cmd のダブルクリックは保存先を開きます。通常の fixtures は開かず、--open 指定時だけ開きます。存在するデータを上書きしません。自動試験では OS の一時領域に変更可能な文書・索引を置き、共通 load は実行内で共有します。保存用データ・実行の証跡は outputs に残します。
 
+Excelセル移動の位置解決は `core/tests/excel_target.rs` がデスクトップの純粋処理を直接読み込み、根拠選択・セル番地の上限・位置不明・非対応をExcelなしで確認します。通常の `core-api-properties` 工程に含めます。接続と実Officeの確認範囲は[Excelセル移動の確認方針](../docs/test-plans/excel-navigation-test-plan.md)、シート名フィルタと操作要求は[U45〜U49](ui/specs/excel-results.spec.mjs)を参照してください。
+
 ## 実 CLI の受け入れ
 
 デスクトップ層の参照開始位置の判定は `core/tests/folder_dialog.rs` が製品の純粋処理 `src-tauri/src/folder_dialog.rs` を直接コンパイルして確認します。日本語・空白を含む既存フォルダ自体、空欄・存在しないパス・ファイルからのフォールバック、実行ファイル取得不可をOSダイアログなしで検証し、`test` / `ci` の バックエンドの `core-api-properties` 工程に含めます。

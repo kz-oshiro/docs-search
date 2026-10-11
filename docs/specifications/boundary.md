@@ -130,6 +130,16 @@ Excelの結合範囲・非表示行列は内部のシートメタデータとし
 
 折りたたみはフォルダの絶対パスとファイルパスごとのGUI状態で、結果や出力件数を変えない。本文条件は元の全結果を保持したまま、一致箇所の表示抜粋に適用する。JSON記録の `filterInclude` / `filterExclude` に各1語句を保存し、filteredのrowsは残した箇所だけ、allは全件を持つ。`modifiedAt` / `documentOrder`もJSON行へ渡す。
 
+シート名条件は結果または根拠の `location.sheetName` を判定し、検索要求を変更しない。JSON記録の `filterSheet` に指定した文字列を保存する。省略した既存Reportは空文字として受け入れる。`scope=filtered` のrowsだけに条件を適用し、`scope=all` は全件・空のfilterSheetを渡す。元の根拠・検索集計は保持する。
+
+## Excelセル移動の境界
+
+`open_excel_result(searchId, resultId, evidenceIndex?)` は最新検索の保持結果からxlsx/xlsmの元ファイル・シート名・セル番地を解決する。GUIから任意のパスやセル番地を受け取らない。根拠のある結果は番号を必須にし、セル・数式・番地付きコメントの `location.cellAddress`、図形の `location.anchor` だけを使用する。セル番地はA1形式・Excelの最大行列以内に限定し、範囲式や任意の式を渡さない。位置不明・不正な番号・旧検索IDは拒否する。
+
+Windows同梱のWindows PowerShellを非表示のSTA補助プロセスとして起動する。実行するプログラムはEXEへ埋め込む固定ソース、入力はUTF-8 JSONの標準入力で、パスやシート名をスクリプトへ展開しない。ROTの既存ブックまたはExcel.ApplicationのWorkbooksから対象を探し、接続できない複数インスタンスは拒否する。新規Openは読み取り専用・UpdateLinks=0・AutomationSecurity=3で行い、移動中はEnableEventsを停止し、元のアプリケーション設定をfinallyで戻す。ユーザーのブックを保存・閉じる・再読込する操作はしない。
+
+結合起点・非表示・保護の処理後に、[Application.Goto](https://learn.microsoft.com/en-us/office/vba/api/excel.application.goto)のスクロール指定で移動し、ActiveWorkbook/ActiveSheet/ActiveCellを照合する。成功はvoid、拒否は利用者向け文字列を返す。複数の移動処理は同時に実行しない。Officeのモーダルダイアログや接続制限はOffice側で解消してから再操作する。接続可否・Office互換性は[確認方針](../test-plans/excel-navigation-test-plan.md)に従う。
+
 ## `SearchIssue` と終了集計
 
 `SearchIssue` は発生段階（`discovery` または `read`）、判明している場合のパス、分類コード、利用者向けの短い理由を持つ。分類コードは少なくとも `accessDenied`、`unreadable`、`encrypted`、`unsupportedEncoding`、`resourceLimit`、`changedDuringRead`、`internalError` を区別する。内部の例外やスタックトレースを GUI にそのまま渡さない。

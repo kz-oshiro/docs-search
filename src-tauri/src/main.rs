@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
+mod excel_open;
+mod excel_target;
 mod folder_dialog;
 
 struct ActiveSearch {
@@ -220,6 +222,28 @@ fn open_result(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn open_excel_result(
+    search_id: String,
+    result_id: usize,
+    evidence_index: Option<usize>,
+    state: tauri::State<'_, SearchState>,
+) -> Result<(), String> {
+    let target = {
+        let current = state.0.lock().map_err(|_| "検索状態を取得できません。")?;
+        let hit = current
+            .latest
+            .as_ref()
+            .filter(|session| session.id == search_id)
+            .and_then(|session| session.hits.get(&result_id))
+            .ok_or("現在の検索結果が見つかりません。再検索してください。")?;
+        excel_target::resolve(hit, evidence_index)?
+    };
+    tauri::async_runtime::spawn_blocking(move || excel_open::open(&target))
+        .await
+        .map_err(|_| "Excelへの移動処理を完了できませんでした。")?
+}
+
+#[tauri::command]
 fn validate_folder_paths(paths: Vec<String>) -> Vec<String> {
     paths
         .into_iter()
@@ -392,6 +416,7 @@ fn main() {
             save_result_edit,
             cancel_result_edit,
             open_result,
+            open_excel_result,
             format_report,
             preview_batch,
             save_report

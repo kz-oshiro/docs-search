@@ -22,6 +22,8 @@ cargo xtask setup
 
 固定 `package-lock.json` で `npm ci` を実行し、Playwright 1.63.0 の Chromium を準備します。通常の test / ui / ci は依存を自動インストールしません。不足は失敗/理由付き skipped として記録し、全体を成功にしません。
 
+任意の「Excelでセルを開く」はデスクトップ版ExcelのCOMとWindows同梱のWindows PowerShellを使います。追加のPowerShellモジュールは不要です。検索・通常のファイル起動はこの接続を使いません。企業の実行制限などで接続できない場合は画面の理由を確認し、ファイル名から開けます。
+
 ## テスト
 
 ```text
