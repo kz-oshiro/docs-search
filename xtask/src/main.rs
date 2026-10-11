@@ -824,3 +824,29 @@ fn main() {
         }
     }
 }
+
+#[cfg(all(test, windows))]
+mod process_contracts {
+    #[test]
+    fn owned_processes_exclude_reused_parent_pids() {
+        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/ui/exe/process-tree.tests.ps1");
+        let output = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+            ])
+            .arg(script)
+            .output()
+            .expect("Windows PowerShell process-tree contracts must run");
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}

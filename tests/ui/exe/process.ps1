@@ -1,5 +1,6 @@
 param([ValidateSet('owner', 'snapshot', 'window', 'close', 'cleanup')][string]$Action)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'process-tree.ps1')
 $processes = @(Get-CimInstance Win32_Process)
 $rootId = [int]$env:DOCS_SEARCH_CHILD_PID
 $root = $processes | Where-Object { $_.ProcessId -eq $rootId }
@@ -42,14 +43,10 @@ if ($Action -in @('cleanup', 'close')) {
     }
     exit 0
 }
-$owned = @($rootId)
-do {
-    $children = @($processes | Where-Object { $owned -contains [int]$_.ParentProcessId -and $owned -notcontains [int]$_.ProcessId } | ForEach-Object { [int]$_.ProcessId })
-    $owned += $children
-} while ($children.Count)
+$owned = @(Get-OwnedProcesses $processes $rootId)
 if ($Action -eq 'owner') {
     $listeners = @(Get-NetTCPConnection -State Listen -LocalPort ([int]$env:DOCS_SEARCH_CHILD_PORT) -ErrorAction SilentlyContinue)
-    $valid = @($listeners | Where-Object { $owned -contains [int]$_.OwningProcess })
+    $valid = @($listeners | Where-Object { $owned.ProcessId -contains [int]$_.OwningProcess })
     if (-not $listeners.Count -or $valid.Count -ne $listeners.Count) { throw 'CDP port is not owned by the launched EXE process tree' }
     foreach ($listener in $valid) {
         $owner = $processes | Where-Object { $_.ProcessId -eq $listener.OwningProcess }
@@ -57,6 +54,6 @@ if ($Action -eq 'owner') {
     }
     @{ rootCreated = $root.CreationDate.ToString('o'); listeners = @($valid | Select-Object LocalAddress, LocalPort, OwningProcess) } | ConvertTo-Json -Compress
 } else {
-    $result = @($processes | Where-Object { $owned -contains [int]$_.ProcessId } | ForEach-Object { @{ id = [int]$_.ProcessId; created = $_.CreationDate.ToString('o') } })
+    $result = @($owned | ForEach-Object { @{ id = [int]$_.ProcessId; created = $_.CreationDate.ToString('o') } })
     ConvertTo-Json -InputObject $result -Compress
 }
