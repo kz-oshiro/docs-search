@@ -45,7 +45,7 @@
         <small>識別子は英字・数字・アンダースコア（先頭は英字またはアンダースコア）。TAB_01 と TAB_010 を区別します。日本語・空白・記号を含む行は通常の文字列検索を選んでください。</small>
         <small id="batch-error" class="error" role="alert"></small>
       </fieldset>
-      <div class="field"><label for="root">検索フォルダ</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダを追加">追加</button><small id="root-error" class="error" role="alert"></small></div>
+      <div class="field"><label for="root">検索フォルダ</label><div id="root-folders" class="folder-list"><div class="folder-row"><input id="root" class="folder-input" type="text" autocomplete="off" placeholder="検索するフォルダを選択" aria-describedby="root-error"><button class="folder-browse" type="button">参照…</button><button class="folder-history" type="button" aria-haspopup="dialog" aria-controls="folder-history-dialog">履歴…</button></div></div><button id="add-root" class="folder-add" type="button" aria-label="検索フォルダを追加">追加</button><small id="root-error" class="error" role="alert"></small><p id="folder-history-save-status" class="folder-save-status" role="status">最近使った検索フォルダを20件まで保存します。</p></div>
       <fieldset id="advanced-conditions" class="field advanced-conditions" hidden aria-describedby="advanced-error">
         <legend>高度な検索条件</legend>
         <p class="advanced-help">1行を1語句として扱います。空白や AND / OR の文字も語句の一部です。</p>
@@ -222,6 +222,15 @@
       <div id="results" class="results" role="list"></div><p id="empty-state" class="empty-state">フォルダと検索語を指定して、検索を始めてください。</p><button id="more" type="button" hidden>さらに表示</button>
     </section>
   </main>
+  <dialog id="folder-history-dialog" aria-labelledby="folder-history-title" aria-describedby="folder-history-help folder-history-target">
+    <h2 id="folder-history-title">検索フォルダの履歴</h2>
+    <p id="folder-history-target"></p>
+    <p id="folder-history-help">選んだフォルダをこの欄に入力します。検索は開始しません。履歴を削除しても入力欄や実際のフォルダは消えません。</p>
+    <p id="folder-history-state" role="status"></p>
+    <ul id="folder-history-list"></ul>
+    <p id="folder-history-error" class="error" role="alert"></p>
+    <div class="folder-history-actions"><button id="folder-history-clear" type="button">履歴をすべて削除</button><button id="folder-history-close" type="button">閉じる</button></div>
+  </dialog>
   <dialog id="result-editor" aria-labelledby="edit-title" aria-describedby="edit-location">
     <h2 id="edit-title">一致箇所を編集</h2><p id="edit-location"></p>
     <label for="edit-evidence">編集する根拠</label><select id="edit-evidence"></select><button id="edit-load" type="button">読み込む</button>

@@ -29,6 +29,8 @@ Excelセル移動の位置解決は `core/tests/excel_target.rs` がデスクト
 
 デスクトップ層の参照開始位置の判定は `core/tests/folder_dialog.rs` が製品の純粋処理 `src-tauri/src/folder_dialog.rs` を直接コンパイルして確認します。日本語・空白を含む既存フォルダ自体、空欄・存在しないパス・ファイルからのフォールバック、実行ファイル取得不可をOSダイアログなしで検証し、`test` / `ci` の バックエンドの `core-api-properties` 工程に含めます。
 
+検索フォルダ履歴（#34）は `tests/ui/specs/folder-history.spec.mjs` のU50〜U57で、選択・保存・削除・重複・上限・拒否/遅延・キーボードを確認します。実WebView2プロファイルの再起動保存と履歴選択から実パス検証への接続だけは既存E10へ追加し、個別試験の全分岐を繰り返しません。[確認方針](../docs/test-plans/playwright-ui-test-plan.md#フォルダ履歴の確認34)を参照してください。
+
 | 対象 | Cargo の integration test |
 |---|---|
 | 共通検索 | `core/tests/cli_backend.rs`：共通27・93拡張子の初期選択 |

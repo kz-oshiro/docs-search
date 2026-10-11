@@ -31,6 +31,7 @@ let rankedPaths = [];
 let batchSummary = [];
 let executionSummary = null;
 let persistFolderInputs;
+let rememberFolderHistory = () => {};
 function clearCopyStatus() {
   if (copyStatusTimer !== null) clearTimeout(copyStatusTimer);
   copyStatusTimer = null;
@@ -109,6 +110,7 @@ function refreshFolderLabels(container, label) {
   container.querySelectorAll('.folder-row').forEach((row, index) => {
     row.querySelector('.folder-input').setAttribute('aria-label', `${label} ${index + 1}`);
     row.querySelector('.folder-browse').setAttribute('aria-label', `${label} ${index + 1} を参照`);
+    row.querySelector('.folder-history')?.setAttribute('aria-label', `${label} ${index + 1} を履歴から選択`);
     const remove = row.querySelector('.folder-remove');
     if (remove) remove.setAttribute('aria-label', `${label} ${index + 1} を削除`);
   });
@@ -120,13 +122,47 @@ function addFolderRow(container, label, errorId, focus = true) {
   const browse = document.createElement('button'); browse.className = 'folder-browse'; browse.type = 'button'; browse.textContent = '参照…';
   const remove = document.createElement('button'); remove.className = 'folder-remove'; remove.type = 'button'; remove.textContent = '削除';
   row.append(entry, browse, remove);
+  if (container.id === 'root-folders') remove.before(folderHistoryButton());
   container.append(row);
   refreshFolderLabels(container, label);
   if (focus) entry.focus();
   return entry;
 }
+function folderHistoryButton() {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'folder-history'; button.textContent = '履歴…';
+  button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', 'folder-history-dialog');
+  return button;
+}
+function folderHistoryKey(path) {
+  const value = path.trim().replaceAll('/', '\\').replace(/^\\\\\?\\UNC\\/i, '\\\\').replace(/^\\\\\?\\/, '');
+  const root = value.match(/^(?:[a-z]:\\|\\\\[^\\]+\\[^\\]+(?:\\|$))/i)?.[0];
+  if (!root) return value.replace(/\\+$/, '').toLowerCase();
+  const parts = [];
+  for (const part of value.slice(root.length).split(/\\+/)) {
+    if (!part || part === '.') continue;
+    if (part === '..') parts.pop();
+    else parts.push(part);
+  }
+  return `${root.replace(/\\+$/, '')}\\${parts.join('\\')}`.toLowerCase();
+}
+function uniqueFolderHistory(paths) {
+  const keys = new Set(), result = [];
+  for (const value of paths) {
+    if (typeof value !== 'string' || !value.trim() || value.includes('\0')) continue;
+    const path = value.trim(), key = folderHistoryKey(path);
+    if (keys.has(key)) continue;
+    keys.add(key); result.push(path);
+    if (result.length === 20) break;
+  }
+  return result;
+}
 export function init_folder_lists() {
   const storageKey = 'docs-search.folders.v1';
+  const historyKey = 'docs-search.folder-history.v1';
+  const dialog = document.getElementById('folder-history-dialog');
+  const historyList = document.getElementById('folder-history-list');
+  let history = [], historyTarget, historyTrigger, historySession = 0, historyBusy = false;
   let folderRevision = 0;
   function persist() {
     folderRevision++;
@@ -134,6 +170,78 @@ export function init_folder_lists() {
     catch { set_text('folder-save-status','フォルダ入力を保存できません。この起動中だけ使用します。'); }
   }
   persistFolderInputs = persist;
+  function renderHistory() {
+    historyList.replaceChildren();
+    for (const path of history) {
+      const item = document.createElement('li');
+      const select = document.createElement('button');
+      select.type = 'button'; select.className = 'folder-history-select'; select.textContent = path;
+      select.disabled = historyBusy;
+      select.addEventListener('click', () => void selectHistory(path));
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'folder-history-remove'; remove.textContent = '削除';
+      remove.setAttribute('aria-label', `${path} を履歴から削除`); remove.disabled = historyBusy;
+      remove.addEventListener('click', () => {
+        const index = history.indexOf(path);
+        history = history.filter(value => value !== path); saveHistory(); renderHistory();
+        const buttons = historyList.querySelectorAll('.folder-history-select');
+        (buttons[Math.min(index, buttons.length - 1)] ?? document.getElementById('folder-history-close')).focus();
+      });
+      item.append(select, remove); historyList.append(item);
+    }
+    set_text('folder-history-state', historyBusy ? 'フォルダを確認中…' : history.length ? `${history.length} 件（最近使った順）` : '履歴はありません。');
+    document.getElementById('folder-history-clear').disabled = historyBusy || !history.length;
+  }
+  function saveHistory() {
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(history));
+      set_text('folder-history-save-status', '最近使った検索フォルダを20件まで保存します。');
+    } catch { set_text('folder-history-save-status', 'フォルダ履歴を保存できません。この起動中だけ使用します。'); }
+  }
+  rememberFolderHistory = paths => {
+    const next = uniqueFolderHistory([...paths, ...history]);
+    if (JSON.stringify(next) === JSON.stringify(history)) return;
+    history = next; saveHistory();
+    if (dialog.open) renderHistory();
+  };
+  function closeHistory(focus = historyTrigger) {
+    historySession++; historyBusy = false; historyTarget = null;
+    dialog.close(); if (focus?.isConnected) focus.focus();
+  }
+  async function selectHistory(path) {
+    if (historyBusy) return;
+    const entry = historyTarget, session = historySession, revision = folderRevision, previous = entry?.value;
+    historyBusy = true; set_text('folder-history-error', ''); renderHistory();
+    document.getElementById('folder-history-close').focus();
+    try {
+      const validated = await invoke('validate_folder_paths', { paths: [path] });
+      if (session !== historySession || !dialog.open) return;
+      if (!entry?.isConnected || revision !== folderRevision || entry.value !== previous) {
+        set_text('folder-history-error', '入力欄が変更されました。閉じて、使いたい欄から履歴を選び直してください。');
+      } else if (!Array.isArray(validated) || validated.length !== 1 || typeof validated[0] !== 'string' || !validated[0]) {
+        set_text('folder-history-error', `フォルダが見つからないか、利用できません。移動先・アクセス権を確認するか、この履歴を削除してください。\n${path}`);
+      } else {
+        entry.value = path; set_text('root-error', ''); set_text('general-error', '');
+        persist(); rememberFolderHistory([path]); closeHistory(entry);
+      }
+    } catch {
+      if (session === historySession && dialog.open) set_text('folder-history-error', `フォルダを確認できません。閉じて、パス入力か参照をお試しください。\n${path}`);
+    } finally {
+      if (session === historySession) { historyBusy = false; renderHistory(); }
+    }
+  }
+  document.getElementById('folder-history-close').addEventListener('click', () => closeHistory());
+  dialog.addEventListener('cancel', event => { event.preventDefault(); closeHistory(); });
+  document.getElementById('folder-history-clear').addEventListener('click', () => {
+    history = []; saveHistory(); set_text('folder-history-error', ''); renderHistory();
+    document.getElementById('folder-history-close').focus();
+  });
+  try {
+    const saved = JSON.parse(localStorage.getItem(historyKey) ?? '[]');
+    if (!Array.isArray(saved)) throw new Error('invalid history');
+    history = uniqueFolderHistory(saved);
+    if (history.length !== saved.length) set_text('folder-history-save-status', 'フォルダ履歴の重複・不正な項目・上限超過分を除いて読み込みました。');
+  } catch { set_text('folder-history-save-status', '保存したフォルダ履歴を読み取れません。この起動中の履歴とパス入力・参照を使えます。'); }
   for (const [containerId, addId, label, errorId] of [
     ['root-folders', 'add-root', '検索フォルダ', 'root-error'],
     ['excluded-folders', 'add-excluded', '対象外フォルダ', 'excluded-error']
@@ -150,6 +258,12 @@ export function init_folder_lists() {
         refreshFolderLabels(container, label);
         set_text(errorId, '');
         persist();
+      } else if (button.classList.contains('folder-history')) {
+        historyTarget = button.closest('.folder-row').querySelector('.folder-input'); historyTrigger = button;
+        historySession++; historyBusy = false; set_text('folder-history-error', '');
+        set_text('folder-history-target', historyTarget.getAttribute('aria-label'));
+        renderHistory(); dialog.showModal();
+        (historyList.querySelector('.folder-history-select') ?? document.getElementById('folder-history-close')).focus();
       } else if (button.classList.contains('folder-browse')) {
         const entry = button.closest('.folder-row').querySelector('.folder-input');
         try {
@@ -159,6 +273,7 @@ export function init_folder_lists() {
             set_text(errorId, '');
             set_text('general-error', '');
             persist();
+            if (containerId === 'root-folders') rememberFolderHistory([path]);
           }
         } catch {
           set_text('general-error', 'フォルダを選択できませんでした。パスを入力してください。');
@@ -327,6 +442,7 @@ function makeReport() {
 export function report_started(searchId, request) {
   reportSearchId = searchId;
   reportRequest = request;
+  rememberFolderHistory([request.rootDirectory, ...(request.additionalDirectories ?? [])]);
   const batch = request.querySpec?.mode === 'batch';
   for (const id of ['save-matrix-csv','save-matrix-tsv']) document.getElementById(id).hidden = !batch;
   document.getElementById('batch-results').hidden = !batch;

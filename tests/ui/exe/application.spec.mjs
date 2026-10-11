@@ -149,6 +149,9 @@ test('E10: EXE再起動後に実プロファイル復元と無効パス検証', 
   await app.page.locator('#excluded-folders input').fill(app.localAppData);
   await app.page.locator('#appearance-settings summary').click();
   await app.page.locator('#theme-color').selectOption('teal');
+  // E10 alone checks the new history key across real WebView2 restarts and
+  // history selection through the existing native path-validation command.
+  await app.finished(await app.search(app.documents, '履歴確認用の存在しない語句'));
   await app.stop({ graceful: true });
   await fs.rmdir(removed); // Only this explicitly created empty folder is removed.
   await app.launch();
@@ -159,6 +162,14 @@ test('E10: EXE再起動後に実プロファイル復元と無効パス検証', 
   await expect(app.page.locator('html')).toHaveAttribute('data-theme', 'teal');
   await expect(app.page.locator('#folder-save-status')).toContainText('無効になった');
   await expect(app.page.locator('#status')).toHaveText('待機中');
+  expect(await app.events()).toEqual([]);
+  await app.page.locator('#root-folders .folder-history').nth(1).click();
+  await expect(app.page.locator('.folder-history-select')).toHaveText([app.documents, removed]);
+  await app.page.getByRole('button', { name: removed, exact: true }).click();
+  await expect(app.page.locator('#folder-history-error')).toContainText('フォルダが見つからないか、利用できません');
+  await expect(app.page.locator('#root-folders input').nth(1)).toHaveValue('');
+  await app.page.getByRole('button', { name: app.documents, exact: true }).click();
+  await expect(app.page.locator('#root-folders input').nth(1)).toHaveValue(app.documents);
   expect(await app.events()).toEqual([]);
 });
 

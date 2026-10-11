@@ -228,6 +228,8 @@ for (const mode of ['standard', 'conditions', 'batch']) {
     await page.locator('#root').press('Tab');
     await expect(page.locator('#root-folders .folder-browse').first()).toBeFocused();
     await page.locator('#root-folders .folder-browse').first().press('Tab');
+    await expect(page.locator('#root-folders .folder-history').first()).toBeFocused();
+    await page.locator('#root-folders .folder-history').first().press('Tab');
     await expect(roots.nth(1)).toBeFocused();
     await page.locator('#add-root').click();
     await expect(roots).toHaveCount(3);
