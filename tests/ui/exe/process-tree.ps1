@@ -19,3 +19,18 @@ function Get-OwnedProcesses {
     } while ($added)
     $Processes | Where-Object { $owned.ContainsKey([int]$_.ProcessId) }
 }
+
+function Wait-OwnedProcessesExit {
+    param([object[]]$Saved, [scriptblock]$ReadProcesses = { Get-CimInstance Win32_Process }, [int]$TimeoutMs = 5000)
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $processes = @(& $ReadProcesses)
+        $remaining = @(foreach ($entry in $Saved) {
+            $processes | Where-Object { $_.ProcessId -eq $entry.id -and $_.CreationDate.ToString('o') -eq $entry.created }
+        })
+        if (-not $remaining.Count) { return }
+        # CIM can briefly retain a process after its handle signals termination.
+        # Re-observe until absent, with one deadline for the entire owned tree.
+    } while ($timer.ElapsedMilliseconds -lt $TimeoutMs)
+    throw "Owned EXE/WebView2 process could not be terminated: $($remaining.ProcessId -join ',')"
+}

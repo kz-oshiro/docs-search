@@ -33,13 +33,7 @@ if ($Action -in @('cleanup', 'close')) {
         }
     }
     if ($Action -eq 'cleanup') {
-        foreach ($entry in $saved) {
-            Wait-Process -Id $entry.id -Timeout 5 -ErrorAction SilentlyContinue
-        }
-        $remaining = @(Get-CimInstance Win32_Process)
-        foreach ($entry in $saved) {
-            if ($remaining | Where-Object { $_.ProcessId -eq $entry.id -and $_.CreationDate.ToString('o') -eq $entry.created }) { throw 'Owned EXE/WebView2 process could not be terminated' }
-        }
+        Wait-OwnedProcessesExit $saved
     }
     exit 0
 }

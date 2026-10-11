@@ -15,4 +15,21 @@ if (($actual -join ',') -ne '100,400,500,700') {
 if (@(Get-OwnedProcesses $processes 999).Count -ne 0) {
     throw 'An absent root must not claim processes with a stale parent PID'
 }
-Write-Output 'Owned process creation-order contracts passed'
+$ownedProcess = Process 100 999 30
+$saved = @(@{ id = 100; created = $ownedProcess.CreationDate.ToString('o') })
+$script:observations = 0
+Wait-OwnedProcessesExit $saved {
+    $script:observations++
+    if ($script:observations -eq 1) { $ownedProcess }
+}
+if ($script:observations -ne 2) { throw 'Delayed CIM disappearance must be re-observed' }
+$reusedProcess = Process 100 999 60
+Wait-OwnedProcessesExit $saved { $reusedProcess } -TimeoutMs 0
+$rejected = $false
+try { Wait-OwnedProcessesExit $saved { $ownedProcess } -TimeoutMs 0 }
+catch {
+    if ($_.Exception.Message -notlike 'Owned EXE/WebView2 process could not be terminated:*') { throw }
+    $rejected = $true
+}
+if (-not $rejected) { throw 'An owned process surviving the deadline must fail cleanup' }
+Write-Output 'Owned process creation-order and exit-observation contracts passed'
