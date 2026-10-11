@@ -201,7 +201,7 @@ test('U09: 操作した行の現在パスで参照し選択・取消・失敗を
 });
 
 for (const mode of ['standard', 'conditions', 'batch']) {
-  test(`U40: ${mode}の検索で空欄を整理し入力順・操作・保存復元を保つ`, async ({ ui, page }) => {
+  test(`U43: ${mode}の検索で空欄を整理し入力順・操作・保存復元を保つ`, async ({ ui, page }) => {
     await ui.open();
     const roots = page.locator('#root-folders input');
     for (const value of ['C:\\日本語 空白', '', ' \t ', 'C:\\last', '']) {
@@ -252,7 +252,7 @@ for (const mode of ['standard', 'conditions', 'batch']) {
   });
 }
 
-test('U41: 全空欄は1欄で指定を促し、他の入力拒否より先に空欄を整理する', async ({ ui, page }) => {
+test('U44: 全空欄は1欄で指定を促し、他の入力拒否より先に空欄を整理する', async ({ ui, page }) => {
   await ui.open();
   const roots = page.locator('#root-folders input');
   await page.locator('#search').click();

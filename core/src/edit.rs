@@ -283,8 +283,13 @@ impl EditDraft {
         ));
         let mut created = false;
         let result = (|| {
-            let mut file = OpenOptions::new().create_new(true).write(true).open(&temporary)
-                .map_err(|_| "同じフォルダに保存用ファイルを作成できません。書き込み権限を確認してください。")?;
+            let mut file = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temporary)
+                .map_err(|_| {
+                    "同じフォルダに保存用ファイルを作成できません。書き込み権限を確認してください。"
+                })?;
             created = true;
             file.write_all(&self.bytes[..self.start])
                 .and_then(|_| file.write_all(&encoded))
